@@ -41,3 +41,9 @@ npm run smoke                # loads the game headless and reports console error
 - Multiplayer hit claims are client-reported (presence based): duplicates are ignored and a single claim is capped at 120 damage, but it is not cheat-proof without a server.
 - Profiling the running game in headless Chromium showed essentially no JavaScript hot spots (frame time is GPU/fill bound), so the tiered graphics settings are the main lever.
 - Accessibility: HUD colours can be switched to a colour-blind-safe blue/orange palette. First-run players are offered the guided lessons.
+
+## Android APK
+`.github/workflows/android.yml` wraps the game with Capacitor and builds `viper-sortie.apk` (landscape, full screen, debug-signed so it installs directly).
+- **Get it:** GitHub > Actions > *Android APK* > latest run > Artifacts, or run the workflow manually / push a `v*` tag to publish a downloadable GitHub Release.
+- **Install:** allow "install unknown apps" for your browser, open the APK. It is a debug build, not a Play Store release; a Play Store build needs your own signing key.
+- The web build needs no tooling; the APK build only runs in CI (it needs the Android SDK).

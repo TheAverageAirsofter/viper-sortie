@@ -1,0 +1,7 @@
+{
+  "appId": "io.github.theaverageairsofter.vipersortie",
+  "appName": "Viper Sortie",
+  "webDir": "www",
+  "backgroundColor": "#0b1217",
+  "android": { "allowMixedContent": false }
+}
