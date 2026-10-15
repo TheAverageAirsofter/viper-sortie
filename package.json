@@ -1,0 +1,11 @@
+{
+  "name": "viper-sortie",
+  "private": true,
+  "description": "Mobile-first 3D F-16 combat flight sim (static site, no build step)",
+  "scripts": {
+    "test": "node --test test/*.test.js",
+    "smoke": "node tools/smoke.js",
+    "serve": "python3 -m http.server 8080"
+  },
+  "devDependencies": { "playwright-core": "^1.50.0" }
+}
