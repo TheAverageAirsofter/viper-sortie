@@ -1,0 +1,18 @@
+// Headless UI checks: first-run hint, training start, colour-blind palette. usage: node tools/ui-test.js
+const { chromium } = require('playwright-core'); const path = require('path'), assert = require('assert');
+(async () => {
+  const b = await chromium.launch({ executablePath: process.env.CHROME || '/opt/pw-browsers/chromium', args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--no-sandbox'] });
+  const p = await b.newPage({ viewport: { width: 900, height: 420 } }); const errs = [];
+  p.on('pageerror', e => errs.push(e.message));
+  await p.route(/fonts\.(googleapis|gstatic)\.com/, r => r.abort());
+  await p.goto('file://' + path.resolve(__dirname, '../index.html')); await p.waitForTimeout(2000);
+  assert(await p.isVisible('#firstRun'), 'first-run hint shows on a fresh profile');
+  await p.click('#bPal'); assert.match(await p.textContent('#bPal'), /blue/);
+  assert.equal(await p.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--hud').trim()), '#5cd0ff');
+  await p.click('#bFirst'); assert(!(await p.isVisible('#firstRun')));
+  assert.match(await p.textContent('#bMission'), /Train/i);
+  await p.click('#bStart'); await p.waitForTimeout(4000);
+  await p.reload(); await p.waitForTimeout(1500);
+  assert(!(await p.isVisible('#firstRun')), 'hint stays dismissed'); assert.match(await p.textContent('#bPal'), /blue/, 'palette persists');
+  assert.deepEqual(errs, []); console.log('ui ok'); await b.close();
+})().catch(e => { console.error(e); process.exit(1); });

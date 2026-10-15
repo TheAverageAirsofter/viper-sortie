@@ -155,3 +155,5 @@ button.ghost{font:12px/1 var(--f-hud);background:transparent;color:var(--paper);
   @keyframes pulse{to{box-shadow:0 0 0 6px rgba(125,255,154,.25)}}
 }
 .sr{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+.firstRun{display:flex;gap:10px;align-items:center;justify-content:space-between;border:1px solid var(--hud-dim);border-radius:8px;padding:8px 10px;margin:8px 0;font:12px/1.4 var(--f-body);background:rgba(8,16,20,.5)}
+.firstRun .ghost{flex:none}

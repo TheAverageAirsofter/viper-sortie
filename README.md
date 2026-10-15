@@ -14,7 +14,8 @@ Opening `index.html` directly also works (offline install/caching needs http(s))
 | `index.html` | markup and HUD controls |
 | `css/style.css` | styles |
 | `js/physics.js` | pure flight maths (atmosphere, drag, thrust), unit-tested |
-| `js/game.js` | the game |
+| `src/*.js` | the game in ordered slices (data, render, cockpit, effects, audio, flight, ops, state, ai, combat, net, hud, main); they share one scope, so they are not standalone modules |
+| `js/game.js` | built from `src/` by `npm run build` and committed, so the site runs without a build |
 | `vendor/three.min.js` | three.js r128, self-hosted (MIT, see `vendor/three.LICENSE`) |
 | `sw.js`, `manifest.webmanifest` | offline play and install as an app |
 | `test/`, `tools/smoke.js` | Node unit tests and a headless-Chromium smoke test |
@@ -22,6 +23,8 @@ Opening `index.html` directly also works (offline install/caching needs http(s))
 ## Test
 ```
 npm install && npm test      # unit tests
+npm run build                # rebuild js/game.js after editing src/ (CI check: node tools/build.js --check)
+node tools/ui-test.js        # headless UI checks
 npm run smoke                # loads the game headless and reports console errors (needs Chromium; set CHROME=/path)
 ```
 
@@ -29,4 +32,6 @@ npm run smoke                # loads the game headless and reports console error
 - Physics steps are capped at about 16.7 ms regardless of frame rate.
 - If play stays under about 35 fps for a few seconds, graphics drop one tier automatically (your saved choice is untouched).
 - Status messages are mirrored to a screen-reader live region; camera shake is reduced under `prefers-reduced-motion`.
-- Multiplayer hit claims are client-reported (presence based); it is fine for friendly rooms but not cheat-proof.
+- Multiplayer hit claims are client-reported (presence based): duplicates are ignored and a single claim is capped at 120 damage, but it is not cheat-proof without a server.
+- Profiling the running game in headless Chromium showed essentially no JavaScript hot spots (frame time is GPU/fill bound), so the tiered graphics settings are the main lever.
+- Accessibility: HUD colours can be switched to a colour-blind-safe blue/orange palette. First-run players are offered the guided lessons.

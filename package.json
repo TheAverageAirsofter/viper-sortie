@@ -3,9 +3,13 @@
   "private": true,
   "description": "Mobile-first 3D F-16 combat flight sim (static site, no build step)",
   "scripts": {
-    "test": "node --test test/*.test.js",
+    "build": "node tools/build.js",
+    "test": "node tools/build.js --check && node --test test/*.test.js",
     "smoke": "node tools/smoke.js",
-    "serve": "python3 -m http.server 8080"
+    "serve": "python3 -m http.server 8080",
+    "ui": "node tools/ui-test.js"
   },
-  "devDependencies": { "playwright-core": "^1.50.0" }
+  "devDependencies": {
+    "playwright-core": "^1.50.0"
+  }
 }

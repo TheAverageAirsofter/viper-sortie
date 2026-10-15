@@ -3894,7 +3894,8 @@ function netRemote(p){
   r.fl=pr.fl||0; r.ch=pr.ch||0;
   // hits other pilots claim on me
   for(const h of (pr.h||[])){const key=p.peer+':'+h[0]; if(NET.seenHits.has(key))continue; NET.seenHits.add(key);
-    if(h[1]===NET.me&&state==='play'&&P.alive&&!(r&&r.mate)){const dmg=+h[2]||0;P.hp-=dmg;hurtT=dmg>40?.8:.35;shake=dmg>40?1.2:.4;sndHit();buzz(dmg>40?[120,60,200]:40);
+    if(h[1]===NET.me&&state==='play'&&P.alive&&!(r&&r.mate)){const dmg=clamp(+h[2]||0,0,120);P.hp-=dmg;   // claims are client-reported, so bound what one claim can do
+    hurtT=dmg>40?.8:.35;shake=dmg>40?1.2:.4;sndHit();buzz(dmg>40?[120,60,200]:40);
       NET.lastHitBy=p.peer; if(dmg>40){message('MISSILE HIT',1.2);damageSystem(2)}else if(Math.random()<.1)damageSystem(1);
       if(P.hp<=0)die(dmg>40?'missile':'shot')}}
   // their missiles in flight
@@ -4112,7 +4113,7 @@ function updateCamera(dt){
 }
 
 /* ---------------- HUD ---------------- */
-const HUD='#7dff9a',HUDD='rgba(125,255,154,.5)',WARN='#ffb347',THREAT='#ff5a4e';
+let HUD='#7dff9a',HUDD='rgba(125,255,154,.5)',WARN='#ffb347',THREAT='#ff5a4e';
 const FONT='"B612 Mono", ui-monospace, Menlo, monospace';
 const _pv=new V3();
 function proj(v){_pv.copy(v).project(camera);return{x:(_pv.x+1)/2*W,y:(1-_pv.y)/2*H,ok:_pv.z<1&&_pv.z>-1}}
@@ -4525,4 +4526,21 @@ function frame(now){
   drawHUD(); drawRadarPanel();
 }
 requestAnimationFrame(frame);
+
+/* ---------- HUD colour palette (colour-blind safe option: cyan friendly, orange threat, yellow warning) ---------- */
+const PALS={green:{n:'green',hud:'#7dff9a',dim:'rgba(125,255,154,.45)',warn:'#ffb347',threat:'#ff5a4e'},
+  cb:{n:'blue / orange',hud:'#5cd0ff',dim:'rgba(92,208,255,.45)',warn:'#ffe14d',threat:'#ff8c1a'}};
+let palKey='green'; try{const k=localStorage.getItem('viperPal');if(PALS[k])palKey=k}catch(e){}
+function applyPal(){const p=PALS[palKey],r=document.documentElement.style;HUD=p.hud;HUDD=p.dim;WARN=p.warn;THREAT=p.threat;
+  r.setProperty('--hud',p.hud);r.setProperty('--hud-dim',p.dim);r.setProperty('--warn',p.warn);r.setProperty('--threat',p.threat);$('bPal').textContent='HUD colours: '+p.n}
+$('bPal').addEventListener('click',()=>{palKey=palKey==='green'?'cb':'green';try{localStorage.setItem('viperPal',palKey)}catch(e){};applyPal()});
+applyPal();
+
+/* ---------- first-run hint: point new pilots at the guided lessons ---------- */
+(function(){let seen=false;try{seen=!!localStorage.getItem('vsSeen')}catch(e){}
+  const box=$('firstRun');box.hidden=seen||mission==='TRAINING';
+  const done=()=>{box.hidden=true;try{localStorage.setItem('vsSeen','1')}catch(e){}};
+  $('bFirst').addEventListener('click',()=>{mission='TRAINING';try{localStorage.setItem('viperMission',mission)}catch(e){};done();setMenuLabels();applyAC()});
+  $('bStart').addEventListener('click',done);
+})();
 })();
