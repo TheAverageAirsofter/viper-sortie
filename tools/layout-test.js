@@ -17,6 +17,7 @@ const path = require('path'), assert = require('assert');
   await p.click('#laySize'); assert.match(await p.textContent('#laySize'), /120%/);
   await p.screenshot({ path: process.env.SHOT || '/tmp/w/layout.png' });
   await p.click('#layDone'); assert(await p.isVisible('#ov')); assert(!(await p.isVisible('#bGun')));
+  await p.waitForTimeout(800);   // let the browser flush localStorage to its store before the page is torn down (a reload right after the write can read it back empty on CI)
   await p.reload(); await p.waitForTimeout(1500);
   await p.waitForFunction(() => document.getElementById('bGun') && document.getElementById('bGun').style.translate !== '', null, { timeout: 8000 }).catch(() => {});   // slow CI runners: wait for the saved layout to apply
   const info = await p.evaluate(() => ({ ls: localStorage.getItem('viperLayout'), tr: document.getElementById('bGun').style.translate, sc: document.getElementById('bGun').style.scale, ua: navigator.userAgent }));
