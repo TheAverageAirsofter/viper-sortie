@@ -24,4 +24,15 @@ function thrust(A,t,sig,M,h){
   return A.T_MIL*dry+(ab-A.T_MIL*dry)*(t-.8)/.2;
 }
 
-if(typeof module!=='undefined')module.exports={atm,cd0,thrust,clamp,T_IDLE};
+// Missile kinematics: fly a motor/drag model forward in 0.25 s steps; S = distance flown, V = speed at each step.
+function flyout(spec,alt,v0){
+  const at=atm(alt), S=[], V=[]; let v=v0,s=0;
+  for(let t=0;t<spec.life;t+=.25){
+    let a=-at.rho*spec.cd*v*v;
+    if(t<spec.burn)a+=spec.acc; else if(spec.sus&&t<spec.burn+spec.sus&&v<spec.vCap)a+=spec.susAcc;
+    v+=a*.25; s+=v*.25; S.push(s); V.push(v);
+    if(t>spec.burn+(spec.sus||0)&&v<250)break;
+  }
+  return {S,V};
+}
+if(typeof module!=='undefined')module.exports={atm,cd0,thrust,flyout,clamp,T_IDLE};

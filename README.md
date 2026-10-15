@@ -29,6 +29,8 @@ npm run smoke                # loads the game headless and reports console error
 ```
 
 ## Notes
+- CI (`.github/workflows/ci.yml`) runs the unit tests, the bundle-freshness check and the four headless tests on every push.
+- `flyout` (missile kinematics) now lives in `js/physics.js` with the other pure maths and is unit-tested.
 - three.js is r160 with colour management off, linear output and legacy light units, so it looks like the original r128 build. r161+ drops the UMD build, so going further means moving to ES modules.
 - Mission list includes a time-attack "Bandit rush" (8 kills in 5 minutes).
 - More headless checks: `node tools/play-test.js` (cameras, weapons, countermeasures) and `node tools/rush-test.js`.

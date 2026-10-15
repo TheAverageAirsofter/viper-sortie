@@ -23,3 +23,20 @@ test('thrust lapses with altitude', () => {
   assert.ok(thrust(A, .8, atm(9000).sig, .8, 9000) < thrust(A, .8, atm(0).sig, .8, 0));
 });
 test('clamp', () => { assert.equal(clamp(5, 0, 1), 1); assert.equal(clamp(-5, 0, 1), 0); assert.equal(clamp(.4, 0, 1), .4); });
+
+const { flyout } = require('../js/physics.js');
+const AMRAAM = { life: 90, burn: 8, acc: 160, cd: 3.5e-5, sus: 0, vCap: 0 };
+test('flyout: missile accelerates during burn then bleeds speed', () => {
+  const f = flyout(AMRAAM, 8000, 250), at8 = f.V[Math.floor(8 / .25) - 1];
+  assert.ok(at8 > 250, 'faster after the motor burns'); assert.ok(f.V[f.V.length - 1] < at8, 'slower by the end');
+});
+test('flyout: distance is strictly increasing', () => {
+  const f = flyout(AMRAAM, 5000, 300); for (let i = 1; i < f.S.length; i++) assert.ok(f.S[i] > f.S[i - 1]);
+});
+test('flyout: range is longer at altitude (thin air)', () => {
+  const hi = flyout(AMRAAM, 10000, 250), lo = flyout(AMRAAM, 500, 250);
+  assert.ok(hi.S[hi.S.length - 1] > lo.S[lo.S.length - 1]);
+});
+test('flyout: stops once spent and slow', () => {
+  const f = flyout({ life: 200, burn: 2, acc: 50, cd: 1e-3, sus: 0, vCap: 0 }, 0, 200); assert.ok(f.S.length < 200 / .25);
+});

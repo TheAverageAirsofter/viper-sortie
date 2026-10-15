@@ -3400,16 +3400,6 @@ syncRadarUI();
 
 /* ---------------- launch zones: fly the missile's own motor/drag model forward ---------------- */
 // Rmax: he holds course. Rne ("no escape"): he turns tail and runs at his current speed.
-function flyout(spec,alt,v0){
-  const at=atm(alt), S=[], V=[]; let v=v0,s=0;
-  for(let t=0;t<spec.life;t+=.25){
-    let a=-at.rho*spec.cd*v*v;
-    if(t<spec.burn)a+=spec.acc; else if(spec.sus&&t<spec.burn+spec.sus&&v<spec.vCap)a+=spec.susAcc;
-    v+=a*.25; s+=v*.25; S.push(s); V.push(v);
-    if(t>spec.burn+(spec.sus||0)&&v<250)break;
-  }
-  return {S,V};
-}
 function dlz(spec,shooter,target){
   const los=new V3().subVectors(target.pos,shooter.pos), d=los.length(); los.divideScalar(d||1);
   const away=target.vel.dot(los), vt=target.vel.length();

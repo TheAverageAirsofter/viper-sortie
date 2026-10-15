@@ -1,0 +1,18 @@
+name: CI
+on:
+  push:
+  pull_request:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: npm install
+      - run: npm test                      # bundle is up to date + unit tests
+      - run: npx playwright-core install --with-deps chromium
+      - run: node tools/smoke.js           # loads, launches, no console/page errors
+      - run: node tools/ui-test.js         # first-run hint, palette, persistence
+      - run: node tools/play-test.js       # cameras, weapons, countermeasures
+      - run: node tools/rush-test.js       # Bandit rush mission

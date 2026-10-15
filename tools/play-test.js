@@ -1,7 +1,7 @@
 // Headless gameplay exercise: cycles cameras, fires every weapon, deploys countermeasures, pauses; fails on any page error.
-const { chromium } = require('playwright-core'); const path = require('path');
+const path = require('path');
 (async () => {
-  const b = await chromium.launch({ executablePath: process.env.CHROME || '/opt/pw-browsers/chromium', args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--no-sandbox'] });
+  const b = await require('./launch')();
   const p = await b.newPage({ viewport: { width: 900, height: 420 } }); const errs = [];
   p.on('pageerror', e => errs.push(e.message));
   await p.route(/fonts\.(googleapis|gstatic)\.com/, r => r.abort());

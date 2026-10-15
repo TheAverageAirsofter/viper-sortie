@@ -1,7 +1,7 @@
 // Headless UI checks: first-run hint, training start, colour-blind palette. usage: node tools/ui-test.js
-const { chromium } = require('playwright-core'); const path = require('path'), assert = require('assert');
+const path = require('path'), assert = require('assert');
 (async () => {
-  const b = await chromium.launch({ executablePath: process.env.CHROME || '/opt/pw-browsers/chromium', args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--no-sandbox'] });
+  const b = await require('./launch')();
   const p = await b.newPage({ viewport: { width: 900, height: 420 } }); const errs = [];
   p.on('pageerror', e => errs.push(e.message));
   await p.route(/fonts\.(googleapis|gstatic)\.com/, r => r.abort());
