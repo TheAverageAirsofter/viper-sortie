@@ -15,8 +15,8 @@ Opening `index.html` directly also works (offline install/caching needs http(s))
 | `css/style.css` | styles |
 | `js/physics.js` | pure flight maths (atmosphere, drag, thrust), unit-tested |
 | `src/*.js` | the game in ordered slices (data, render, cockpit, effects, audio, flight, ops, state, ai, combat, net, hud, main); they share one scope, so they are not standalone modules |
-| `js/game.js` | built from `src/` by `npm run build` and committed, so the site runs without a build |
-| `vendor/three.min.js` | three.js r160 (UMD build), self-hosted (MIT, see `vendor/three.LICENSE`) |
+| `js/game.js`, `js/game.min.js` | built from `src/` by `npm run build` and committed; the page loads the minified one |
+| `vendor/three.min.js` | three.js r170, bundled by `tools/build-three.js` (esbuild) into a classic script and self-hosted (MIT, see `vendor/three.LICENSE`) |
 | `sw.js`, `manifest.webmanifest` | offline play and install as an app |
 | `test/`, `tools/smoke.js` | Node unit tests and a headless-Chromium smoke test |
 
@@ -29,11 +29,15 @@ npm run smoke                # loads the game headless and reports console error
 ```
 
 ## Notes
+- **Controls guide** labels every button on the first launch (replay it from the menu). **HUD text size** and **Mirror left/right** (in Move buttons) help with comfort and left-handed play.
+- **Best scores** are kept per mission on the device, and **Share result** uses the phone's share sheet (or copies the text).
+- **Android release:** add the secrets listed at the top of `.github/workflows/android.yml` (keystore, passwords, alias) and the same workflow also builds a signed release APK and an `.aab` for the Play Store. Create the keystore yourself and keep it safe; losing it means you cannot update the app.
+- `?test` in the URL exposes a small hook (`window.__vs`) used by `tools/sim-test.js`.
 - **Engagement range** (menu): Short is the original (merge ~9-14 km), Long (default, ~2.5x) and Extreme (~4x) start fights farther out, so radar missiles are shot from range and there is time to notch, drag or defend. It scales wave, rush and escort merges and pushes the scripted 2v4 / 4-ship starts back.
 - **Move buttons:** menu > "Move buttons…" lets you drag every on-screen control (and the throttle and countermeasure strip) where your thumbs rest, resize them (85–140%), or reset. Saved per device in localStorage.
 - CI (`.github/workflows/ci.yml`) runs the unit tests, the bundle-freshness check and the four headless tests on every push.
 - `flyout` (missile kinematics) now lives in `js/physics.js` with the other pure maths and is unit-tested.
-- three.js is r160 with colour management off, linear output and legacy light units, so it looks like the original r128 build. r161+ drops the UMD build, so going further means moving to ES modules.
+- three.js is r170 bundled into a classic script (`npm run build:three`), so it works from file:// and in the APK. r165+ removed legacy lights, so light intensities are scaled by pi (`LK`) to keep the original look; colour management is off and output is linear.
 - Mission list includes a time-attack "Bandit rush" (8 kills in 5 minutes).
 - More headless checks: `node tools/play-test.js` (cameras, weapons, countermeasures) and `node tools/rush-test.js`.
 - Physics steps are capped at about 16.7 ms regardless of frame rate.

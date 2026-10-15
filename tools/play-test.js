@@ -2,7 +2,7 @@
 const path = require('path');
 (async () => {
   const b = await require('./launch')();
-  const p = await b.newPage({ viewport: { width: 900, height: 420 } }); const errs = [];
+  const p = await b.newPage({ viewport: { width: 900, height: 420 } }); const errs = []; await p.addInitScript(() => { try { localStorage.setItem('vsTips', '1'); } catch (e) {} });
   p.on('pageerror', e => errs.push(e.message));
   await p.route(/fonts\.(googleapis|gstatic)\.com/, r => r.abort());
   await p.goto('file://' + path.resolve(__dirname, '../index.html')); await p.waitForTimeout(1500);

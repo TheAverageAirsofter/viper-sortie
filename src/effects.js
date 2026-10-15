@@ -63,7 +63,7 @@ function updateParticles(dt){
 }
 function explode(p,big,noRec){
   const n=big?55:22; if(!noRec&&typeof REC3!=='undefined')REC3.booms.push({t:clock,p:p.toArray(),big});
-  boomLight.position.copy(p); boomLight.intensity=big?4:2.2; boomLight.distance=big?2600:1500;
+  boomLight.position.copy(p); boomLight.intensity=(big?4:2.2)*LK; boomLight.distance=big?2600:1500;
   for(let i=0;i<(big?6:3);i++)puff(p.x,p.y,p.z,rand(-8,8),rand(-8,8),rand(-8,8),1,.9,.6,1,rand(16,26)*(big?1.5:1),40,rand(.15,.3));
   for(let i=0;i<n;i++){const d=new V3(rand(-1,1),rand(-1,1),rand(-1,1)).normalize().multiplyScalar(rand(20,big?150:70));
     puff(p.x,p.y,p.z,d.x,d.y,d.z,1,rand(.38,.7),.1,1,rand(8,20)*(big?1.6:1),30,rand(.4,1.0))}

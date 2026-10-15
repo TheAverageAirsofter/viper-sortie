@@ -7,9 +7,13 @@
     "test": "node tools/build.js --check && node --test test/*.test.js",
     "smoke": "node tools/smoke.js",
     "serve": "python3 -m http.server 8080",
-    "ui": "node tools/ui-test.js"
+    "ui": "node tools/ui-test.js",
+    "build:three": "node tools/build-three.js",
+    "sim": "node tools/sim-test.js"
   },
   "devDependencies": {
-    "playwright-core": "^1.50.0"
+    "esbuild": "^0.28.2",
+    "playwright-core": "^1.50.0",
+    "three": "^0.170.0"
   }
 }

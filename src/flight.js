@@ -76,7 +76,7 @@ function applyEnv(){
   const u=sky.material.uniforms; u.top.value.setHex(E.top); u.hor.value.setHex(E.hor); u.bot.value.setHex(E.bot); u.glow.value.setHex(E.glow); u.disk.value=timeOfDay==='NIGHT'?.35:1;
   SUN_DIR.set(...E.sun).normalize(); sun.position.copy(SUN_DIR); sun.color.setHex(E.sc);
   const oc=ovc();
-  sun.intensity=E.si*(oc?.55:1)*(weather==='RAIN'?.75:1); hemi.intensity=E.hi*(oc?.8:1)*(weather==='RAIN'?.85:1);
+  sun.intensity=E.si*LK*(oc?.55:1)*(weather==='RAIN'?.75:1); hemi.intensity=E.hi*LK*(oc?.8:1)*(weather==='RAIN'?.85:1);
   {const sp={CLEAR:3,SCATTERED:7,OVERCAST:11,RAIN:15}[weather]||7,a=Math.random()*Math.PI*2;WIND.set(Math.sin(a)*sp,0,Math.cos(a)*sp);turbK={CLEAR:.12,SCATTERED:.3,OVERCAST:.55,RAIN:.9}[weather]||.3}
   rain.visible=false;
   scene.background=new THREE.Color(E.hor); scene.fog.color.setHex(E.hor); scene.fog.far=weather==='RAIN'?9000:oc?14000:16800; scene.fog.near=weather==='RAIN'?900:oc?2500:4000;
@@ -231,7 +231,7 @@ function updateGlints(){let k=0;const day=timeOfDay!=='NIGHT'&&!ovc()&&SUN_DIR.y
   for(;k<GLINTS.length;k++)GLINTS[k].visible=false}
 const flareLight=new THREE.PointLight(0xffd090,0,600,2);scene.add(flareLight);
 function updateFlareLight(){let best=null,bd=1e9;for(const o of CM.objs)if(o.type==='flare'&&o.alive){const d=o.pos.distanceTo(camera.position);if(d<bd){bd=d;best=o}}
-  if(best&&bd<900){flareLight.position.copy(best.pos);flareLight.intensity=(timeOfDay==='NIGHT'?3:1.4)*(.8+Math.random()*.4)*clamp(best.life/1.5,0,1)}else flareLight.intensity=0}
+  if(best&&bd<900){flareLight.position.copy(best.pos);flareLight.intensity=LK*(timeOfDay==='NIGHT'?3:1.4)*(.8+Math.random()*.4)*clamp(best.life/1.5,0,1)}else flareLight.intensity=0}
 function setShadows(on){renderer.shadowMap.enabled=on;renderer.shadowMap.type=THREE.PCFSoftShadowMap;sun.castShadow=on;
   if(on){sun.shadow.mapSize.set(1024,1024);const c=sun.shadow.camera;c.left=c.bottom=-15;c.right=c.top=15;c.near=1;c.far=200;c.updateProjectionMatrix();sun.shadow.bias=-.0006;sun.shadow.normalBias=.03;sun.target=playerJet}
   else sun.target=new THREE.Object3D();

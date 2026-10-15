@@ -7,13 +7,15 @@ const renderer=new THREE.WebGLRenderer({canvas:glCanvas,antialias:true,powerPref
 renderer.setPixelRatio(DPR); renderer.autoClear=false;
 // keep the r128 look on newer three.js: linear output, no colour management, legacy light units
 if(THREE.ColorManagement)THREE.ColorManagement.enabled=false; if('outputColorSpace' in renderer)renderer.outputColorSpace=THREE.LinearSRGBColorSpace; if('useLegacyLights' in renderer)renderer.useLegacyLights=true;
+// r165+ removed legacy lights: light intensities are pi times lower, so scale ours back up to keep the same look (LK is 1 on older builds)
+const LK=('useLegacyLights' in renderer)?1:Math.PI;
 const scene=new THREE.Scene();
 const HORIZON=new THREE.Color(0xc6d9e5);
 scene.background=HORIZON;
 scene.fog=new THREE.Fog(HORIZON,4000,19000);
 const camera=new THREE.PerspectiveCamera(66,1,1,40000);
-const hemi=new THREE.HemisphereLight(0xd6e8ff,0x4d5a3c,0.95); scene.add(hemi);
-const sun=new THREE.DirectionalLight(0xfff0d8,1.05); sun.position.set(-0.5,1,0.6); scene.add(sun);
+const hemi=new THREE.HemisphereLight(0xd6e8ff,0x4d5a3c,0.95*LK); scene.add(hemi);
+const sun=new THREE.DirectionalLight(0xfff0d8,1.05*LK); sun.position.set(-0.5,1,0.6); scene.add(sun);
 const SUN_DIR=sun.position.clone().normalize();
 const sky=new THREE.Mesh(new THREE.SphereGeometry(30000,32,16),new THREE.ShaderMaterial({
   side:THREE.BackSide,depthWrite:false,fog:false,

@@ -15,7 +15,8 @@
 
 <div id="photoBar" hidden><span>PHOTO · drag to orbit · pinch / scroll to zoom</span><button class="ghost" id="phSnap" type="button">Capture</button><button class="ghost" id="phExit" type="button">Done</button></div>
 <div id="photoShot" hidden><img id="photoImg" alt="Captured screenshot"><p id="photoMsg">Long-press the picture to save it.</p><button class="ghost" id="phClose" type="button">Close</button></div>
-<div id="layBar" hidden><span id="layMsg">Drag any control to move it</span><button class="ghost" id="laySize" type="button">Size 100%</button><button class="ghost" id="layReset" type="button">Reset</button><button class="ghost" id="layDone" type="button">Done</button></div>
+<div id="tips" hidden><p id="tipsNote">Tap anywhere to start flying</p></div>
+<div id="layBar" hidden><span id="layMsg">Drag any control to move it</span><button class="ghost" id="layMirror" type="button">Mirror left/right</button><button class="ghost" id="laySize" type="button">Size 100%</button><button class="ghost" id="layReset" type="button">Reset</button><button class="ghost" id="layDone" type="button">Done</button></div>
 <div id="rpBar" hidden><span id="rpLbl">REPLAY</span><button class="ghost" id="rpCam" type="button">Camera</button><button class="ghost" id="rpExit" type="button">Exit</button></div>
 <div id="ctrls" hidden>
   <div id="stickHint">DRAG<br>TO FLY</div>
@@ -68,6 +69,7 @@
     <p class="lede" id="ovLede">Real energy fighting. Thrust, drag and air density set your speed, hard turns bleed it, and holding 9&nbsp;g too long will black you out. Corner speed is about <span id="ovCorner">350</span>&nbsp;knots.</p>
     <p class="spec" id="ovSpec"><span><b>9 g</b> / −3 g</span><span><b>Mach 2</b> high</span><span>M61A1 <b>6,000 rpm</b> · 500 rds</span><span>AIM-9X <b>Mach 2+</b></span><span>AIM-120C <b>Mach 4 · 40 g</b></span></p>
     <div class="stats" id="ovStats" hidden></div>
+    <div id="lbBox" hidden><span class="eyebrow">Best scores · <span id="lbMode"></span></span><ol id="lbList"></ol></div>
     <div id="debrief" hidden>
       <div class="dbHead"><span class="eyebrow">Debrief</span><button class="ghost" id="dbPlay" type="button">Play</button>
         <input id="dbSlider" type="range" min="0" max="1000" value="1000" aria-label="Replay time"><span id="dbTime">0:00</span></div>
@@ -123,6 +125,8 @@
       <button class="ghost" id="bQual" type="button">Graphics: Medium</button>
       <button class="ghost" id="bPal" type="button">HUD colours: green</button>
       <button class="ghost" id="bLayout" type="button">Move buttons…</button>
+      <button class="ghost" id="bText" type="button">HUD text size: 100%</button>
+      <button class="ghost" id="bTips" type="button">Show controls guide</button>
       <button class="ghost" id="bTilt" type="button">Controls: touch stick</button>
       <button class="ghost" id="bHaptic" type="button">Vibration: on</button>
       <button class="ghost" id="bLoad" type="button">Canisters: 2 flare + 2 chaff</button>
@@ -135,6 +139,7 @@
     </div>
     <div class="row">
       <div id="firstRun" class="firstRun" hidden><span>First flight? Try the guided lessons: dogfighting, missile defense, landing and more.</span><button class="ghost" id="bFirst" type="button">Start training</button></div>
+      <button class="ghost" id="bShare" type="button" hidden>Share result</button>
       <button class="primary" id="bStart" type="button">Launch</button>
       <button class="ghost" id="bReplay" type="button" hidden>Watch replay</button>
       <button class="ghost" id="bPhoto" type="button" hidden>Photo mode</button>
@@ -147,5 +152,5 @@
 
 <script src="vendor/three.min.js"></script>
 <script src="js/physics.js"></script>
-<script src="js/game.js"></script>
+<script src="js/game.min.js"></script>
 <script>if('serviceWorker' in navigator&&location.protocol!=='file:')addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));</script>

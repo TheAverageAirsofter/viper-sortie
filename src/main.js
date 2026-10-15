@@ -147,7 +147,7 @@ function frame(now){
   updateCamera(dt||.016); if(killCamCamera(rdt||.016))playerJet.visible=P.alive; if(state==='replay')updateReplay(dt||.016); if(PHOTO.on)photoCam(); sky.position.copy(camera.position);
   waterMat.uniforms.t.value=now*.001; glare.position.copy(camera.position).addScaledVector(SUN_DIR,26000);
   pMat.uniforms.fogC.value.copy(scene.fog.color); pMat.uniforms.fogN.value=scene.fog.near; pMat.uniforms.fogF.value=scene.fog.far;
-  if(boomLight.intensity>0)boomLight.intensity=Math.max(0,boomLight.intensity-(dt||.016)*7);
+  if(boomLight.intensity>0)boomLight.intensity=Math.max(0,boomLight.intensity-(dt||.016)*7*LK);
   updateShadow(); gust=1+.35*Math.sin(clock*.7)*Math.sin(clock*1.9+1); updateRain(dt||.016);
   for(const cl of clouds){if(!cl.visible)continue;const d=cl.position.distanceTo(camera.position),o=clamp((d-380)/900,0,1)*.95;if(cl.userData.op!==o){cl.userData.op=o;for(const m of cl.userData.mats)m.opacity=o}}
   sndEngine(); sndExtra(); sndFlyby(); updateGlints(); updateFlareLight(); shadowFollow();
@@ -213,3 +213,57 @@ addEventListener('pointercancel',()=>{if(layDrag){layDrag.el.classList.remove('d
 function syncRange(){$('bRange').textContent='Engagement range: '+ENG_RANGES[rangeKey].n.toLowerCase()+' (~'+Math.round(11.5*engK())+' km merge)'}
 $('bRange').addEventListener('click',()=>{const k=Object.keys(ENG_RANGES);rangeKey=k[(k.indexOf(rangeKey)+1)%k.length];try{localStorage.setItem('viperRange',rangeKey)}catch(e){};syncRange()});
 syncRange();
+
+/* ---------- HUD text size ---------- */
+const TXT_SIZES=[1,1.15,1.3]; let txtK=1; try{const v=+localStorage.getItem('viperText');if(TXT_SIZES.includes(v))txtK=v}catch(e){}
+function syncText(){TXTK=txtK;$('bText').textContent='HUD text size: '+Math.round(txtK*100)+'%'}
+$('bText').addEventListener('click',()=>{txtK=TXT_SIZES[(TXT_SIZES.indexOf(txtK)+1)%TXT_SIZES.length];try{localStorage.setItem('viperText',txtK)}catch(e){};syncText()});
+syncText();
+
+/* ---------- left-handed preset: mirror every control across the screen ---------- */
+$('layMirror').addEventListener('click',()=>{for(const id of LAY_IDS){const el=$(id);if(!el)continue;
+  const was=el.hidden;if(was)el.hidden=false;const r=el.getBoundingClientRect();if(was)el.hidden=true;if(!r.width)continue;
+  const o=lay.p[id]||[0,0],dx=innerWidth-r.right-r.left;lay.p[id]=[Math.round((+o[0]||0)+dx),+o[1]||0]}
+  layApply()});
+
+/* ---------- controls guide: labels every button; shown once after the first launch ---------- */
+const TIPS=[['bGun','<b>GUN</b> hold to fire'],['b9','<b>9X</b> heat-seeking missile'],['b120','<b>120</b> radar missile'],['bLock','<b>LOCK</b> radar target'],
+  ['thr','<b>THROTTLE</b> drag; top = afterburner'],['cm','<b>FLR / CHF</b> decoys vs missiles'],['bGear','<b>GEAR</b> up / down'],['bBrake','<b>BRK</b> speed brake'],
+  ['bRdr','<b>RDR</b> radar panel'],['bCam','<b>CAM</b> change view'],['bPause','<b>II</b> pause / menu']];
+function tipsShow(){const box=$('tips');box.querySelectorAll('.tip').forEach(e=>e.remove());box.hidden=false;
+  const placed=[],W_=innerWidth,H_=innerHeight,hit=(a,b)=>a.l<b.r&&a.r>b.l&&a.t<b.b&&a.b>b.t;
+  for(const [id,html] of TIPS){const el=$(id);if(!el||el.hidden)continue;const r=el.getBoundingClientRect();if(!r.width)continue;
+    const d=document.createElement('div');d.className='tip';d.innerHTML=html;box.appendChild(d);const w=d.offsetWidth,h=d.offsetHeight,cx=r.left+r.width/2,cy=r.top+r.height/2,g=8;
+    // try below, above, left, right of the control; take the first spot that is on screen and clear of other labels and of the controls
+    const cands=[];for(const o of [0,34,68,104])cands.push([cx,r.bottom+g+o+h/2],[cx,r.top-g-o-h/2],[r.left-g-o-w/2,cy],[r.right+g+o+w/2,cy]);const ctl=TIPS.map(t=>$(t[0])).filter(e=>e&&!e.hidden).map(e=>e.getBoundingClientRect());
+    let best=null,bestScore=1e9;
+    for(const [x0,y0] of cands){const x=clamp(x0,w/2+4,W_-w/2-4),y=clamp(y0,h/2+4,H_-h/2-4),box_={l:x-w/2,r:x+w/2,t:y-h/2,b:y+h/2};
+      let sc=Math.abs(x-x0)+Math.abs(y-y0)+Math.hypot(x-cx,y-cy)*.05;for(const p of placed)if(hit(box_,p))sc+=1000;for(const c of ctl)if(c!==r&&hit(box_,{l:c.left,r:c.right,t:c.top,b:c.bottom}))sc+=100;
+      if(sc<bestScore){bestScore=sc;best={x,y,box_}}}
+    d.style.left=best.x+'px';d.style.top=best.y+'px';placed.push(best.box_)}}
+function tipsHide(){$('tips').hidden=true;try{localStorage.setItem('vsTips','1')}catch(e){}}
+$('tips').addEventListener('pointerdown',e=>{e.stopPropagation();e.preventDefault();tipsHide()});
+$('bTips').addEventListener('click',()=>{try{localStorage.removeItem('vsTips')}catch(e){};$('bStart').click()});   // launch, then the guide shows
+$('bStart').addEventListener('click',()=>{let seen=false;try{seen=!!localStorage.getItem('vsTips')}catch(e){}
+  if(!seen)setTimeout(()=>{if(state==='play'&&$('tips').hidden)tipsShow()},700)});
+
+/* ---------- local leaderboard (per mission, top 10) and share ---------- */
+function lbGet(m){try{const a=JSON.parse(localStorage.getItem('vsLb_'+m)||'[]');return Array.isArray(a)?a.filter(x=>x&&+x.s>0):[]}catch(e){return[]}}
+function lbAdd(){if(!(score>0)||mission==='ONLINE'||mission==='TRAINING')return -1;
+  const e={s:score,k:kills,ac:AC.id,t:Date.now()},a=lbGet(mission);a.push(e);a.sort((x,y)=>y.s-x.s);const keep=a.slice(0,10);
+  try{localStorage.setItem('vsLb_'+mission,JSON.stringify(keep))}catch(er){};lbLast=e;return keep.indexOf(e)}
+let lbLast=null;
+function lbRender(over){const a=lbGet(mission),box=$('lbBox');box.hidden=!a.length||!over;if(box.hidden)return;
+  $('lbMode').textContent=MISSIONS[mission];const ol=$('lbList');ol.textContent='';
+  a.slice(0,5).forEach(e=>{const li=document.createElement('li');li.textContent=e.s+' pts · '+e.k+' kill'+(e.k===1?'':'s')+' · '+(AC_DEFS[e.ac]?AC_DEFS[e.ac].name:e.ac);if(e===lbLast||(lbLast&&e.t===lbLast.t&&e.s===lbLast.s))li.className='me';ol.appendChild(li)})}
+function shareText(){return 'Viper Sortie · '+MISSIONS[mission]+': '+score+' pts, '+kills+' kill'+(kills===1?'':'s')+' in the '+AC.name+(missionText?' ('+missionText+')':'')+'.'}
+$('bShare').addEventListener('click',async()=>{const t=shareText();
+  try{if(navigator.share){await navigator.share({title:'Viper Sortie',text:t});return}}catch(e){if(e&&e.name==='AbortError')return}
+  try{await navigator.clipboard.writeText(t);message('RESULT COPIED',1.6)}catch(e){prompt('Copy your result:',t)}});
+const _showOverlay=showOverlay;
+showOverlay=function(kind){_showOverlay(kind);const over=kind==='over';$('bShare').hidden=!over||!(score>0);lbRender(over)};
+const _careerAward=careerAward;
+careerAward=function(){lbAdd();return _careerAward.apply(this,arguments)};
+
+/* ---------- test hook (only with ?test in the URL) ---------- */
+if(/[?&]test\b/.test(location.search))window.__vs={P,fly,dlz,flyout,AC_DEFS,V3,atm,clamp,lbAdd,showOverlay:k=>showOverlay(k),setScore:(n,k)=>{score=n;kills=k},get state(){return state},get AC(){return AC}};

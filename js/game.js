@@ -251,13 +251,15 @@ const renderer=new THREE.WebGLRenderer({canvas:glCanvas,antialias:true,powerPref
 renderer.setPixelRatio(DPR); renderer.autoClear=false;
 // keep the r128 look on newer three.js: linear output, no colour management, legacy light units
 if(THREE.ColorManagement)THREE.ColorManagement.enabled=false; if('outputColorSpace' in renderer)renderer.outputColorSpace=THREE.LinearSRGBColorSpace; if('useLegacyLights' in renderer)renderer.useLegacyLights=true;
+// r165+ removed legacy lights: light intensities are pi times lower, so scale ours back up to keep the same look (LK is 1 on older builds)
+const LK=('useLegacyLights' in renderer)?1:Math.PI;
 const scene=new THREE.Scene();
 const HORIZON=new THREE.Color(0xc6d9e5);
 scene.background=HORIZON;
 scene.fog=new THREE.Fog(HORIZON,4000,19000);
 const camera=new THREE.PerspectiveCamera(66,1,1,40000);
-const hemi=new THREE.HemisphereLight(0xd6e8ff,0x4d5a3c,0.95); scene.add(hemi);
-const sun=new THREE.DirectionalLight(0xfff0d8,1.05); sun.position.set(-0.5,1,0.6); scene.add(sun);
+const hemi=new THREE.HemisphereLight(0xd6e8ff,0x4d5a3c,0.95*LK); scene.add(hemi);
+const sun=new THREE.DirectionalLight(0xfff0d8,1.05*LK); sun.position.set(-0.5,1,0.6); scene.add(sun);
 const SUN_DIR=sun.position.clone().normalize();
 const sky=new THREE.Mesh(new THREE.SphereGeometry(30000,32,16),new THREE.ShaderMaterial({
   side:THREE.BackSide,depthWrite:false,fog:false,
@@ -1090,8 +1092,8 @@ let pFlame=playerJet.getObjectByName('flame');
 /* ---------------- cockpit: its own scene in seat coordinates (eye at origin, forward −Z) ---------------- */
 const cockScene=new THREE.Scene();
 const cockCam=new THREE.PerspectiveCamera(66,1,.02,80);
-cockScene.add(new THREE.HemisphereLight(0xcfe0f0,0x15181b,.6));
-const cSun=new THREE.DirectionalLight(0xfff0d8,.95); cockScene.add(cSun); cockScene.add(cSun.target);
+cockScene.add(new THREE.HemisphereLight(0xcfe0f0,0x15181b,.6*LK));
+const cSun=new THREE.DirectionalLight(0xfff0d8,.95*LK); cockScene.add(cSun); cockScene.add(cSun.target);
 const cock=new THREE.Group(); cockScene.add(cock);
 const EYE=new V3(...AC.eye);                       // pilot eye in jet coordinates
 const QRY=new THREE.Quaternion().setFromAxisAngle(UP,Math.PI);
@@ -1341,7 +1343,7 @@ function updateParticles(dt){
 }
 function explode(p,big,noRec){
   const n=big?55:22; if(!noRec&&typeof REC3!=='undefined')REC3.booms.push({t:clock,p:p.toArray(),big});
-  boomLight.position.copy(p); boomLight.intensity=big?4:2.2; boomLight.distance=big?2600:1500;
+  boomLight.position.copy(p); boomLight.intensity=(big?4:2.2)*LK; boomLight.distance=big?2600:1500;
   for(let i=0;i<(big?6:3);i++)puff(p.x,p.y,p.z,rand(-8,8),rand(-8,8),rand(-8,8),1,.9,.6,1,rand(16,26)*(big?1.5:1),40,rand(.15,.3));
   for(let i=0;i<n;i++){const d=new V3(rand(-1,1),rand(-1,1),rand(-1,1)).normalize().multiplyScalar(rand(20,big?150:70));
     puff(p.x,p.y,p.z,d.x,d.y,d.z,1,rand(.38,.7),.1,1,rand(8,20)*(big?1.6:1),30,rand(.4,1.0))}
@@ -1508,7 +1510,7 @@ function applyEnv(){
   const u=sky.material.uniforms; u.top.value.setHex(E.top); u.hor.value.setHex(E.hor); u.bot.value.setHex(E.bot); u.glow.value.setHex(E.glow); u.disk.value=timeOfDay==='NIGHT'?.35:1;
   SUN_DIR.set(...E.sun).normalize(); sun.position.copy(SUN_DIR); sun.color.setHex(E.sc);
   const oc=ovc();
-  sun.intensity=E.si*(oc?.55:1)*(weather==='RAIN'?.75:1); hemi.intensity=E.hi*(oc?.8:1)*(weather==='RAIN'?.85:1);
+  sun.intensity=E.si*LK*(oc?.55:1)*(weather==='RAIN'?.75:1); hemi.intensity=E.hi*LK*(oc?.8:1)*(weather==='RAIN'?.85:1);
   {const sp={CLEAR:3,SCATTERED:7,OVERCAST:11,RAIN:15}[weather]||7,a=Math.random()*Math.PI*2;WIND.set(Math.sin(a)*sp,0,Math.cos(a)*sp);turbK={CLEAR:.12,SCATTERED:.3,OVERCAST:.55,RAIN:.9}[weather]||.3}
   rain.visible=false;
   scene.background=new THREE.Color(E.hor); scene.fog.color.setHex(E.hor); scene.fog.far=weather==='RAIN'?9000:oc?14000:16800; scene.fog.near=weather==='RAIN'?900:oc?2500:4000;
@@ -1663,7 +1665,7 @@ function updateGlints(){let k=0;const day=timeOfDay!=='NIGHT'&&!ovc()&&SUN_DIR.y
   for(;k<GLINTS.length;k++)GLINTS[k].visible=false}
 const flareLight=new THREE.PointLight(0xffd090,0,600,2);scene.add(flareLight);
 function updateFlareLight(){let best=null,bd=1e9;for(const o of CM.objs)if(o.type==='flare'&&o.alive){const d=o.pos.distanceTo(camera.position);if(d<bd){bd=d;best=o}}
-  if(best&&bd<900){flareLight.position.copy(best.pos);flareLight.intensity=(timeOfDay==='NIGHT'?3:1.4)*(.8+Math.random()*.4)*clamp(best.life/1.5,0,1)}else flareLight.intensity=0}
+  if(best&&bd<900){flareLight.position.copy(best.pos);flareLight.intensity=LK*(timeOfDay==='NIGHT'?3:1.4)*(.8+Math.random()*.4)*clamp(best.life/1.5,0,1)}else flareLight.intensity=0}
 function setShadows(on){renderer.shadowMap.enabled=on;renderer.shadowMap.type=THREE.PCFSoftShadowMap;sun.castShadow=on;
   if(on){sun.shadow.mapSize.set(1024,1024);const c=sun.shadow.camera;c.left=c.bottom=-15;c.right=c.top=15;c.near=1;c.far=200;c.updateProjectionMatrix();sun.shadow.bias=-.0006;sun.shadow.normalBias=.03;sun.target=playerJet}
   else sun.target=new THREE.Object3D();
@@ -4123,7 +4125,8 @@ let HUD='#7dff9a',HUDD='rgba(125,255,154,.5)',WARN='#ffb347',THREAT='#ff5a4e';
 const FONT='"B612 Mono", ui-monospace, Menlo, monospace';
 const _pv=new V3();
 function proj(v){_pv.copy(v).project(camera);return{x:(_pv.x+1)/2*W,y:(1-_pv.y)/2*H,ok:_pv.z<1&&_pv.z>-1}}
-function txt(c,s,x,y,align,col,size,w){c.font=`${w||400} ${size||12}px ${FONT}`;c.textAlign=align||'left';c.fillStyle=col||HUD;c.fillText(s,x,y)}
+let TXTK=1;   // HUD text size setting
+function txt(c,s,x,y,align,col,size,w){c.font=`${w||400} ${(size||12)*TXTK}px ${FONT}`;c.textAlign=align||'left';c.fillStyle=col||HUD;c.fillText(s,x,y)}
 const nm=d=>(d/1852).toFixed(d<18520?1:0);
 // tall phone screens lift the left/right tapes so the countermeasure column fits under them
 const tapeY=()=>W<H?H*.34:H*.42;
@@ -4520,7 +4523,7 @@ function frame(now){
   updateCamera(dt||.016); if(killCamCamera(rdt||.016))playerJet.visible=P.alive; if(state==='replay')updateReplay(dt||.016); if(PHOTO.on)photoCam(); sky.position.copy(camera.position);
   waterMat.uniforms.t.value=now*.001; glare.position.copy(camera.position).addScaledVector(SUN_DIR,26000);
   pMat.uniforms.fogC.value.copy(scene.fog.color); pMat.uniforms.fogN.value=scene.fog.near; pMat.uniforms.fogF.value=scene.fog.far;
-  if(boomLight.intensity>0)boomLight.intensity=Math.max(0,boomLight.intensity-(dt||.016)*7);
+  if(boomLight.intensity>0)boomLight.intensity=Math.max(0,boomLight.intensity-(dt||.016)*7*LK);
   updateShadow(); gust=1+.35*Math.sin(clock*.7)*Math.sin(clock*1.9+1); updateRain(dt||.016);
   for(const cl of clouds){if(!cl.visible)continue;const d=cl.position.distanceTo(camera.position),o=clamp((d-380)/900,0,1)*.95;if(cl.userData.op!==o){cl.userData.op=o;for(const m of cl.userData.mats)m.opacity=o}}
   sndEngine(); sndExtra(); sndFlyby(); updateGlints(); updateFlareLight(); shadowFollow();
@@ -4586,4 +4589,58 @@ addEventListener('pointercancel',()=>{if(layDrag){layDrag.el.classList.remove('d
 function syncRange(){$('bRange').textContent='Engagement range: '+ENG_RANGES[rangeKey].n.toLowerCase()+' (~'+Math.round(11.5*engK())+' km merge)'}
 $('bRange').addEventListener('click',()=>{const k=Object.keys(ENG_RANGES);rangeKey=k[(k.indexOf(rangeKey)+1)%k.length];try{localStorage.setItem('viperRange',rangeKey)}catch(e){};syncRange()});
 syncRange();
+
+/* ---------- HUD text size ---------- */
+const TXT_SIZES=[1,1.15,1.3]; let txtK=1; try{const v=+localStorage.getItem('viperText');if(TXT_SIZES.includes(v))txtK=v}catch(e){}
+function syncText(){TXTK=txtK;$('bText').textContent='HUD text size: '+Math.round(txtK*100)+'%'}
+$('bText').addEventListener('click',()=>{txtK=TXT_SIZES[(TXT_SIZES.indexOf(txtK)+1)%TXT_SIZES.length];try{localStorage.setItem('viperText',txtK)}catch(e){};syncText()});
+syncText();
+
+/* ---------- left-handed preset: mirror every control across the screen ---------- */
+$('layMirror').addEventListener('click',()=>{for(const id of LAY_IDS){const el=$(id);if(!el)continue;
+  const was=el.hidden;if(was)el.hidden=false;const r=el.getBoundingClientRect();if(was)el.hidden=true;if(!r.width)continue;
+  const o=lay.p[id]||[0,0],dx=innerWidth-r.right-r.left;lay.p[id]=[Math.round((+o[0]||0)+dx),+o[1]||0]}
+  layApply()});
+
+/* ---------- controls guide: labels every button; shown once after the first launch ---------- */
+const TIPS=[['bGun','<b>GUN</b> hold to fire'],['b9','<b>9X</b> heat-seeking missile'],['b120','<b>120</b> radar missile'],['bLock','<b>LOCK</b> radar target'],
+  ['thr','<b>THROTTLE</b> drag; top = afterburner'],['cm','<b>FLR / CHF</b> decoys vs missiles'],['bGear','<b>GEAR</b> up / down'],['bBrake','<b>BRK</b> speed brake'],
+  ['bRdr','<b>RDR</b> radar panel'],['bCam','<b>CAM</b> change view'],['bPause','<b>II</b> pause / menu']];
+function tipsShow(){const box=$('tips');box.querySelectorAll('.tip').forEach(e=>e.remove());box.hidden=false;
+  const placed=[],W_=innerWidth,H_=innerHeight,hit=(a,b)=>a.l<b.r&&a.r>b.l&&a.t<b.b&&a.b>b.t;
+  for(const [id,html] of TIPS){const el=$(id);if(!el||el.hidden)continue;const r=el.getBoundingClientRect();if(!r.width)continue;
+    const d=document.createElement('div');d.className='tip';d.innerHTML=html;box.appendChild(d);const w=d.offsetWidth,h=d.offsetHeight,cx=r.left+r.width/2,cy=r.top+r.height/2,g=8;
+    // try below, above, left, right of the control; take the first spot that is on screen and clear of other labels and of the controls
+    const cands=[];for(const o of [0,34,68,104])cands.push([cx,r.bottom+g+o+h/2],[cx,r.top-g-o-h/2],[r.left-g-o-w/2,cy],[r.right+g+o+w/2,cy]);const ctl=TIPS.map(t=>$(t[0])).filter(e=>e&&!e.hidden).map(e=>e.getBoundingClientRect());
+    let best=null,bestScore=1e9;
+    for(const [x0,y0] of cands){const x=clamp(x0,w/2+4,W_-w/2-4),y=clamp(y0,h/2+4,H_-h/2-4),box_={l:x-w/2,r:x+w/2,t:y-h/2,b:y+h/2};
+      let sc=Math.abs(x-x0)+Math.abs(y-y0)+Math.hypot(x-cx,y-cy)*.05;for(const p of placed)if(hit(box_,p))sc+=1000;for(const c of ctl)if(c!==r&&hit(box_,{l:c.left,r:c.right,t:c.top,b:c.bottom}))sc+=100;
+      if(sc<bestScore){bestScore=sc;best={x,y,box_}}}
+    d.style.left=best.x+'px';d.style.top=best.y+'px';placed.push(best.box_)}}
+function tipsHide(){$('tips').hidden=true;try{localStorage.setItem('vsTips','1')}catch(e){}}
+$('tips').addEventListener('pointerdown',e=>{e.stopPropagation();e.preventDefault();tipsHide()});
+$('bTips').addEventListener('click',()=>{try{localStorage.removeItem('vsTips')}catch(e){};$('bStart').click()});   // launch, then the guide shows
+$('bStart').addEventListener('click',()=>{let seen=false;try{seen=!!localStorage.getItem('vsTips')}catch(e){}
+  if(!seen)setTimeout(()=>{if(state==='play'&&$('tips').hidden)tipsShow()},700)});
+
+/* ---------- local leaderboard (per mission, top 10) and share ---------- */
+function lbGet(m){try{const a=JSON.parse(localStorage.getItem('vsLb_'+m)||'[]');return Array.isArray(a)?a.filter(x=>x&&+x.s>0):[]}catch(e){return[]}}
+function lbAdd(){if(!(score>0)||mission==='ONLINE'||mission==='TRAINING')return -1;
+  const e={s:score,k:kills,ac:AC.id,t:Date.now()},a=lbGet(mission);a.push(e);a.sort((x,y)=>y.s-x.s);const keep=a.slice(0,10);
+  try{localStorage.setItem('vsLb_'+mission,JSON.stringify(keep))}catch(er){};lbLast=e;return keep.indexOf(e)}
+let lbLast=null;
+function lbRender(over){const a=lbGet(mission),box=$('lbBox');box.hidden=!a.length||!over;if(box.hidden)return;
+  $('lbMode').textContent=MISSIONS[mission];const ol=$('lbList');ol.textContent='';
+  a.slice(0,5).forEach(e=>{const li=document.createElement('li');li.textContent=e.s+' pts · '+e.k+' kill'+(e.k===1?'':'s')+' · '+(AC_DEFS[e.ac]?AC_DEFS[e.ac].name:e.ac);if(e===lbLast||(lbLast&&e.t===lbLast.t&&e.s===lbLast.s))li.className='me';ol.appendChild(li)})}
+function shareText(){return 'Viper Sortie · '+MISSIONS[mission]+': '+score+' pts, '+kills+' kill'+(kills===1?'':'s')+' in the '+AC.name+(missionText?' ('+missionText+')':'')+'.'}
+$('bShare').addEventListener('click',async()=>{const t=shareText();
+  try{if(navigator.share){await navigator.share({title:'Viper Sortie',text:t});return}}catch(e){if(e&&e.name==='AbortError')return}
+  try{await navigator.clipboard.writeText(t);message('RESULT COPIED',1.6)}catch(e){prompt('Copy your result:',t)}});
+const _showOverlay=showOverlay;
+showOverlay=function(kind){_showOverlay(kind);const over=kind==='over';$('bShare').hidden=!over||!(score>0);lbRender(over)};
+const _careerAward=careerAward;
+careerAward=function(){lbAdd();return _careerAward.apply(this,arguments)};
+
+/* ---------- test hook (only with ?test in the URL) ---------- */
+if(/[?&]test\b/.test(location.search))window.__vs={P,fly,dlz,flyout,AC_DEFS,V3,atm,clamp,lbAdd,showOverlay:k=>showOverlay(k),setScore:(n,k)=>{score=n;kills=k},get state(){return state},get AC(){return AC}};
 })();

@@ -55,7 +55,8 @@ let HUD='#7dff9a',HUDD='rgba(125,255,154,.5)',WARN='#ffb347',THREAT='#ff5a4e';
 const FONT='"B612 Mono", ui-monospace, Menlo, monospace';
 const _pv=new V3();
 function proj(v){_pv.copy(v).project(camera);return{x:(_pv.x+1)/2*W,y:(1-_pv.y)/2*H,ok:_pv.z<1&&_pv.z>-1}}
-function txt(c,s,x,y,align,col,size,w){c.font=`${w||400} ${size||12}px ${FONT}`;c.textAlign=align||'left';c.fillStyle=col||HUD;c.fillText(s,x,y)}
+let TXTK=1;   // HUD text size setting
+function txt(c,s,x,y,align,col,size,w){c.font=`${w||400} ${(size||12)*TXTK}px ${FONT}`;c.textAlign=align||'left';c.fillStyle=col||HUD;c.fillText(s,x,y)}
 const nm=d=>(d/1852).toFixed(d<18520?1:0);
 // tall phone screens lift the left/right tapes so the countermeasure column fits under them
 const tapeY=()=>W<H?H*.34:H*.42;

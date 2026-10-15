@@ -162,3 +162,8 @@ body.laying #ov{display:none!important}
 body.laying #ctrls .lay{outline:2px dashed var(--hud);outline-offset:3px;cursor:grab}
 body.laying #ctrls .lay.drag{outline-style:solid;opacity:.8}
 body.laying #ctrls #cm .cmb{pointer-events:none}
+#tips{position:fixed;inset:0;z-index:8;background:rgba(5,10,14,.55);touch-action:auto}
+#tips .tip{position:fixed;max-width:130px;padding:3px 6px;border:1px solid var(--hud-dim);border-radius:5px;background:rgba(8,16,20,.9);color:var(--paper);font:10px/1.25 var(--f-hud);text-align:center;transform:translate(-50%,-50%)}
+#tips .tip b{color:var(--hud)}
+#tipsNote{position:fixed;left:50%;top:42%;transform:translate(-50%,-50%);margin:0;padding:8px 14px;border:1px solid var(--hud);border-radius:8px;background:rgba(8,16,20,.9);font:700 13px var(--f-hud);letter-spacing:.06em;color:var(--hud)}
+#lbBox{margin:8px 0}#lbList{margin:4px 0 0;padding-left:22px;font:12px/1.5 var(--f-hud);color:var(--paper);font-variant-numeric:tabular-nums}#lbList li.me{color:var(--hud)}

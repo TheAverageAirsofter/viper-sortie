@@ -1,8 +1,8 @@
 /* ---------------- cockpit: its own scene in seat coordinates (eye at origin, forward −Z) ---------------- */
 const cockScene=new THREE.Scene();
 const cockCam=new THREE.PerspectiveCamera(66,1,.02,80);
-cockScene.add(new THREE.HemisphereLight(0xcfe0f0,0x15181b,.6));
-const cSun=new THREE.DirectionalLight(0xfff0d8,.95); cockScene.add(cSun); cockScene.add(cSun.target);
+cockScene.add(new THREE.HemisphereLight(0xcfe0f0,0x15181b,.6*LK));
+const cSun=new THREE.DirectionalLight(0xfff0d8,.95*LK); cockScene.add(cSun); cockScene.add(cSun.target);
 const cock=new THREE.Group(); cockScene.add(cock);
 const EYE=new V3(...AC.eye);                       // pilot eye in jet coordinates
 const QRY=new THREE.Quaternion().setFromAxisAngle(UP,Math.PI);

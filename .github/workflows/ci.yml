@@ -17,3 +17,5 @@ jobs:
       - run: node tools/play-test.js       # cameras, weapons, countermeasures
       - run: node tools/rush-test.js       # Bandit rush mission
       - run: node tools/layout-test.js     # movable controls
+      - run: node tools/features-test.js   # controls guide, mirror layout, text size, leaderboard
+      - run: node tools/sim-test.js        # flight model and launch-zone behaviour
