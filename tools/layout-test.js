@@ -18,6 +18,7 @@ const path = require('path'), assert = require('assert');
   await p.screenshot({ path: process.env.SHOT || '/tmp/w/layout.png' });
   await p.click('#layDone'); assert(await p.isVisible('#ov')); assert(!(await p.isVisible('#bGun')));
   await p.reload(); await p.waitForTimeout(1500);
+  await p.waitForFunction(() => document.getElementById('bGun') && document.getElementById('bGun').style.translate !== '', null, { timeout: 8000 }).catch(() => {});   // slow CI runners: wait for the saved layout to apply
   const info = await p.evaluate(() => ({ ls: localStorage.getItem('viperLayout'), tr: document.getElementById('bGun').style.translate, sc: document.getElementById('bGun').style.scale, ua: navigator.userAgent }));
   assert.ok(info.tr !== '', 'layout persisted: ' + JSON.stringify(info) + ' errs=' + JSON.stringify(errs));
   await p.click('#bStart'); await p.waitForTimeout(2500); assert(await p.isVisible('#bGun'));
