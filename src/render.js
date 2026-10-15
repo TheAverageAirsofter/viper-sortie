@@ -5,6 +5,8 @@ let quality='MED'; try{const q=localStorage.getItem('viperQuality');if(QUALS[q])
 let DPR=Math.min(window.devicePixelRatio||1,QUALS[quality].dpr);
 const renderer=new THREE.WebGLRenderer({canvas:glCanvas,antialias:true,powerPreference:'high-performance'});
 renderer.setPixelRatio(DPR); renderer.autoClear=false;
+// keep the r128 look on newer three.js: linear output, no colour management, legacy light units
+if(THREE.ColorManagement)THREE.ColorManagement.enabled=false; if('outputColorSpace' in renderer)renderer.outputColorSpace=THREE.LinearSRGBColorSpace; if('useLegacyLights' in renderer)renderer.useLegacyLights=true;
 const scene=new THREE.Scene();
 const HORIZON=new THREE.Color(0xc6d9e5);
 scene.background=HORIZON;

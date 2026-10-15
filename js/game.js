@@ -249,6 +249,8 @@ let quality='MED'; try{const q=localStorage.getItem('viperQuality');if(QUALS[q])
 let DPR=Math.min(window.devicePixelRatio||1,QUALS[quality].dpr);
 const renderer=new THREE.WebGLRenderer({canvas:glCanvas,antialias:true,powerPreference:'high-performance'});
 renderer.setPixelRatio(DPR); renderer.autoClear=false;
+// keep the r128 look on newer three.js: linear output, no colour management, legacy light units
+if(THREE.ColorManagement)THREE.ColorManagement.enabled=false; if('outputColorSpace' in renderer)renderer.outputColorSpace=THREE.LinearSRGBColorSpace; if('useLegacyLights' in renderer)renderer.useLegacyLights=true;
 const scene=new THREE.Scene();
 const HORIZON=new THREE.Color(0xc6d9e5);
 scene.background=HORIZON;
@@ -2422,7 +2424,8 @@ function resetPlayer(){
 }
 let friends=[], mission='WAVES', banditType='F16', missionT=0, missionDone=false, spawnQ=[];
 try{mission=localStorage.getItem('viperMission')||'WAVES';banditType=localStorage.getItem('viperBandit')||'F16'}catch(e){}
-const MISSIONS={WAVES:'Waves',STRIKE:'Strike / SEAD',INTERCEPT:'Intercept bombers',ESCORT:'Escort the C-130','2V4':'2 v 4 with wingman','4SHIP':'4-ship vs 6',CONVOY:'Convoy attack',ANTISHIP:'Anti-ship strike',CRUISE:'Cruise missile defence',CAMPAIGN:'Campaign',ONLINE:'Online dogfight',TRAINING:'Training'};
+const RUSH_KILLS=8, RUSH_TIME=300;   // time-attack: bandits keep arriving, four at a time
+const MISSIONS={WAVES:'Waves',STRIKE:'Strike / SEAD',INTERCEPT:'Intercept bombers',RUSH:'Bandit rush (8 in 5 min)',ESCORT:'Escort the C-130','2V4':'2 v 4 with wingman','4SHIP':'4-ship vs 6',CONVOY:'Convoy attack',ANTISHIP:'Anti-ship strike',CRUISE:'Cruise missile defence',CAMPAIGN:'Campaign',ONLINE:'Online dogfight',TRAINING:'Training'};
 const LESSONS={BFM:'Dogfighting basics',DEFENSE:'Missile defense',BVR:'Long-range shot',LANDING:'Landing',REFUEL:'Air refueling'};
 let lesson='BFM'; try{if(LESSONS[localStorage.getItem('vsLesson')])lesson=localStorage.getItem('vsLesson')}catch(e){}
 let trainDefeated=0, trainConnT=0;
@@ -2500,6 +2503,7 @@ function setupMission(){
     spawnGround('aaa',cx-400,cz-300); spawnGround('aaa',cx+500,cz+200);
     const tp=pickBanditType(); spawnPair(tp,new V3(cx-6000,8000,cz+12000),new V3(0,6000,0),{rdr:Math.min(2,AC_DEFS[tp].mrN)});
     message(AC.strike?'STRIKE · KILL THE SAMS, RADAR AND BUNKERS · '+Math.round(cz/1000)+' KM NORTH':'STRIKE · '+AC.name.toUpperCase()+' HAS NO STRIKE FIT · USE GUNS OR ESCORT',3.2);return}
+  if(mission==='RUSH'){message('BANDIT RUSH · SHOOT DOWN '+RUSH_KILLS+' IN '+fmtT(RUSH_TIME),3);return}
   if(mission==='INTERCEPT'){
     P.pos.set(0,6500,0); P.vel.set(0,0,250);
     const tp=pickBanditType();
@@ -2669,6 +2673,14 @@ function updateMission(dt){
       if(waveClearT<=0){waveClearT=3;if(wave>0)message('WAVE '+wave+' CLEAR · REARMED & REFUELED',2.4)}
       waveClearT-=dt; if(waveClearT<=0.0001){waveClearT=0;nextWave()}
     }
+    return;
+  }
+  if(mission==='RUSH'){
+    if(kills>=RUSH_KILLS){endMission(true,RUSH_KILLS+' bandits down with '+fmtT(RUSH_TIME-missionT)+' to spare');return}
+    if(missionT>=RUSH_TIME){endMission(false,'Time expired: '+kills+' of '+RUSH_KILLS+' bandits down');return}
+    if(enemies.length<4&&!P.scramble){const heading=Math.atan2(P.fwd.x,P.fwd.z),a=heading+rand(-.9,.9),dist=rand(9000,14000);
+      const c=new V3(P.pos.x+Math.sin(a)*dist,0,P.pos.z+Math.cos(a)*dist);c.y=Math.max(Math.max(groundH(c.x,c.z),0)+1500,P.pos.y+rand(-1200,1500));
+      const tp=pickBanditType(),ac=AC_DEFS[tp];spawnPair(tp,c,P.pos,{ir:Math.min(2,ac.srN),rdr:Math.min(2,ac.mrN)})}
     return;
   }
   if(mission==='INTERCEPT'){
@@ -4127,6 +4139,7 @@ function missionStatus(){
   if(sortie)return sortieStatus();
   if(mission==='WAVES')return 'WAVE '+wave;
   if(mission==='STRIKE'){const o=ground.filter(g=>g.objective&&g.alive).length;return 'TARGETS LEFT '+o}
+  if(mission==='RUSH')return 'KILLS '+kills+' / '+RUSH_KILLS+' · '+fmtT(Math.max(0,RUSH_TIME-missionT));
   if(mission==='INTERCEPT'){const b=enemies.filter(e=>e.kind==='bomber');const eta=b.length?Math.min(...b.map(x=>Math.max(0,(x.pos.z-2500)/x.speed))):0;return 'BOMBERS '+b.length+' · ETA '+fmtT(eta)}
   if(mission==='ESCORT'){const tr=friends.find(f=>f.kind==='transport');if(!tr)return 'ESCORT';return 'C-130 '+Math.round(clamp(tr.pos.z/ESCORT_LEN,0,1)*100)+'% · '+fmtT((ESCORT_LEN-tr.pos.z)/tr.speed)}
   const w=friends.find(f=>f.kind==='fighter');return 'BANDITS '+enemies.length+' · TWO '+(w&&w.alive?w.cmd:'DOWN');

@@ -16,7 +16,7 @@ Opening `index.html` directly also works (offline install/caching needs http(s))
 | `js/physics.js` | pure flight maths (atmosphere, drag, thrust), unit-tested |
 | `src/*.js` | the game in ordered slices (data, render, cockpit, effects, audio, flight, ops, state, ai, combat, net, hud, main); they share one scope, so they are not standalone modules |
 | `js/game.js` | built from `src/` by `npm run build` and committed, so the site runs without a build |
-| `vendor/three.min.js` | three.js r128, self-hosted (MIT, see `vendor/three.LICENSE`) |
+| `vendor/three.min.js` | three.js r160 (UMD build), self-hosted (MIT, see `vendor/three.LICENSE`) |
 | `sw.js`, `manifest.webmanifest` | offline play and install as an app |
 | `test/`, `tools/smoke.js` | Node unit tests and a headless-Chromium smoke test |
 
@@ -29,6 +29,9 @@ npm run smoke                # loads the game headless and reports console error
 ```
 
 ## Notes
+- three.js is r160 with colour management off, linear output and legacy light units, so it looks like the original r128 build. r161+ drops the UMD build, so going further means moving to ES modules.
+- Mission list includes a time-attack "Bandit rush" (8 kills in 5 minutes).
+- More headless checks: `node tools/play-test.js` (cameras, weapons, countermeasures) and `node tools/rush-test.js`.
 - Physics steps are capped at about 16.7 ms regardless of frame rate.
 - If play stays under about 35 fps for a few seconds, graphics drop one tier automatically (your saved choice is untouched).
 - Status messages are mirrored to a screen-reader live region; camera shake is reduced under `prefers-reduced-motion`.

@@ -65,6 +65,7 @@ function missionStatus(){
   if(sortie)return sortieStatus();
   if(mission==='WAVES')return 'WAVE '+wave;
   if(mission==='STRIKE'){const o=ground.filter(g=>g.objective&&g.alive).length;return 'TARGETS LEFT '+o}
+  if(mission==='RUSH')return 'KILLS '+kills+' / '+RUSH_KILLS+' · '+fmtT(Math.max(0,RUSH_TIME-missionT));
   if(mission==='INTERCEPT'){const b=enemies.filter(e=>e.kind==='bomber');const eta=b.length?Math.min(...b.map(x=>Math.max(0,(x.pos.z-2500)/x.speed))):0;return 'BOMBERS '+b.length+' · ETA '+fmtT(eta)}
   if(mission==='ESCORT'){const tr=friends.find(f=>f.kind==='transport');if(!tr)return 'ESCORT';return 'C-130 '+Math.round(clamp(tr.pos.z/ESCORT_LEN,0,1)*100)+'% · '+fmtT((ESCORT_LEN-tr.pos.z)/tr.speed)}
   const w=friends.find(f=>f.kind==='fighter');return 'BANDITS '+enemies.length+' · TWO '+(w&&w.alive?w.cmd:'DOWN');
