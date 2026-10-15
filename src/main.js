@@ -208,3 +208,8 @@ addEventListener('pointermove',e=>{if(!layDrag)return;const d=layDrag,r=d.r;
   lay.p[d.el.id]=[Math.round(d.ox+dx),Math.round(d.oy+dy)];layApply()});
 addEventListener('pointerup',()=>{if(layDrag){layDrag.el.classList.remove('drag');layDrag=null;laySave()}});
 addEventListener('pointercancel',()=>{if(layDrag){layDrag.el.classList.remove('drag');layDrag=null}});
+
+/* ---------- engagement range setting ---------- */
+function syncRange(){$('bRange').textContent='Engagement range: '+ENG_RANGES[rangeKey].n.toLowerCase()+' (~'+Math.round(11.5*engK())+' km merge)'}
+$('bRange').addEventListener('click',()=>{const k=Object.keys(ENG_RANGES);rangeKey=k[(k.indexOf(rangeKey)+1)%k.length];try{localStorage.setItem('viperRange',rangeKey)}catch(e){};syncRange()});
+syncRange();

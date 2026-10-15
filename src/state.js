@@ -40,6 +40,10 @@ const DIFF={
   ACE:    {name:'Ace',    g:9,  react:0,  irSee:3500,defP:1,  cmP:1,  notch:true,notchP:.55,rne:true, iK:.75,rK:.8, spread:.012,gunR:1000,lock:1,  cd:1}
 };
 const REMOTE_SK={notchP:.5};
+// Engagement range: how far out the fight starts. Short = original; Long/Extreme give time to notch, drag and defend against radar missiles.
+const ENG_RANGES={SHORT:{n:'Short',k:1},LONG:{n:'Long',k:2.5},EXTREME:{n:'Extreme',k:4}};
+let rangeKey='LONG'; try{const r=localStorage.getItem('viperRange');if(ENG_RANGES[r])rangeKey=r}catch(e){}
+const engK=()=>ENG_RANGES[rangeKey].k, farK=()=>1+(engK()-1)*.3;   // engK scales random merge distances; farK scales fixed scripted set-ups
 let difficulty='REGULAR'; try{const d=localStorage.getItem('viperDiff');if(DIFF[d])difficulty=d}catch(e){}
 const sk=e=>e.sk?e.sk:e.remote?REMOTE_SK:e.team==='red'?DIFF[difficulty]:DIFF.VETERAN;   // your wingman flies at veteran level
 const RED_COLORS={body:0x6a3f3a,dark:0x2f2523,glass:0x222a30,glassE:0x000000,flame:0xff6a3a};
@@ -126,15 +130,15 @@ function setupMission(){
     const thr=spawnFighter('blue',AC.id,new V3(-1600,4200,-500),new V3(-1600,4200,30000),{speed:230}); thr.lead=P;thr.side=-1;thr.cs=3;
     const fou=spawnFighter('blue',AC.id,new V3(-3000,4200,-800),new V3(-3000,4200,30000),{speed:230}); fou.lead=thr;fou.side=-1;fou.cs=4;
     for(const w of [two,thr,fou]){w.cmd='ENGAGE';w.bombs=2}
-    spawnPair(pickBanditType(),new V3(-5000,6000,30000),new V3(0,4000,0));spawnPair(pickBanditType(),new V3(1000,5500,33000),new V3(0,4000,0));spawnPair(pickBanditType(),new V3(6000,6500,31000),new V3(0,4000,0));
+    spawnPair(pickBanditType(),new V3(-5000,6000,30000*farK()),new V3(0,4000,0));spawnPair(pickBanditType(),new V3(1000,5500,33000*farK()),new V3(0,4000,0));spawnPair(pickBanditType(),new V3(6000,6500,31000*farK()),new V3(0,4000,0));
     spawnGround('sam',2000,36000);spawnGround('aaa',2600,35400);
     syncWing(); message('4-SHIP · TAP WING TO COMMAND THE FLIGHT',2.8); gciPicture(); return}
   if(mission==='2V4'){
     const w=spawnFighter('blue',AC.id,new V3(1600,4000,-300),new V3(1600,4000,30000),{speed:230});
     w.lead=P;w.side=1;w.cmd='ENGAGE';w.cs=2;w.bombs=2;syncWing();
     const tp=pickBanditType();
-    spawnPair(tp,new V3(-4000,6000,26000),new V3(0,4000,0));
-    spawnPair(pickBanditType(),new V3(5000,5000,29000),new V3(0,4000,0));
+    spawnPair(tp,new V3(-4000,6000,26000*farK()),new V3(0,4000,0));
+    spawnPair(pickBanditType(),new V3(5000,5000,29000*farK()),new V3(0,4000,0));
     message('2 V 4 · YOUR WINGMAN IS ON YOUR RIGHT',2.6);return}
 }
 const ESCORT_LEN=36000;
@@ -222,7 +226,7 @@ function nextWave(){
   wave++; const n=Math.min(1+wave,6);
   const heading=Math.atan2(P.fwd.x,P.fwd.z);
   for(let i=0;i<n;i+=2){
-    const a=heading+rand(-.9,.9), dist=rand(9000,14000);
+    const a=heading+rand(-.9,.9), dist=rand(9000,14000)*engK();
     const c=new V3(P.pos.x+Math.sin(a)*dist,0,P.pos.z+Math.cos(a)*dist);
     c.y=Math.max(Math.max(groundH(c.x,c.z),0)+1500,P.pos.y+rand(-1200,1500));
     const tp=pickBanditType(), ac=AC_DEFS[tp], ld={ir:Math.min(2,ac.srN),rdr:wave>=4?ac.mrN:wave>=2?Math.min(2,ac.mrN):0};
@@ -280,7 +284,7 @@ function updateMission(dt){
   if(mission==='RUSH'){
     if(kills>=RUSH_KILLS){endMission(true,RUSH_KILLS+' bandits down with '+fmtT(RUSH_TIME-missionT)+' to spare');return}
     if(missionT>=RUSH_TIME){endMission(false,'Time expired: '+kills+' of '+RUSH_KILLS+' bandits down');return}
-    if(enemies.length<4&&!P.scramble){const heading=Math.atan2(P.fwd.x,P.fwd.z),a=heading+rand(-.9,.9),dist=rand(9000,14000);
+    if(enemies.length<4&&!P.scramble){const heading=Math.atan2(P.fwd.x,P.fwd.z),a=heading+rand(-.9,.9),dist=rand(9000,14000)*engK();
       const c=new V3(P.pos.x+Math.sin(a)*dist,0,P.pos.z+Math.cos(a)*dist);c.y=Math.max(Math.max(groundH(c.x,c.z),0)+1500,P.pos.y+rand(-1200,1500));
       const tp=pickBanditType(),ac=AC_DEFS[tp];spawnPair(tp,c,P.pos,{ir:Math.min(2,ac.srN),rdr:Math.min(2,ac.mrN)})}
     return;
@@ -295,7 +299,7 @@ function updateMission(dt){
     const tr=friends.find(f=>f.kind==='transport');
     if(!tr||!tr.alive){endMission(false,'The C-130 was shot down');return}
     for(const q of spawnQ)if(!q.done&&missionT>=q.t){q.done=true;
-      const a=rand(-.6,.6),d=rand(16000,20000);const c=new V3(tr.pos.x+Math.sin(a)*d,tr.pos.y+rand(500,2500),tr.pos.z+Math.cos(a)*d);
+      const a=rand(-.6,.6),d=rand(16000,20000)*farK();const c=new V3(tr.pos.x+Math.sin(a)*d,tr.pos.y+rand(500,2500),tr.pos.z+Math.cos(a)*d);
       const pr=spawnPair(pickBanditType(),c,tr.pos);pr.forEach(x=>x.escortPref=Math.random()<.65);message('BANDITS · 2-SHIP INBOUND ON THE C-130',2)}
     if(tr.pos.z>=ESCORT_LEN-200)endMission(true,'The C-130 made it home');
     return;

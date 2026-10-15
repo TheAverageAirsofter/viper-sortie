@@ -29,6 +29,7 @@ npm run smoke                # loads the game headless and reports console error
 ```
 
 ## Notes
+- **Engagement range** (menu): Short is the original (merge ~9-14 km), Long (default, ~2.5x) and Extreme (~4x) start fights farther out, so radar missiles are shot from range and there is time to notch, drag or defend. It scales wave, rush and escort merges and pushes the scripted 2v4 / 4-ship starts back.
 - **Move buttons:** menu > "Move buttons…" lets you drag every on-screen control (and the throttle and countermeasure strip) where your thumbs rest, resize them (85–140%), or reset. Saved per device in localStorage.
 - CI (`.github/workflows/ci.yml`) runs the unit tests, the bundle-freshness check and the four headless tests on every push.
 - `flyout` (missile kinematics) now lives in `js/physics.js` with the other pure maths and is unit-tested.
