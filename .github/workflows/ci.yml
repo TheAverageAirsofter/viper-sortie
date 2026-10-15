@@ -16,3 +16,4 @@ jobs:
       - run: node tools/ui-test.js         # first-run hint, palette, persistence
       - run: node tools/play-test.js       # cameras, weapons, countermeasures
       - run: node tools/rush-test.js       # Bandit rush mission
+      - run: node tools/layout-test.js     # movable controls

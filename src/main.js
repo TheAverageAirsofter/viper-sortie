@@ -177,3 +177,34 @@ applyPal();
   $('bFirst').addEventListener('click',()=>{mission='TRAINING';try{localStorage.setItem('viperMission',mission)}catch(e){};done();setMenuLabels();applyAC()});
   $('bStart').addEventListener('click',done);
 })();
+
+/* ---------- movable controls: drag buttons to where your thumbs rest (saved per device) ---------- */
+const LAY_IDS=['bGun','b9','b120','bAg','bAgN','bLock','bGear','bBrake','bRdr','bCam','bPause','bEject','thr','cm'];
+const LAY_SIZES=[.85,1,1.2,1.4];
+let lay={s:1,p:{}}; try{const v=JSON.parse(localStorage.getItem('viperLayout')||'null');if(v&&typeof v==='object'){lay.s=LAY_SIZES.includes(v.s)?v.s:1;lay.p=v.p&&typeof v.p==='object'?v.p:{}}}catch(e){}
+function layApply(){for(const id of LAY_IDS){const el=$(id);if(!el)continue;const o=lay.p[id];
+  el.style.translate=o?`${+o[0]||0}px ${+o[1]||0}px`:'';el.style.scale=lay.s===1?'':String(lay.s)}
+  const b=$('laySize');if(b)b.textContent='Size '+Math.round(lay.s*100)+'%'}
+function laySave(){try{localStorage.setItem('viperLayout',JSON.stringify(lay))}catch(e){}}
+layApply();
+let layOn=false,layDrag=null,layHidden=[];
+function layEnter(){if(layOn)return;layOn=true;document.body.classList.add('laying');
+  layHidden=['bAg','bAgN','bEject','cJett','cTgp','cNvg','cWing'].map($).filter(e=>e&&e.hidden);layHidden.forEach(e=>e.hidden=false);   // show the situational buttons so they can be placed too
+  $('ctrls').hidden=false;$('layBar').hidden=false;LAY_IDS.forEach(id=>{const e=$(id);if(e)e.classList.add('lay')})}
+function layExit(){if(!layOn)return;layOn=false;layDrag=null;document.body.classList.remove('laying');
+  layHidden.forEach(e=>e.hidden=true);layHidden=[];$('ctrls').hidden=true;$('layBar').hidden=true;LAY_IDS.forEach(id=>{const e=$(id);if(e)e.classList.remove('lay','drag')});laySave()}
+$('bLayout').addEventListener('click',layEnter);
+$('layDone').addEventListener('click',layExit);
+$('layReset').addEventListener('click',()=>{lay={s:1,p:{}};layApply()});
+$('laySize').addEventListener('click',()=>{lay.s=LAY_SIZES[(LAY_SIZES.indexOf(lay.s)+1)%LAY_SIZES.length];layApply()});
+// capture phase: while editing, controls only move; they never fire game actions
+$('ctrls').addEventListener('pointerdown',e=>{if(!layOn)return;e.stopPropagation();e.preventDefault();
+  const el=LAY_IDS.map($).find(x=>x&&x.contains(e.target));if(!el)return;
+  const o=lay.p[el.id]||[0,0];layDrag={el,x:e.clientX,y:e.clientY,ox:+o[0]||0,oy:+o[1]||0,r:el.getBoundingClientRect()};el.classList.add('drag')},true);
+for(const t of ['click','touchstart','mousedown'])$('ctrls').addEventListener(t,e=>{if(layOn){e.stopPropagation();if(e.cancelable)e.preventDefault()}},true);
+addEventListener('pointermove',e=>{if(!layDrag)return;const d=layDrag,r=d.r;
+  let dx=e.clientX-d.x,dy=e.clientY-d.y;                                    // keep the whole control on screen
+  dx=clamp(dx,-r.left,innerWidth-r.right);dy=clamp(dy,-r.top,innerHeight-r.bottom);
+  lay.p[d.el.id]=[Math.round(d.ox+dx),Math.round(d.oy+dy)];layApply()});
+addEventListener('pointerup',()=>{if(layDrag){layDrag.el.classList.remove('drag');layDrag=null;laySave()}});
+addEventListener('pointercancel',()=>{if(layDrag){layDrag.el.classList.remove('drag');layDrag=null}});

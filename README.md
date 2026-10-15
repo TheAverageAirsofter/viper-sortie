@@ -29,6 +29,7 @@ npm run smoke                # loads the game headless and reports console error
 ```
 
 ## Notes
+- **Move buttons:** menu > "Move buttons…" lets you drag every on-screen control (and the throttle and countermeasure strip) where your thumbs rest, resize them (85–140%), or reset. Saved per device in localStorage.
 - CI (`.github/workflows/ci.yml`) runs the unit tests, the bundle-freshness check and the four headless tests on every push.
 - `flyout` (missile kinematics) now lives in `js/physics.js` with the other pure maths and is unit-tested.
 - three.js is r160 with colour management off, linear output and legacy light units, so it looks like the original r128 build. r161+ drops the UMD build, so going further means moving to ES modules.
