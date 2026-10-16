@@ -6,6 +6,7 @@ const stn=(sr,mr)=>[...sr.map((l,i)=>[l[0],l[1],'r9_'+i]),...mr.map((l,i)=>[l[0]
 // short-range heat seekers (game values; ranges and gimbal limits est.)
 const SRM={
   AIM9B:{burn:2.2,acc:90,cd:8e-5,gmax:16,life:18,fuze:7,gimbal:.5,decoy:.35,minR:600,maxR:3500,cone:.3,lockT:1.5},     // rear-aspect, flare-prone
+  AIM9P:{burn:3.5,acc:115,cd:7.5e-5,gmax:25,life:22,fuze:7,gimbal:.7,decoy:.2,minR:500,maxR:6000,cone:.4,lockT:1.2},
   AIM9L:{burn:4,acc:130,cd:7e-5,gmax:32,life:25,fuze:8,gimbal:.9,decoy:.14,minR:400,maxR:8500,cone:.55,lockT:1},        // all-aspect
   R60:{burn:3,acc:120,cd:7e-5,gmax:35,life:18,fuze:6,gimbal:.7,decoy:.2,minR:300,maxR:6000,cone:.5,lockT:1},
   AAM3:{burn:4,acc:135,cd:7e-5,gmax:35,life:25,fuze:8,gimbal:1.0,decoy:.12,minR:400,maxR:9000,cone:.65,lockT:.9},
@@ -17,6 +18,7 @@ const SRM={
   FALCON:{burn:2.5,acc:90,cd:8e-5,gmax:18,life:15,fuze:6,gimbal:.5,decoy:.3,minR:500,maxR:6000,cone:.35,lockT:1.5}};
 // radar missiles: semi-active Sparrow family (the launcher keeps illuminating), AMRAAM A/B, AAM-4, Derby
 const MRM={
+  AIM7E:{burn:3.5,acc:120,cd:5.5e-5,gmax:22,life:50,fuze:9,gimbal:.9,decoy:0,minR:1500,maxR:24000,cone:.9,lockT:1.8,sarh:true,launchG:4,termR:30000,dlR:0},
   AIM7:{burn:4,acc:130,cd:5e-5,gmax:25,life:55,fuze:10,gimbal:1.0,decoy:0,minR:1500,maxR:35000,cone:1.05,lockT:1.5,sarh:true,launchG:5,termR:45000,dlR:0},
   SKYFLASH:{burn:4.5,acc:135,cd:5e-5,gmax:28,life:60,fuze:10,gimbal:1.0,decoy:0,minR:1500,maxR:42000,cone:1.05,lockT:1.5,sarh:true,launchG:5,termR:50000,dlR:0},
   R3R:{burn:3,acc:85,cd:7e-5,gmax:12,life:25,fuze:7,gimbal:.6,decoy:.05,minR:700,maxR:8000,cone:.45,lockT:1.6,sarh:true,launchG:3,termR:10000,dlR:0},
@@ -30,10 +32,10 @@ const SRD=(n,r,w)=>({srName:n,srFull:r,sr:w});
 // F-4E Phantom II: 49.2 m² wing, 2× J79-GE-17 52.9 / 79.6 kN, +6.5 g in combat, Mach 2.2, M61A1 (639 rds), AIM-9L + AIM-7M, APQ-120 (no track-while-scan)
 dv('F15C','F4E','F-4E Phantom II','Phantom',{corner:440,
   S:49.2,MASS:17500,CLMAX:1.45,KIND:.12,T_AB:159000,T_MIL:105800,ram:.45,cdK:1.35,supK:.15,gmax:7,roll:3.0,vne:800,
-  gunRate:100,gunRounds:639,fuelCap:5900,sfcDry:.85,sfcAB:1.9,fuelUnit:'LB',engines:2,refuel:'boom',irstR:0,irstMax:0,
+  gunRate:100,gunRounds:640,fuelCap:5900,sfcDry:.85,sfcAB:1.9,fuelUnit:'LB',engines:2,refuel:'boom',irstR:0,irstMax:0,
   srName:'9L',srFull:'AIM-9L',mrName:'7M',mrFull:'AIM-7M',srN:4,mrN:4,sr:SRM.AIM9L,mr:MRM.AIM7,
   radar:{modes:['RWS'],name:'AN/APQ-120',range:70000},
-  cm:cmo(30,30,0,false,null,'','ALE-40',stn([['2A','9L'],['2B','9L'],['8A','9L'],['8B','9L']],[['5','7M'],['6','7M'],['7','7M'],['4','7M']])),
+  cm:cmo(30,60,0,false,null,'','ALE-40',stn([['2A','9L'],['2B','9L'],['8A','9L'],['8B','9L']],[['5','7M'],['6','7M'],['7','7M'],['4','7M']])),
   spec:'<span><b>+6.5 g</b> (heavy, draggy)</span><span><b>Mach 2.2</b></span><span>2× J79 <b>79.6 kN</b></span><span>M61A1 · <b>639 rds</b></span><span>AIM-7M · AIM-9L</span><span>No look-down TWS</span>',
   snd:{f:34,roar:240,wh:.002,twin:1,howl:[130,.01]},seek:{flareP:.04,chaffP:.03},rwrSym:'F4',rwrName:'ALR-46',srDesc:'AIM-9L all-aspect heat seeker on the inboard pylons',mrDesc:'AIM-7M Sparrow (Fox 1): you must keep the radar lock until it hits',cmDesc:'ALE-40 dispensers'});
 delete AC_DEFS.F4E.model;
@@ -82,13 +84,13 @@ delete AC_DEFS.F22A.model;
 // MiG-21bis: 23 m² delta wing, R25-300 (40.3 / 69.7 kN), +8 g, GSh-23L (200 rds), RP-22 Sapfir, R-60M + R-3R (semi-active), no countermeasure bays beyond ASO-2 flares
 dv('MIG29','MIG21','MiG-21bis','Fishbed',{corner:400,
   S:23,MASS:8400,CLMAX:1.4,KIND:.14,T_AB:69700,T_MIL:40300,ram:.35,cdK:1.05,supK:.1,gmax:8,roll:4.0,vne:800,tvc:false,
-  gunRate:50,gunRounds:200,muzzle:690,gunDmg:1,gunSnd:1200,ammo:'23MM',
+  gunRate:50,gunRounds:250,muzzle:690,gunDmg:1,gunSnd:1200,ammo:'23MM',
   fuelCap:2300,sfcDry:.95,sfcAB:2.1,fuelUnit:'KG',engines:1,refuel:null,irstR:0,irstMax:0,
-  srName:'R60',srFull:'R-60M',mrName:'R3R',mrFull:'R-3R',srN:2,mrN:2,sr:SRM.R60,mr:MRM.R3R,
+  srName:'R60',srFull:'R-60M',mrName:'R3R',mrFull:'R-3R',srN:4,mrN:2,sr:SRM.R60,mr:MRM.R3R,
   radar:{modes:['RWS'],name:'RP-22 Sapfir',range:30000},
-  cm:cmo(32,0,0,false,null,'','ASO-2',stn([['1','R60'],['4','R60']],[['2','R3R'],['3','R3R']])),
-  spec:'<span><b>+8 g</b></span><span><b>Mach 2.05</b></span><span>R25-300 <b>69.7 kN</b></span><span>GSh-23L · <b>200 rds</b></span><span>R-60M · R-3R</span><span>Short-range radar</span>',
-  snd:{f:30,roar:215,wh:.004,twin:0,howl:[150,.012]},seek:{flareP:.04,chaffP:.02},rwrSym:'21',rwrName:'SPO-10',srDesc:'R-60M heat seeker, short range',mrDesc:'R-3R semi-active radar missile: hold the lock to impact',cmDesc:'ASO-2 flares'});
+  cm:cmo(0,0,0,false,null,'','none',stn([['1','R60'],['2','R60'],['3','R60'],['4','R60']],[['5','R3R'],['6','R3R']])),
+  spec:'<span><b>+8 g</b></span><span><b>Mach 2.05</b></span><span>R25-300 <b>69.7 kN</b></span><span>GSh-23L · <b>200 rds</b></span><span>R-60M · R-3R</span><span>Short-range radar · no countermeasures</span>',
+  snd:{f:30,roar:215,wh:.004,twin:0,howl:[150,.012]},seek:{flareP:.04,chaffP:.02},rwrSym:'21',rwrName:'SPO-10',srDesc:'R-60M heat seeker, short range',mrDesc:'R-3R semi-active radar missile: hold the lock to impact',cmDesc:'none'});
 delete AC_DEFS.MIG21.model;
 // Su-30SM: 62 m² wing, 2× AL-31FP (76.2 / 122.6 kN) with 2-axis thrust vectoring, N011M Bars PESA, OLS-30, 9.4 t fuel, R-77-1 + R-73, 2 seats
 dv('SU27','SU30SM','Su-30SM','Flanker',{corner:350,
@@ -114,13 +116,13 @@ delete AC_DEFS.SU57.model;
 // F-104G Starfighter: 18.2 m² wing, J79-MTU-J1K (52.8 / 79.6 kN), +7 g, M61A1 (725 rds), AIM-9B at the wing tips, NASARR ranging radar, very fast but a poor turner
 dv('F16','F104G','F-104G Starfighter','Zipper',{corner:480,
   S:18.22,MASS:9300,CLMAX:1.05,KIND:.18,T_AB:79600,T_MIL:52800,ram:.45,cdK:1.0,supK:.12,gmax:7,roll:5.5,vne:880,
-  gunRate:100,gunRounds:725,muzzle:1030,gunDmg:1,gunSnd:1800,ammo:'PGU-28',
+  gunRate:100,gunRounds:750,muzzle:1030,gunDmg:1,gunSnd:1800,ammo:'PGU-28',
   fuelCap:3500,sfcDry:.95,sfcAB:1.95,fuelUnit:'LB',engines:1,refuel:null,irstR:0,irstMax:0,
-  srName:'9B',srFull:'AIM-9B',mrName:'-',mrFull:'none',srN:2,mrN:0,sr:SRM.AIM9B,mr:MRM.AIM7,
+  srName:'9B',srFull:'AIM-9B',mrName:'-',mrFull:'none',srN:4,mrN:0,sr:SRM.AIM9B,mr:MRM.AIM7,
   radar:{modes:['RWS'],name:'NASARR F15A',range:25000},
-  cm:cmo(0,0,0,false,null,'','none',stn([['TIP L','9B'],['TIP R','9B']],[])),
-  spec:'<span><b>+7 g</b> · tiny wing</span><span><b>Mach 2</b></span><span>J79 <b>79.6 kN</b></span><span>M61A1 · <b>725 rds</b></span><span>AIM-9B · ranging radar</span><span>No countermeasures</span>',
-  snd:{f:36,roar:235,wh:.003,twin:0,howl:[190,.011]},seek:{flareP:.02,chaffP:.01},rwrSym:'104',rwrName:'none',srDesc:'AIM-9B Sidewinder at the wing tips (rear aspect, short range)',mrDesc:'No radar missiles',cmDesc:'none'});
+  cm:cmo(30,30,0,false,null,'','CM',stn([['TIP L','9B'],['TIP R','9B'],['PYL L','9B'],['PYL R','9B']],[])),
+  spec:'<span><b>+7 g</b> · tiny wing</span><span><b>Mach 2</b></span><span>J79 <b>79.6 kN</b></span><span>M61A1 · <b>750 rds</b></span><span>4× AIM-9B · ranging radar</span><span>60 countermeasures</span>',
+  snd:{f:36,roar:235,wh:.003,twin:0,howl:[190,.011]},seek:{flareP:.02,chaffP:.01},rwrSym:'104',rwrName:'none',srDesc:'AIM-9B Sidewinder at the wing tips and pylons (rear aspect, short range)',mrDesc:'No radar missiles',cmDesc:'60 cartridges'});
 delete AC_DEFS.F104G.model; AC_DEFS.F104G.cut={r:.55,full:[-6,2.8],open:[2.8,6.5]};
 // F-4F Phantom II (ICE): upgraded Luftwaffe Phantom, APG-65 radar, AIM-120B + AIM-9L, no leading-edge slats
 dv('F4E','F4F','F-4F Phantom II ICE','Phantom',{corner:440,
@@ -148,7 +150,20 @@ dv('F35A','F35DE','F-35A Lightning II (Luftwaffe)','Lightning',{});
 
 /* ===== Japan ===== */
 // F-4EJ Kai: Mitsubishi-built Phantom, APG-66J look-down radar, AIM-7F + AIM-9L + AAM-3, JM61A1 (639 rds)
-dv('F4E','F4EJ','F-4EJ Kai Phantom II','Phantom',{corner:440,
+// F-4EJ: Mitsubishi-built Phantom as delivered (AIM-7E-2 and AIM-9P, APQ-120, JM61A1), no look-down radar
+dv('F4E','F4EJ','F-4EJ Phantom II','Phantom',{corner:440,
+  srName:'9P',srFull:'AIM-9P',sr:SRM.AIM9P,mrName:'7E',mrFull:'AIM-7E-2',mr:MRM.AIM7E,
+  cm:cmo(30,60,0,false,null,'','ALE-40',stn([['2A','9P'],['2B','9P'],['8A','9P'],['8B','9P']],[['5','7E'],['6','7E'],['7','7E'],['4','7E']])),
+  spec:'<span><b>+6.5 g</b></span><span><b>Mach 2.2</b></span><span>2× J79-IHI <b>79.6 kN</b></span><span>APQ-120</span><span>AIM-7E-2 · AIM-9P</span><span>JM61A1 · 639 rds</span>',
+  srDesc:'AIM-9P heat seeker (rear aspect, short range)',mrDesc:'AIM-7E-2 Sparrow (Fox 1): hold the lock, short reach'});
+// F-4E (Israeli Air Force): US-built Phantom flown by Israel in the 1970s-80s with Shafrir 2 / AIM-9P and AIM-7E-2
+dv('F4E','F4EIL','F-4E Phantom II (IAF)','Phantom',{corner:440,
+  srName:'SHAF2',srFull:'Shafrir 2',sr:SRM.AIM9P,mrName:'7E',mrFull:'AIM-7E-2',mr:MRM.AIM7E,
+  cm:cmo(30,60,0,false,null,'','ALE-40',stn([['2A','Shaf'],['2B','Shaf'],['8A','Shaf'],['8B','Shaf']],[['5','7E'],['6','7E'],['7','7E'],['4','7E']])),
+  spec:'<span><b>+6.5 g</b></span><span><b>Mach 2.2</b></span><span>2× J79 <b>79.6 kN</b></span><span>APQ-120</span><span>AIM-7E-2 · Shafrir 2</span><span>M61A1 · 639 rds</span>',
+  srDesc:'Shafrir 2 heat seeker, short range',mrDesc:'AIM-7E-2 Sparrow (Fox 1): hold the lock, short reach'});
+// F-4EJ Kai: the upgraded Japanese Phantom, APG-66J look-down radar, AIM-7F + AAM-3
+dv('F4E','F4EJK','F-4EJ Kai Phantom II','Phantom',{corner:440,
   srName:'AAM3',srFull:'AAM-3',sr:SRM.AAM3,mrName:'7F',mrFull:'AIM-7F',
   radar:{modes:['RWS','TWS'],name:'AN/APG-66J',range:90000},
   cm:cmo(30,60,0,false,'ECM','J/ALQ-8 pod','ALE-40',stn([['2A','AAM3'],['2B','AAM3'],['8A','AAM3'],['8B','AAM3']],[['5','7F'],['6','7F'],['7','7F'],['4','7F']])),
@@ -262,9 +277,9 @@ dv('F16','JA37','JA 37 Viggen','Viggen',{corner:440,
   S:46,MASS:15500,CLMAX:1.9,KIND:.11,T_AB:125000,T_MIL:72800,ram:.35,cdK:1.05,supK:.15,gmax:7,roll:4.0,vne:880,
   gunRate:22.5,gunRounds:150,muzzle:1050,gunDmg:2,gunSnd:900,ammo:'30MM',
   fuelCap:4500,sfcDry:.85,sfcAB:2.0,fuelUnit:'KG',engines:1,refuel:null,irstR:0,irstMax:0,
-  srName:'RB74',srFull:'Rb 74',mrName:'RB71',mrFull:'Rb 71 Sky Flash',srN:4,mrN:2,sr:SRM.AIM9L,mr:MRM.SKYFLASH,
+  srName:'RB74',srFull:'Rb 74',mrName:'RB71',mrFull:'Rb 71 Sky Flash',srN:6,mrN:2,sr:SRM.AIM9L,mr:MRM.SKYFLASH,
   radar:{modes:['RWS','TWS'],name:'PS-46/A',range:80000},
-  cm:cmo(60,120,0,false,'ECM','BOZ-100 pod','BOZ',stn([['6A','Rb74'],['6B','Rb74'],['7A','Rb74'],['7B','Rb74']],[['5A','Rb71'],['5B','Rb71']])),
+  cm:cmo(60,120,0,false,'ECM','BOZ-100 pod','BOZ',stn([['6A','Rb74'],['6B','Rb74'],['7A','Rb74'],['7B','Rb74'],['4A','Rb74'],['4B','Rb74']],[['5A','Rb71'],['5B','Rb71']])),
   spec:'<span><b>+7 g</b></span><span><b>Mach 2</b></span><span>RM8B <b>125 kN</b></span><span>PS-46/A <b>look-down</b></span><span>Rb 71 · Rb 74</span><span>Canard-delta</span>',
   snd:{f:30,roar:215,wh:.004,twin:0,howl:[170,.014]},seek:{flareP:.06,chaffP:.05},rwrSym:'37',rwrName:'RWR (est.)',srDesc:'Rb 74 (AIM-9L) heat seeker on the wing pylons',mrDesc:'Rb 71 Sky Flash semi-active radar missile: hold the lock',cmDesc:'BOZ dispensers'});
 delete AC_DEFS.JA37.model;
@@ -372,7 +387,7 @@ M2.F104G={L:16.7,nz:3.8,radome:6.4,
   wings:[{st:[{x:.7,zle:.9,zte:-3.3,y:-.12,t:.03},{x:3.34,zle:-.5,zte:-1.7,y:-.12,t:.025}]},{st:[{x:.3,zle:-6.9,zte:-8.3,y:2.9,t:.03},{x:1.9,zle:-7.5,zte:-8.3,y:2.9,t:.025}]}],
   fins:[{x:0,y:.4,st:[{h:0,zle:-4.0,zte:-8.0,t:.05},{h:2.5,zle:-6.8,zte:-8.4,t:.04}]}],
   canopy:[3.5,.5,.4,.36,1.2],frame:-1,noz:[[0,0,-8.2,.45,1.1]],
-  r9:mir([[3.45,-.12,-.35,null]]),r120:[]};
+  r9:mir([[3.45,-.12,-.35,null],[2.0,-.45,-.3,-.05]]),r120:[]};
 // MiG-21bis: 15 m, 7.2 m span, delta wing with all-moving tailplane, shock cone
 M2.MIG21={L:14.8,nz:3.2,radome:5.6,
   fus:[[-6.8,.5,.5,.45,0,2.3],[-5.5,.6,.55,.5,0,2.5],[-3,.62,.6,.55,0,2.7],[-.5,.65,.6,.55,.05,2.8],[2,.58,.58,.5,.05,2.6],[4,.5,.5,.45,.05,2.4],[5.5,.46,.46,.42,.05,2.4],[6.6,.44,.42,.4,0,2.3],[7.15,.18,.18,.18,0,2],[7.4,0,0,0,0,2]],
@@ -380,7 +395,7 @@ M2.MIG21={L:14.8,nz:3.2,radome:5.6,
   wings:[{st:[{x:.55,zle:1.8,zte:-4.0,y:-.25,t:.04},{x:3.57,zle:-.3,zte:-2.1,y:-.25,t:.03}]},{st:[{x:.55,zle:-5.2,zte:-6.9,y:-.1,t:.03},{x:2.0,zle:-6.3,zte:-7.2,y:-.1,t:.025}]}],
   fins:[{x:0,y:.5,st:[{h:0,zle:-2.6,zte:-6.2,t:.05},{h:2.2,zle:-5.2,zte:-6.9,t:.04}]}],
   canopy:[2.7,.58,.36,.34,1.35],frame:-1,noz:[[0,.1,-6.9,.42,1.0]],
-  r9:mir([[2.4,-.34,-.8,-.06]]),r120:mir([[1.4,-.3,-.4,-.06]])};
+  r9:mir([[2.4,-.34,-.8,-.06],[3.0,-.3,-1.6,-.06]]),r120:mir([[1.4,-.3,-.4,-.06]])};
 // Su-57: 19.8 m, 14.1 m span, wide spaced engines, LEVCON-less blended wing, canted all-moving tails, internal bays
 M2.SU57={L:19.5,nz:5.8,radome:7.2,internal:1,
   fus:[[-9.5,.5,.42,.4,.1,2.4],[-8,.7,.5,.45,.1,2.6],[-5,.95,.62,.55,.05,2.8],[-1.5,1.05,.65,.6,0,2.8],[2,.9,.62,.58,0,2.6],[4.8,.65,.5,.45,0,2.3],[7.2,.45,.35,.32,-.03,2.2],[9.0,.25,.2,.2,-.05,2.1],[10.0,0,0,0,-.06,2]],
@@ -405,7 +420,7 @@ M2.JA37={L:16.4,nz:4.2,radome:6.2,
   wings:[{st:[{x:.9,zle:.6,zte:-6.4,y:-.12,t:.04},{x:3.2,zle:-1.4,zte:-6.4,y:-.12,t:.035},{x:5.3,zle:-3.9,zte:-6.0,y:-.12,t:.025}]},{st:[{x:.9,zle:4.3,zte:3.0,y:.45,t:.03},{x:2.6,zle:3.6,zte:2.8,y:.5,t:.025}]}],
   fins:[{x:0,y:.5,st:[{h:0,zle:-2.5,zte:-6.9,t:.05},{h:3.7,zle:-5.6,zte:-7.4,t:.04}]}],
   canopy:[3.4,.7,.42,.4,1.45],frame:-1.1,noz:[[0,.05,-7.7,.55,1.2]],
-  r9:mir([[2.7,-.18,-1.6,.0],[4.3,-.18,-2.8,.0]]),r120:mir([[2.0,-.45,-.4,-.08]])};
+  r9:mir([[2.7,-.18,-1.6,.0],[4.3,-.18,-2.8,.0],[1.6,-.4,.2,-.05]]),r120:mir([[2.0,-.45,-.4,-.08]])};
 // Lightning F.6: 16.8 m, 10.6 m span, 60° swept wings, two Avons stacked in the fuselage, nose intake
 M2.LIGHTNING={L:16.8,nz:4.2,radome:7.4,
   fus:[[-8.0,.55,.7,.6,.1,2.2],[-6.5,.72,.85,.8,.1,2.5],[-4,.85,1.0,.9,.1,2.6],[-1,.85,1.0,.9,.1,2.7],[2,.8,.95,.85,.05,2.6],[4.2,.7,.85,.75,.05,2.4],[6.0,.6,.7,.65,0,2.3],[7.5,.52,.55,.5,0,2.2],[8.4,.4,.4,.4,0,2.1],[8.5,0,0,0,0,2]],
@@ -435,21 +450,21 @@ const m2Alias=(id,src,patch)=>{M2[id]=patch?Object.assign({},M2[src],patch):M2[s
 m2Alias('F15E','F15C',{parts:[...M2.F15C.parts,{x:1.72,st:[[-4.6,.3,.35,.3,.05,2],[-1,.36,.4,.32,.05,2],[2.2,.3,.35,.28,.05,2]]}],canopy:[4.9,.95,.5,.5,2.25]});
 m2Alias('FA18C','FA18E');
 m2Alias('F2A','F16',{wings:[{st:[{x:.85,zle:1.5,zte:-4.2,y:-.08,t:.04},{x:5.6,zle:-1.9,zte:-3.4,y:-.08,t:.03}]},M2.F16.wings[1],M2.F16.wings[2]],r9:mir([[5.5,-.08,-2.7,null]])});
-for(const [id,src] of [['F4F','F4E'],['F4EJ','F4E'],['F4E2K','F4E'],['PHANTOM2','F4E'],['F15J','F15C'],['F15JK','F15C'],['F15BAZ','F15C'],['F15I','F15E'],['F16BARAK','F16'],['F16I','F16B70'],
+for(const [id,src] of [['F4F','F4E'],['F4EJ','F4E'],['F4EJK','F4E'],['F4EIL','F4E'],['F4E2K','F4E'],['PHANTOM2','F4E'],['F15J','F15C'],['F15JK','F15C'],['F15BAZ','F15C'],['F15I','F15E'],['F16BARAK','F16'],['F16I','F16B70'],
   ['F35DE','F35A'],['F35AJ','F35A'],['F35B','F35A'],['F35BJ','F35A'],['F35I','F35A'],['MIG29G','MIG29'],['EF2K1','TYPHOON'],['EF2K3','TYPHOON'],['SU30SM','SU35'],['J7G','MIG21'],['J11B','SU27'],['J15','SU33'],['J16','SU35']])m2Alias(id,src);
-for(const id of ['F4E','F35A','F22A','F104G','MIG21','SU57','J35F','JA37','LIGHTNING','TORNADO3','KFIR','F15E','FA18C','F2A','F4F','F4EJ','F4E2K','PHANTOM2','F15J','F15JK','F15BAZ','F15I','F16BARAK','F16I','F35DE','F35AJ','F35B','F35BJ','F35I',
+for(const id of ['F4E','F35A','F22A','F104G','MIG21','SU57','J35F','JA37','LIGHTNING','TORNADO3','KFIR','F15E','FA18C','F2A','F4F','F4EJ','F4EJK','F4EIL','F4E2K','PHANTOM2','F15J','F15JK','F15BAZ','F15I','F16BARAK','F16I','F35DE','F35AJ','F35B','F35BJ','F35I',
   'MIG29G','EF2K1','EF2K3','SU30SM','J7G','J11B','J15','J16'])m2Fit(id);
 // the saved aircraft may be one of the new ones
 try{const k=localStorage.getItem('viperAC');if(AC_DEFS[k])AC=AC_DEFS[k]}catch(e){}
 
 /* ---- tables that other slices own get their rows from here (they run later, so they call these) ---- */
-const ROSTER_LIKE={F15E:'F15C',FA18C:'FA18E',F4F:'F4E',F4EJ:'F4E',F4E2K:'F4E',PHANTOM2:'F4E',F15J:'F15C',F15JK:'F15C',F15BAZ:'F15C',F15I:'F15C',F16BARAK:'F16',F16I:'F16B70',F2A:'F16B70',
+const ROSTER_LIKE={F15E:'F15C',FA18C:'FA18E',F4F:'F4E',F4EJ:'F4E',F4EJK:'F4E',F4EIL:'F4E',F4E2K:'F4E',PHANTOM2:'F4E',F15J:'F15C',F15JK:'F15C',F15BAZ:'F15C',F15I:'F15C',F16BARAK:'F16',F16I:'F16B70',F2A:'F16B70',
   F35DE:'F35A',F35AJ:'F35A',F35B:'F35A',F35BJ:'F35A',F35I:'F35A',MIG29G:'MIG29',EF2K1:'TYPHOON',EF2K3:'TYPHOON',SU30SM:'SU35',J7G:'MIG21',J11B:'SU27',J15:'SU33',J16:'SU35'};
-const ROSTER_IDS=['F4E','FA18C','F15E','F35A','F22A','MIG21','SU30SM','SU57','F104G','F4F','MIG29G','EF2K1','EF2K3','F35DE','F4EJ','F15J','F15JK','F2A','F35AJ','F35B','F35BJ','KFIR','F4E2K','F15BAZ','F16BARAK','F16I','F15I','F35I',
+const ROSTER_IDS=['F4E','FA18C','F15E','F35A','F22A','MIG21','SU30SM','SU57','F104G','F4F','MIG29G','EF2K1','EF2K3','F35DE','F4EJ','F4EJK','F4EIL','F15J','F15JK','F2A','F35AJ','F35B','F35BJ','KFIR','F4E2K','F15BAZ','F16BARAK','F16I','F15I','F35I',
   'J35F','JA37','LIGHTNING','PHANTOM2','TORNADO3','J7G','J11B','J15','J16'];
 const rosterFill=(T,own)=>{Object.assign(T,own);for(const k in ROSTER_LIKE)if(T[k]==null&&T[ROSTER_LIKE[k]]!=null)T[k]=T[ROSTER_LIKE[k]]};
 Object.assign(PODS,{F15E:'LANTIRN',FA18C:'LITENING AT',F16I:'LITENING',F15I:'LITENING',F35A:'EOTS',F35DE:'EOTS',F35AJ:'EOTS',F35B:'EOTS',F35BJ:'EOTS',F35I:'EOTS',F22A:null,SU57:'OLS-50M',J16:'KZ900',J11B:null});
-Object.assign(PITS,{F4E:'TEEN',F4F:'TEEN',F4EJ:'TEEN',F4E2K:'TEEN',PHANTOM2:'TEEN',FA18C:'HORNET',F15E:'LAD',F15J:'TEEN',F15JK:'LAD',F15BAZ:'TEEN',F15I:'LAD',F35A:'LAD',F35DE:'LAD',F35AJ:'LAD',F35B:'LAD',F35BJ:'LAD',F35I:'LAD',F22A:'LAD',
+Object.assign(PITS,{F4E:'TEEN',F4F:'TEEN',F4EJ:'TEEN',F4EJK:'TEEN',F4EIL:'TEEN',F4E2K:'TEEN',PHANTOM2:'TEEN',FA18C:'HORNET',F15E:'LAD',F15J:'TEEN',F15JK:'LAD',F15BAZ:'TEEN',F15I:'LAD',F35A:'LAD',F35DE:'LAD',F35AJ:'LAD',F35B:'LAD',F35BJ:'LAD',F35I:'LAD',F22A:'LAD',
   F104G:'TEEN',MIG21:'RUS',MIG29G:'RUS',SU30SM:'RUS2',SU57:'RUS2',J35F:'TEEN',JA37:'TEEN',LIGHTNING:'TEEN',TORNADO3:'3MFD',KFIR:'TEEN',F16I:'LAD',EF2K1:'3MFD',EF2K3:'3MFD',J7G:'RUS',J11B:'RUS2',J15:'RUS2',J16:'3MFD'});
 for(const id of ['F16BARAK','F16I','F2A','F35A','F35DE','F35AJ','F35B','F35BJ','F35I'])SIDESTICK[id]=1;
 Object.assign(PAINT,{
@@ -464,7 +479,9 @@ Object.assign(PAINT,{
   EF2K1:{p:0,c:['#858c93','#7a8188','#9199a0'],nat:'ger',num:'30+43',lowvis:1},
   EF2K3:{p:0,c:['#858c93','#7a8188','#9199a0'],nat:'ger',num:'31+30',lowvis:1},
   F35DE:{p:0,c:['#7b8187','#70767c','#868c92'],nat:'ger',num:'31+01',lowvis:1},
-  F4EJ:{p:1,c:['#9aa4ac','#7e8a95','#aeb7bd'],nat:'jp',num:'17-8440',lowvis:1},
+  F4EJ:{p:1,c:['#9aa4ac','#7e8a95','#aeb7bd'],nat:'jp',num:'17-8301',lowvis:1},
+  F4EJK:{p:1,c:['#9aa4ac','#7e8a95','#aeb7bd'],nat:'jp',num:'17-8440',lowvis:1},
+  F4EIL:{p:2,c:['#b0a47a','#8d9a7e','#7f8c97'],b:'#bcc4cb',nat:'isr',num:'69'},
   F15J:{p:1,c:['#8b96a1','#6e7b88','#9aa5af'],nat:'jp',num:'92-8920',lowvis:1},
   F15JK:{p:1,c:['#85909b','#68757f','#939ea8'],nat:'jp',num:'12-8808',lowvis:1},
   F2A:{p:1,c:['#8f9ba6','#74818d','#a0abb4'],nat:'jp',num:'63-8523',lowvis:1},

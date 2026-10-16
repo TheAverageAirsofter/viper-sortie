@@ -102,7 +102,7 @@ const qr=$('qRows');
     mRow('Start',()=>[{v:'air',t:'In the air'},{v:'rwy',t:'Runway'},...(AC.carrier?[{v:'cv',t:'Carrier'}]:[])],startCur,v=>drive($('bStartPos'),startCur,v,4)),
     mRow('Mode',()=>[{v:'free',t:'Free play'},{v:'career',t:'Career'}],()=>careerOn?'career':'free',v=>drive($('bMode'),()=>careerOn?'career':'free',v,2)));
   B1.append(mGrp('Opponents'),
-    mRow('Bandits',()=>Object.keys(BANDITS).map(k=>({v:k,t:BANDITS[k]})),()=>banditType,v=>drive($('bBandit'),()=>banditType,v,90),{hidden:()=>$('bBandit').hidden}),
+    mRow('Bandits',()=>{const p=banditPool();return Object.keys(BANDITS).filter(k=>k==='MIXED'||p.indexOf(k)>=0).map(k=>({v:k,t:BANDITS[k]}))},()=>banditPool().indexOf(banditType)>=0?banditType:'MIXED',v=>drive($('bBandit'),()=>banditType,v,90),{hidden:()=>$('bBandit').hidden}),
     mRow('Difficulty',()=>Object.keys(DIFF).map(k=>({v:k,t:DIFF[k].name})),()=>difficulty,v=>drive($('bDiff'),()=>difficulty,v),{hidden:()=>$('bDiff').hidden}),
     mRow('Range',()=>Object.keys(ENG_RANGES).map(k=>({v:k,t:ENG_RANGES[k].n})),()=>rangeKey,v=>drive($('bRange'),()=>rangeKey,v)),
     mGrp('Environment'),
@@ -238,14 +238,12 @@ function diagram(){const m=MIS_ART[mission]||MIS_ART.WAVES,p=MAP_ART[MAP]||MAP_A
 // the enemy battle-rating range for the selected mission, as the bandit picker will use it
 const NO_FIGHTERS=['CONVOY','ANTISHIP','CRUISE'];
 function enemyBR(){if(NO_FIGHTERS.indexOf(mission)>=0)return null;
-  if(banditType!=='MIXED'){const b=progBR(banditType);return{lo:b,hi:b}}
-  const b=progBR(AC.id);let pool=FIGHTERS;if(careerOn){const near=FIGHTERS.filter(f=>Math.abs(progBR(f)-b)<=1);if(near.length>1)pool=near}
-  const v=pool.map(progBR);return{lo:Math.min(...v),hi:Math.max(...v)}}
+  const v=banditPool().filter(k=>banditType==='MIXED'||k===banditType||banditPool().indexOf(banditType)<0).map(progBR);return{lo:Math.min(...v),hi:Math.max(...v)}}
 const kvs=a=>'<dl class="kvs">'+a.map(x=>'<div><dt>'+x[0]+'</dt><dd>'+x[1]+'</dd></div>').join('')+'</dl>';
 function briefQuick(){const k=mission,mine=progBR(AC.id),er=enemyBR(),out=er&&(mine<er.lo-.001||mine>er.hi+.001);
   const rng=er?(er.lo===er.hi?er.lo.toFixed(1):er.lo.toFixed(1)+'–'+er.hi.toFixed(1)):'none';
   $('qBrief').innerHTML='<p class="eyebrow">Briefing</p><h2>'+MISSIONS[k]+'</h2>'+(out?'<p class="warnchip" role="status">Your BR '+mine.toFixed(1)+' is outside the enemy range '+rng+'</p>':'')+'<p class="txt">'+(MIS_BRIEF[k]||MIS_DESC[k]||'')+'</p><div class="diag">'+diagram()+'</div>'+
-    kvs([['Aircraft',AC.name],['BR','<span id="brMine">'+mine.toFixed(1)+' ±1.0</span>'],['Enemy BR','<span id="brEnemy">'+rng+'</span>'],['Time',TMN[timeOfDay]],['Weather',WXN[weather]],['Map',MAP_NAME(MAP)]])}
+    kvs([['Aircraft',AC.name],['BR','<span id="brMine">'+mine.toFixed(1)+' ±0.7</span>'],['Enemy BR','<span id="brEnemy">'+rng+'</span>'],['Time',TMN[timeOfDay]],['Weather',WXN[weather]],['Map',MAP_NAME(MAP)]])}
 function briefTrain(){const k=lesson,done=lessonsDone();$('trBrief').innerHTML='<p class="eyebrow">Lesson '+String(Object.keys(LESSONS).indexOf(k)+1).padStart(2,'0')+'</p><h2>'+LESSONS[k]+'</h2><p class="txt">'+(LES_BRIEF[k]||LES_DESC[k])+'</p>'+
   kvs([['Aircraft',AC.name],['Status',done[k]?'Complete':'Not yet flown'],['Lessons done',Object.keys(done).filter(x=>done[x]).length+' / '+Object.keys(LESSONS).length]])}
 const lessonsDone=()=>{try{return JSON.parse(lsGet('vsLessonsDone','{}'))||{}}catch(e){return{}}};

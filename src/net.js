@@ -259,7 +259,7 @@ function syncCareerUI(){
   pc.innerHTML='';const b=document.createElement('b');b.textContent=RANKS[ri][1];pc.appendChild(b);
   pc.appendChild(document.createTextNode(` · ${career.xp.toLocaleString()} XP · ${career.kills} kill${career.kills===1?'':'s'} · ${career.wins} mission${career.wins===1?'':'s'} won · ${career.sorties} sortie${career.sorties===1?'':'s'}`+
     ` · ${prog.sl.toLocaleString()} SL · ${prog.frp.toLocaleString()} free RP · Hangar > Tech tree to research and buy`));
-  if(!unlocked(AC.id)){AC=AC_DEFS.F16;applyAC()}
+  if(!unlocked(AC.id)){AC=AC_DEFS[PROG_START.find(unlocked)||'F4E'];applyAC()}
 }
 function careerAward(){
   lastAward=null; if(!careerOn||deathCause==='abort'&&missionT<20)return;

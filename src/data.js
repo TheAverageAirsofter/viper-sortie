@@ -131,7 +131,7 @@ AC_DEFS.F15C=Object.assign({},AC_DEFS.F16,{id:'F15C',name:'F-15C Eagle',eyebrow:
   gunRate:100,gunRounds:940,fuelCap:6100,sfcDry:.73,sfcAB:2.05,fuelUnit:'LB',engines:2,refuel:'boom',irstR:0,
   srName:'9X',srFull:'AIM-9X',mrName:'120',mrFull:'AIM-120C',srN:2,mrN:6,sr:AC_DEFS.F16.sr,mr:Object.assign({},AC_DEFS.F16.mr,{maxR:40000}),
   radar:{modes:['RWS','TWS'],name:'APG-63(V)3',range:120000},
-  cm:{fixed:true,flares:30,chaff:60,decoys:0,maws:false,jam:'ECM',jamName:'AN/ALQ-135 internal jammer',cmds:'TEWS',
+  cm:{fixed:true,flares:120,chaff:120,decoys:0,maws:false,jam:'ECM',jamName:'AN/ALQ-135 internal jammer',cmds:'TEWS',
     stations:[['2A','9X','r9_0'],['2B','120C','r120_0'],['3','120C','r120_2'],['4','120C','r120_4'],['6','120C','r120_5'],['7','120C','r120_3'],['8B','120C','r120_1'],['8A','9X','r9_1']]},
   spec:'<span><b>+9 g</b></span><span><b>Mach 2.5</b> high</span><span>2× F100-PW-220</span><span>M61A1 · <b>940 rds</b></span><span>APG-63(V)3 <b>AESA</b></span><span>AIM-120C · AIM-9X</span>',
   fx:{eng:[[.72,-9.6],[-.72,-9.6]],vapor:6.5,nav:[6.5,-8.6,3.6],shadow:[19.4,13],nz:5.2},snd:{f:36,roar:225,wh:.003,twin:1},seek:{flareP:.12,chaffP:.08},

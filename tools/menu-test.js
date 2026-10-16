@@ -90,7 +90,7 @@ const path = require('path'), assert = require('assert');
   await p.click('#qRows .mr[data-name=Preset] .rm'); assert(await p.isVisible('#qRows .pchip'), 'confirm chip, not a modal'); assert.equal(await p.evaluate(() => __vs.preset), 'REALISTIC', 'nothing changes before confirming');
   await p.click('#qRows .pchip [data-n]'); assert(!(await p.isVisible('#qRows .pchip'))); await p.click('#qRows .mr[data-name=Preset] .rm'); await p.click('#qRows .pchip [data-y]'); assert.notEqual(await p.evaluate(() => __vs.preset), 'REALISTIC', 'Apply switches the preset');
   // battle rating on the briefing and the out-of-range chip
-  assert.match(await p.textContent('#brMine'), /BR|\d+\.\d ±1\.0/); assert.match(await p.textContent('#brEnemy'), /\d+\.\d/);
+  assert.match(await p.textContent('#brMine'), /\d+\.\d ±0\.7/); assert.match(await p.textContent('#brEnemy'), /\d+\.\d/);
   await p.evaluate(() => { const e = document.getElementById('bBandit'); for (let i = 0; i < 30 && !/MiG-29\b|Fulcrum|MIG-29/i.test(e.textContent); i++) e.click(); }); await p.waitForTimeout(300);
   const chipNow = await p.isVisible('#qBrief .warnchip'); assert(typeof chipNow === 'boolean');
   await p.click('#mBack');
@@ -111,12 +111,12 @@ const path = require('path'), assert = require('assert');
   // research grid: lock states, connectors, pulse, arrow keys
   await p.click('#bHangar'); await p.click('.hgTabs button[data-tab=tree]'); await p.waitForTimeout(300);
   const st = id => p.getAttribute('.tn[data-id=' + id + ']', 'class');
-  assert.match(await st('F16'), /own/); assert.match(await st('F15C'), /can/); assert.match(await st('F16B70'), /lock/); assert((await p.$$('#hgTree .tgrid path')).length >= 10, 'connectors'); assert.equal((await p.$$('#hgTree .tn.next')).length, 1, 'one next-research pulse');
-  assert.match(await p.textContent('.tn[data-id=F15C] em'), /Research · 4,000 RP/); assert.match(await p.textContent('.tn[data-id=F16B70] em'), /Locked/);
+  assert.match(await st('F4E'), /own/); assert.match(await st('F15C'), /can/); assert.match(await st('F15E'), /lock/); assert((await p.$$('#hgTree .tgrid path')).length >= 10, 'connectors'); assert.equal((await p.$$('#hgTree .tn.next')).length, 1, 'one next-research pulse');
+  assert.match(await p.textContent('.tn[data-id=F15C] em'), /Research · 20,000 RP/); assert.match(await p.textContent('.tn[data-id=F15E] em'), /Locked/);
   await p.evaluate(() => { __vs.prog.frp = 99999; }); await p.click('.tn[data-id=F15C]'); await p.click('#hgTree [data-act=research]'); await p.waitForTimeout(200);
-  assert.match(await st('F15C'), /res/); assert.match(await st('F16B70'), /can/); assert.match(await p.textContent('.tn[data-id=F15C] em'), /Researched · 25,000 SL/);
+  assert.match(await st('F15C'), /res/); assert.match(await st('F15E'), /can/); assert.match(await p.textContent('.tn[data-id=F15C] em'), /Researched · 150,000 SL/);
   await p.focus('.tn[data-id=F15C]'); await p.keyboard.press('ArrowRight'); assert.notEqual(await p.evaluate(() => document.activeElement.dataset.id), 'F15C', 'arrow keys move between nodes');
-  await p.evaluate(() => { __vs.prog.sl = 1000000; }); await p.click('.tn[data-id=F15C]'); await p.click('#hgTree [data-act=buy]'); await p.waitForTimeout(200); assert.match(await st('F15C'), /own/); assert.match(await p.textContent('.tn[data-id=F15C] em'), /Owned · 25,000 SL/);
+  await p.evaluate(() => { __vs.prog.sl = 1000000; }); await p.click('.tn[data-id=F15C]'); await p.click('#hgTree [data-act=buy]'); await p.waitForTimeout(200); assert.match(await st('F15C'), /own/); assert.match(await p.textContent('.tn[data-id=F15C] em'), /Owned · 150,000 SL/);
   await p.click('#hgClose');
   // crew dossier on the Pilot pane
   await p.click('#mWallet'); const cards = await p.$$('#pgCrew .crc'); assert.equal(cards.length, 3, 'a card per crew skill'); assert.equal((await p.$$('#pgCrew .crc:first-child .pips i')).length, 5);
