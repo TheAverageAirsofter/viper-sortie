@@ -218,6 +218,7 @@ body.hangar #ov{display:none!important}
 .tn.can{border-color:#6fb7ff}
 .tn.lock{opacity:.45}
 .tn.sel{outline:2px solid var(--paper);outline-offset:1px}
+.tn.cur{box-shadow:inset 0 0 0 2px var(--hud)}.tn.cur em{color:var(--hud)}
 .tdet h3{margin:4px 0;font:800 20px var(--f-display);text-transform:uppercase}
 .hgT .ok{color:var(--hud);font-size:11px}
 .hgT button.ghost{font-size:11px;padding:6px 8px}

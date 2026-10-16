@@ -1793,8 +1793,121 @@ Object.assign(PAINT,{
   MIRAGEF1:{p:2,c:['#6f7a55','#8d9170','#7e8d9a'],b:'#b9bdc2',nat:'fra',num:'12-YA'},
   M2000:{p:1,c:['#7e8a96','#6a7681','#8a95a0'],nat:'fra',num:'2-EA',lowvis:1}});
 
+/* ===== Cold War jets: F-8E Crusader, F-100D Super Sabre, MiG-19PT, MiG-21F-13, Hunter F.6, Mirage IIIC (BR, guns, weapons and sizes from the War Thunder wiki; masses, thrust and fuel from fact sheets, est. where noted) ===== */
+SRM.AIM9D=Object.assign({},SRM.AIM9B,{acc:120,gmax:20,maxR:5000,gimbal:.55,lockT:1.3});          // cooled seeker, still rear-aspect
+SRM.R3S=Object.assign({},SRM.AIM9B,{acc:112,gmax:16,maxR:3800});                                   // AA-2 Atoll, a Sidewinder copy
+SRM.MAGIC1=Object.assign({},SRM.AIM9P,{acc:130,gmax:22,maxR:5500,gimbal:.6});
+// F-8E Crusader: Vought, J57-P-20A (80 kN AB), 32.5 m² variable-incidence wing, 2× Colt Mk 12 20 mm (250 rds), AIM-9D on the fuselage rails, ranging radar only
+dv('F104G','F8E','F-8E Crusader','Gunfighter',{corner:400,
+  S:32.5,MASS:11500,CLMAX:1.35,KIND:.13,T_AB:80000,T_MIL:48000,ram:.4,cdK:.85,supK:.1,gmax:7.5,roll:4.0,vne:830,
+  gunRate:33,gunRounds:250,muzzle:1030,gunDmg:1,gunSnd:1500,ammo:'20MM',
+  fuelCap:4160,sfcDry:.88,sfcAB:2.0,fuelUnit:'KG',engines:1,refuel:'probe',irstR:0,irstMax:0,
+  srName:'9D',srFull:'AIM-9D',mrName:'-',mrFull:'none',srN:4,mrN:0,sr:SRM.AIM9D,mr:MRM.AIM7,
+  radar:{modes:['RWS'],name:'AN/APS-67',range:12000},
+  cm:cmo(0,0,0,false,null,'','none',stn([['L1','9D'],['L2','9D'],['R1','9D'],['R2','9D']],[])),
+  spec:'<span><b>+7.5 g</b> · variable-incidence wing</span><span><b>Mach 1.8</b></span><span>J57 <b>80 kN</b></span><span>2× Mk 12 · <b>250 rds</b></span><span>4× AIM-9D · ranging radar</span><span>No countermeasures</span>',
+  snd:{f:30,roar:230,wh:.003,twin:0,howl:[170,.01]},seek:{flareP:.02,chaffP:.01},rwrSym:'F8',rwrName:'none',srDesc:'AIM-9D Sidewinder (rear aspect, short range)',mrDesc:'No radar missiles',cmDesc:'none'});
+// F-100D Super Sabre: North American, J57-P-21 (75 kN AB), 49.1 m² wing, 4× M39A1 20 mm (800 rds), AIM-9B, no radar missiles
+dv('F104G','F100D','F-100D Super Sabre','Hun',{corner:380,
+  S:49.1,MASS:11800,CLMAX:1.25,KIND:.14,T_AB:75000,T_MIL:47000,ram:.4,cdK:.8,supK:.15,gmax:7.0,roll:3.6,vne:735,
+  gunRate:100,gunRounds:800,muzzle:1030,gunDmg:1,gunSnd:1800,ammo:'20MM',
+  fuelCap:3500,sfcDry:.9,sfcAB:2.0,fuelUnit:'KG',engines:1,refuel:'probe',irstR:0,irstMax:0,
+  srName:'9B',srFull:'AIM-9B',mrName:'-',mrFull:'none',srN:2,mrN:0,sr:SRM.AIM9B,mr:MRM.AIM7,
+  radar:{modes:['RWS'],name:'AN/APG-30',range:6000},
+  cm:cmo(0,0,0,false,null,'','none',stn([['PYL L','9B'],['PYL R','9B']],[])),
+  spec:'<span><b>+7 g</b></span><span><b>Mach 1.3</b></span><span>J57 <b>75 kN</b></span><span>4× M39A1 · <b>800 rds</b></span><span>2× AIM-9B · gun-ranging radar</span><span>No countermeasures</span>',
+  snd:{f:32,roar:235,wh:.003,twin:0,howl:[150,.01]},seek:{flareP:.02,chaffP:.01},rwrSym:'F1',rwrName:'none',srDesc:'AIM-9B Sidewinder (rear aspect, short range)',mrDesc:'No radar missiles',cmDesc:'none'});
+// MiG-19PT: Shenyang-class twin RD-9B (63.7 kN AB), 25 m² wing, 2× NR-30 30 mm (140 rds), R-3S, ranging radar
+dv('MIG21','MIG19PT','MiG-19PT','Farmer',{corner:330,
+  S:25,MASS:7400,CLMAX:1.25,KIND:.14,T_AB:64000,T_MIL:50000,ram:.35,cdK:1.25,supK:.2,gmax:8,roll:5.2,vne:680,
+  gunRate:28,gunRounds:140,muzzle:780,gunDmg:2,gunSnd:900,ammo:'30MM',
+  fuelCap:1800,sfcDry:1.0,sfcAB:2.1,fuelUnit:'KG',engines:2,refuel:null,
+  srName:'R3S',srFull:'R-3S',mrName:'-',mrFull:'none',srN:2,mrN:0,sr:SRM.R3S,mr:MRM.R3R,
+  radar:{modes:['RWS'],name:'RP-1 Izumrud',range:10000},
+  cm:cmo(0,0,0,false,null,'','none',stn([['1','R3S'],['2','R3S']],[])),
+  spec:'<span><b>+8 g</b></span><span><b>Mach 1.35</b></span><span>2× RD-9B <b>64 kN</b></span><span>2× NR-30 · <b>140 rds</b></span><span>2× R-3S · ranging radar</span><span>No countermeasures</span>',
+  snd:{f:32,roar:220,wh:.002,twin:1,howl:[140,.01]},seek:{flareP:.02,chaffP:.01},rwrSym:'19',rwrName:'none',srDesc:'R-3S heat seeker (rear aspect, short range)',mrDesc:'No radar missiles',cmDesc:'none'});
+// MiG-21F-13: R-11F-300 (56 kN AB), 23 m² delta, one NR-30 (60 rds), 2× R-3S, ranging radar
+dv('MIG21','MIG21F13','MiG-21F-13','Fishbed',{corner:360,
+  S:23,MASS:6600,CLMAX:1.2,KIND:.14,T_AB:56000,T_MIL:38000,ram:.4,cdK:.75,supK:.15,gmax:7.5,roll:5.6,vne:710,
+  gunRate:14.2,gunRounds:60,muzzle:780,gunDmg:2,gunSnd:900,ammo:'30MM',
+  fuelCap:2030,sfcDry:.95,sfcAB:2.1,fuelUnit:'KG',engines:1,refuel:null,
+  srName:'R3S',srFull:'R-3S',mrName:'-',mrFull:'none',srN:2,mrN:0,sr:SRM.R3S,mr:MRM.R3R,
+  radar:{modes:['RWS'],name:'TsD-30 ranging',range:6000},
+  cm:cmo(0,0,0,false,null,'','none',stn([['1','R3S'],['2','R3S']],[])),
+  spec:'<span><b>+7.5 g</b></span><span><b>Mach 2.0</b></span><span>R-11F <b>56 kN</b></span><span>NR-30 · <b>60 rds</b></span><span>2× R-3S · ranging radar</span><span>No countermeasures</span>',
+  snd:{f:32,roar:225,wh:.004,twin:0,howl:[160,.011]},seek:{flareP:.02,chaffP:.01},rwrSym:'21',rwrName:'none',srDesc:'R-3S heat seeker (rear aspect, short range)',mrDesc:'No radar missiles',cmDesc:'none'});
+// Hunter F.6: Hawker, Avon 207 (45 kN, no afterburner), 32.4 m² swept wing, 4× ADEN 30 mm (600 rds), AIM-9B
+dv('F104G','HUNTER','Hunter F.6','Hunter',{corner:340,
+  S:32.4,MASS:7800,CLMAX:1.3,KIND:.12,T_AB:45800,T_MIL:45000,ram:.3,cdK:1.0,supK:.3,gmax:7.5,roll:4.4,vne:640,
+  gunRate:80,gunRounds:600,muzzle:790,gunDmg:2,gunSnd:900,ammo:'30MM',
+  fuelCap:1370,sfcDry:.85,sfcAB:.85,fuelUnit:'KG',engines:1,refuel:null,irstR:0,irstMax:0,
+  srName:'9B',srFull:'AIM-9B',mrName:'-',mrFull:'none',srN:4,mrN:0,sr:SRM.AIM9B,mr:MRM.AIM7,
+  radar:{modes:['RWS'],name:'AN/APG-30 ranging',range:5000},
+  cm:cmo(0,0,0,false,null,'','none',stn([['1','9B'],['2','9B'],['3','9B'],['4','9B']],[])),
+  spec:'<span><b>+7.5 g</b></span><span><b>Mach 0.95</b> (no afterburner)</span><span>Avon <b>45 kN</b></span><span>4× ADEN · <b>600 rds</b></span><span>4× AIM-9B</span><span>No countermeasures</span>',
+  snd:{f:30,roar:195,wh:.003,twin:0,howl:[210,.012]},seek:{flareP:.02,chaffP:.01},rwrSym:'HU',rwrName:'none',srDesc:'AIM-9B Sidewinder (rear aspect, short range)',mrDesc:'No radar missiles',cmDesc:'none'});
+// Mirage IIIC: Dassault delta, Atar 9B (60.8 kN AB), 35 m² wing, 2× DEFA 552 30 mm (250 rds), R.550 Magic 1 + R.530 on the centreline, Cyrano I radar
+MRM.R530=Object.assign({},MRM.R530F,{acc:140,gmax:15,maxR:18000,termR:22000});
+dv('KFIR','MIRAGE3C','Mirage IIIC','Delta',{corner:380,
+  S:35,MASS:7900,CLMAX:1.1,KIND:.15,T_AB:60800,T_MIL:41200,ram:.4,cdK:.45,supK:.15,gmax:7,roll:4.2,vne:790,
+  gunRate:40,gunRounds:250,muzzle:800,gunDmg:2,gunSnd:900,ammo:'30MM',
+  fuelCap:1870,sfcDry:.9,sfcAB:2.0,fuelUnit:'KG',engines:1,refuel:null,irstR:0,irstMax:0,
+  srName:'MAGIC',srFull:'R.550 Magic',mrName:'530',mrFull:'R.530',srN:2,mrN:1,sr:SRM.MAGIC1,mr:MRM.R530,
+  radar:{modes:['RWS'],name:'Cyrano Ibis',range:25000},
+  cm:cmo(0,0,0,false,null,'','none',stn([['PYL L','Magic'],['PYL R','Magic']],[['CL','530']])),
+  spec:'<span><b>+7 g</b> · delta</span><span><b>Mach 2.0</b></span><span>Atar 9B <b>60.8 kN</b></span><span>2× DEFA · <b>250 rds</b></span><span>R.550 Magic · R.530</span><span>No countermeasures</span>',
+  snd:{f:36,roar:230,wh:.003,twin:0,howl:[185,.011]},seek:{flareP:.02,chaffP:.01},rwrSym:'M3',rwrName:'none',srDesc:'R.550 Magic heat seeker',mrDesc:'R.530 semi-active radar missile: hold the lock to impact',cmDesc:'none'});
+for(const id of ['F8E','F100D','MIG19PT','MIG21F13','HUNTER','MIRAGE3C']){delete AC_DEFS[id].model}
+AC_DEFS.F8E.cut=AC_DEFS.F100D.cut=AC_DEFS.HUNTER.cut=AC_DEFS.F104G.cut; AC_DEFS.MIG19PT.cut=AC_DEFS.MIG21F13.cut=AC_DEFS.MIG21.cut; AC_DEFS.MIRAGE3C.cut=AC_DEFS.KFIR.cut;
+// F-8E Crusader: 16.6 m, 10.8 m span, chin intake, high swept wing, low all-moving tail, ventral fins
+M2.F8E={L:16.6,nz:5.2,radome:6.6,
+  fus:[[-8.0,.45,.4,.4,0,2.3],[-6.0,.7,.5,.5,0,2.5],[-3.0,.82,.6,.6,.05,2.7],[0,.85,.62,.62,.1,2.8],[2.5,.78,.6,.58,.05,2.6],[4.5,.65,.5,.5,0,2.4],[6.2,.5,.42,.42,-.05,2.2],[7.5,.3,.26,.26,-.05,2],[8.3,0,0,0,-.05,2]],
+  parts:[{x:0,mouth:1,st:[[-2.5,.4,.3,.35,-.7,2.4],[0,.52,.35,.4,-.72,2.8],[3.0,.5,.34,.4,-.72,3.2],[5.0,.48,.32,.4,-.72,5]]}],
+  wings:[{st:[{x:.8,zle:2.2,zte:-3.0,y:.5,t:.04},{x:5.4,zle:-2.4,zte:-4.4,y:.5,t:.03}]},{st:[{x:.7,zle:-6.3,zte:-8.2,y:-.1,t:.03},{x:3.1,zle:-7.4,zte:-8.5,y:-.1,t:.025}]}],
+  fins:[{x:0,y:.5,st:[{h:0,zle:-3.4,zte:-7.6,t:.05},{h:2.4,zle:-6.8,zte:-8.3,t:.04}]},{x:.5,y:-.45,cant:-2.55,mirror:1,st:[{h:0,zle:-5.6,zte:-7.6},{h:.6,zle:-6.5,zte:-7.8}]}],
+  canopy:[3.4,.62,.42,.4,1.6],frame:-1,noz:[[0,0,-7.6,.5,1.0]],
+  r9:mir([[.95,-.2,2.2,null],[.95,-.2,-.1,null]]),r120:[]};
+// F-100D Super Sabre: 14.3 m, 11.8 m span, nose intake, low swept wing, fixed-chord tailplane, tall swept fin
+M2.F100D={L:14.3,nz:4.8,radome:null,
+  fus:[[-7.0,.45,.4,.4,0,2.3],[-5.2,.65,.5,.5,0,2.5],[-2.5,.78,.58,.55,0,2.7],[0,.8,.6,.55,.05,2.8],[2.5,.74,.58,.52,.05,2.6],[4.5,.7,.52,.5,0,2.4],[6.0,.68,.52,.5,0,2.2],[6.9,.66,.5,.5,0,2],[7.15,0,0,0,0,2]],
+  parts:[{x:0,mouth:1,st:[[5.5,.62,.48,.48,0,3],[6.8,.62,.48,.48,0,3],[7.1,.6,.47,.47,0,5]]}],
+  wings:[{st:[{x:.8,zle:1.4,zte:-3.8,y:-.35,t:.04},{x:5.9,zle:-3.6,zte:-5.4,y:-.2,t:.03}]},{st:[{x:.7,zle:-5.4,zte:-6.9,y:-.25,t:.03},{x:2.8,zle:-6.4,zte:-7.15,y:-.25,t:.025}]}],
+  fins:[{x:0,y:.5,st:[{h:0,zle:-2.8,zte:-6.6,t:.05},{h:2.8,zle:-6.2,zte:-7.15,t:.04}]}],
+  canopy:[2.8,.6,.4,.4,1.5],frame:-1,noz:[[0,0,-6.5,.52,.9]],
+  r9:mir([[3.0,-.6,-1.6,-.25]]),r120:[]};
+// MiG-19PT: 13.0 m, 9.0 m span, nose intake with centre cone, twin engines, swept wing with fences, swept tail
+M2.MIG19PT={L:13.0,nz:4.3,radome:5.8,
+  fus:[[-6.3,.4,.35,.35,0,2.2],[-5,.62,.5,.45,0,2.4],[-2.5,.72,.58,.55,0,2.6],[0,.72,.6,.55,.05,2.7],[2.5,.66,.55,.5,.05,2.5],[4.2,.6,.5,.48,0,2.3],[5.4,.58,.48,.48,0,2.1],[6.0,.5,.4,.4,0,2],[6.5,0,0,0,0,2]],
+  parts:[{x:0,mouth:1,st:[[3.6,.56,.48,.48,0,3],[5.2,.58,.5,.5,0,3],[5.9,.58,.5,.5,0,5]]}],
+  wings:[{st:[{x:.7,zle:1.8,zte:-2.9,y:0,t:.04},{x:4.5,zle:-3.2,zte:-4.6,y:0,t:.03}]},{st:[{x:.6,zle:-4.8,zte:-6.1,y:.1,t:.03},{x:2.4,zle:-5.6,zte:-6.5,y:.1,t:.025}]}],
+  fins:[{x:0,y:.5,st:[{h:0,zle:-2.4,zte:-5.6,t:.05},{h:2.3,zle:-5.0,zte:-6.5,t:.04}]}],
+  canopy:[2.6,.6,.38,.36,1.4],frame:-1,noz:[[.38,0,-6.3,.36,.8],[-.38,0,-6.3,.36,.8]],
+  r9:mir([[3.3,-.4,-1.2,-.05]]),r120:[]};
+// Hunter F.6: 14.0 m, 10.3 m span, wing-root intakes, 35° wing, high tailplane, single pipe
+M2.HUNTER={L:14.0,nz:4.6,radome:6.0,
+  fus:[[-7.0,.4,.35,.35,0,2.2],[-5.5,.55,.5,.5,0,2.4],[-3,.62,.58,.58,0,2.6],[0,.68,.6,.6,.05,2.8],[2.5,.66,.56,.55,.05,2.6],[4.5,.5,.45,.45,0,2.4],[6.0,.36,.34,.34,0,2.2],[6.8,.18,.16,.16,0,2],[7.2,0,0,0,0,2]],
+  parts:[{x:.9,mouth:1,st:[[-1.5,.3,.32,.32,-.05,2.2],[.2,.34,.34,.34,-.05,2.6],[1.8,.34,.34,.34,-.05,3.4],[2.5,.32,.32,.32,-.05,5]]}],
+  wings:[{st:[{x:.9,zle:1.5,zte:-2.7,y:-.1,t:.045},{x:5.15,zle:-1.4,zte:-3.2,y:-.1,t:.03}]},{st:[{x:.5,zle:-5.2,zte:-6.5,y:.35,t:.03},{x:2.2,zle:-5.9,zte:-6.9,y:.35,t:.025}]}],
+  fins:[{x:0,y:.55,st:[{h:0,zle:-2.8,zte:-6.4,t:.05},{h:2.5,zle:-5.6,zte:-7.0,t:.04}]}],
+  canopy:[3.2,.6,.4,.38,1.45],frame:-1,noz:[[0,0,-6.9,.38,.7]],
+  r9:mir([[2.5,-.45,-.6,-.12],[3.7,-.4,-1.0,-.1]]),r120:[]};
+m2Alias('MIG21F13','MIG21',{fins:[{x:0,y:.5,st:[{h:0,zle:-2.6,zte:-6.2,t:.05},{h:1.9,zle:-5.2,zte:-6.9,t:.04}]}],r9:mir([[2.4,-.34,-.8,-.06]]),r120:[]});
+m2Alias('MIRAGE3C','KFIR',{wings:[M2.KFIR.wings[0]],r9:mir([[2.6,-.3,-1.9,-.06]]),r120:[[0,-.5,-.3,-.04]]});
+for(const id of ['F8E','F100D','MIG19PT','MIG21F13','HUNTER','MIRAGE3C'])m2Fit(id);
+ROSTER_IDS.push('F8E','F100D','MIG19PT','MIG21F13','HUNTER','MIRAGE3C');
+Object.assign(ROSTER_LIKE,{F8E:'F104G',F100D:'F104G',HUNTER:'F104G',MIG19PT:'MIG21',MIG21F13:'MIG21',MIRAGE3C:'KFIR'});
+Object.assign(PITS,{F8E:'TEEN',F100D:'TEEN',HUNTER:'TEEN',MIG19PT:'RUS',MIG21F13:'RUS',MIRAGE3C:'TEEN'});
+Object.assign(PAINT,{
+  F8E:{p:1,c:['#8d9399','#6f767d','#a0a7ad'],b:'#c4c9ce',nat:'usn',num:'NK 102',nose:'102'},
+  F100D:{p:0,c:['#b4b9be','#9ea4aa','#c2c7cc'],nat:'usaf',num:'FW 54-2243'},
+  MIG19PT:{p:0,c:['#a9b0b7','#98a0a7','#b6bcc2'],nat:'rus',num:'19',nose:'19'},
+  MIG21F13:{p:2,c:['#7c8663','#929775','#7d8c99'],b:'#b0b5ba',nat:'rus',num:'21',nose:'21'},
+  HUNTER:{p:2,c:['#5f6a4f','#7a8068','#8a9298'],b:'#aab0b5',nat:'raf',num:'XG190'},
+  MIRAGE3C:{p:2,c:['#8e969d','#a7adb3','#7d8995'],b:'#b9bdc2',nat:'fra',num:'3-XA'}});
+
 /* size corrections measured against public length and span (tools/real-dims.json); [across, up, along] */
-Object.assign(M2K,{SU57:[1.156,1.03,.93],TORNADO3:[1,1,.88],J7G:[1.165,1,1],FA18C:[.94,.97,.928],J10C:[1,1,1.073],MIG21:[1,1,1.065],F22A:[1,1,.955],F16:[1.03,1,.975],F16B70:[1.03,1,.975],F16BARAK:[1.03,1,.975],F16I:[1.03,1,.975],FA18E:[1.04,1,1],MIG35:[1.056,1,.978],SU27:[1.035,1,.99],SU35:[1.08,1,.99],SU30SM:[1.035,1,.99],J11B:[1.035,1,.99],J16:[1.035,1,.99],J15:[1.035,1,.957],SU33:[1.035,1,.957],PHANTOM2:[1,1,.917]});
+Object.assign(M2K,{MIG21F13:[1,1,.955],MIRAGE3C:[1,1,.96],SU57:[1.156,1.03,.93],TORNADO3:[1,1,.88],J7G:[1.165,1,1],FA18C:[.94,.97,.928],J10C:[1,1,1.073],MIG21:[1,1,1.065],F22A:[1,1,.955],F16:[1.03,1,.975],F16B70:[1.03,1,.975],F16BARAK:[1.03,1,.975],F16I:[1.03,1,.975],FA18E:[1.04,1,1],MIG35:[1.056,1,.978],SU27:[1.035,1,.99],SU35:[1.08,1,.99],SU30SM:[1.035,1,.99],J11B:[1.035,1,.99],J16:[1.035,1,.99],J15:[1.035,1,.957],SU33:[1.035,1,.957],PHANTOM2:[1,1,.917]});
 /* ---------------- cockpit: its own scene in seat coordinates (eye at origin, forward −Z) ---------------- */
 const cockScene=new THREE.Scene();
 const cockCam=new THREE.PerspectiveCamera(66,1,.02,80);
@@ -2549,10 +2662,17 @@ function groundRoll(dt,rollIn,pitchIn){
 function checkTouchdown(){
   const g=groundH(P.pos.x,P.pos.z);
   if(P.pos.y>g+GEAR_H||P.onGround||P.vel.y>0)return false;
-  const ok=P.gear&&onRunway(P.pos.x,P.pos.z)&&P.vel.y>-4.2&&Math.abs(bankOf(P))<.22&&P.kcas<230&&P.fwd.y>-.12;
-  if(!ok){die(P.gear?'landing':'gearup');return true}
-  P.onGround=true; const sink=-P.vel.y; P.vel.y=0; P.pos.y=BASE_Y+GEAR_H;
-  message(sink<1.5?'GREASED IT':sink<2.8?'TOUCHDOWN':'FIRM TOUCHDOWN',1.6); recEvent('Touched down at '+Math.round(P.kcas)+' kt, sink '+sink.toFixed(1)+' m/s');
+  const sink=-P.vel.y, bank=Math.abs(bankOf(P));
+  // only a clearly wrong arrival destroys the jet (and the screen says why); a firm one costs gear damage instead, as in War Thunder
+  const bad=!P.gear?'GEAR UP':!onRunway(P.pos.x,P.pos.z)?'OFF THE RUNWAY':P.kcas>=280?'TOO FAST':sink>9?'SINK RATE TOO HIGH':bank>.35?'WINGS NOT LEVEL':P.fwd.y<-.2?'NOSE TOO LOW':null;
+  if(bad){message('CRASH · '+bad,2.4);recEvent('Crashed on landing: '+bad.toLowerCase());die(P.gear?'landing':'gearup');return true}
+  P.onGround=true; P.vel.y=0; P.pos.y=BASE_Y+GEAR_H;
+  const hard=sink>5.5||bank>.22||P.kcas>=240||P.fwd.y<-.12;
+  if(hard){const dmg=Math.round(clamp(15+Math.max(0,sink-5.5)*12+Math.max(0,P.kcas-240)*.4,15,70));P.hp-=dmg;hurtT=.5;shake=.6;sndHit();
+    message('HARD LANDING · GEAR DAMAGED',2);recEvent('Hard landing at '+Math.round(P.kcas)+' kt, sink '+sink.toFixed(1)+' m/s (-'+dmg+' % airframe)');
+    if(P.hp<=0){die('landing');return true}}
+  else message(sink<1.5?'GREASED IT':sink<2.8?'TOUCHDOWN':'FIRM TOUCHDOWN',1.6);
+  recEvent('Touched down at '+Math.round(P.kcas)+' kt, sink '+sink.toFixed(1)+' m/s');
   {const dt=dailyAdd('l',1);if(dt)message('DAILY TASK · '+dt,2.6)}
   if(trainHook)trainHook('touchdown'); return true;
 }
@@ -2691,7 +2811,7 @@ const JET_HP={F16:{extra:1,tanks:3,tankKg:1130,ag:['HARM','JDAM']},F16B70:{extra
   MIG29K:{extra:1,tanks:3,tankKg:1150,ag:['KH31P','KAB500KR','FAB500']},MIG35:{extra:1,tanks:3,tankKg:1150,ag:['KH31P','KAB500S','FAB500']},
   SU27:{extra:0,tanks:0,tankKg:0,ag:['FAB500']},SU33:{extra:2,tanks:0,tankKg:0,ag:['FAB500']},SU35:{extra:2,tanks:2,tankKg:1600,ag:['KH31P','KAB500S','FAB500']},
   J10C:{extra:1,tanks:3,tankKg:1100,ag:['YJ91','LS6']},J20:{extra:0,tanks:0,tankKg:0,ag:[]}};
-rosterFill(JET_HP,{F4E:{extra:2,tanks:3,tankKg:1800,ag:['PAVE4']},F35A:{extra:2,tanks:0,tankKg:0,ag:['JDAM']},F22A:{extra:0,tanks:0,tankKg:0,ag:[]},F104G:{extra:1,tanks:2,tankKg:700,ag:[]},
+rosterFill(JET_HP,{F8E:{extra:0,tanks:2,tankKg:1000,ag:[]},F100D:{extra:1,tanks:2,tankKg:1000,ag:[]},MIG19PT:{extra:0,tanks:2,tankKg:400,ag:[]},MIG21F13:{extra:0,tanks:1,tankKg:400,ag:[]},HUNTER:{extra:0,tanks:2,tankKg:540,ag:[]},MIRAGE3C:{extra:0,tanks:2,tankKg:800,ag:[]},F4E:{extra:2,tanks:3,tankKg:1800,ag:['PAVE4']},F35A:{extra:2,tanks:0,tankKg:0,ag:['JDAM']},F22A:{extra:0,tanks:0,tankKg:0,ag:[]},F104G:{extra:1,tanks:2,tankKg:700,ag:[]},
   MIG21:{extra:1,tanks:2,tankKg:400,ag:['FAB500']},SU57:{extra:2,tanks:0,tankKg:0,ag:['KAB500S']},J35F:{extra:0,tanks:1,tankKg:600,ag:[]},JA37:{extra:1,tanks:1,tankKg:1000,ag:[]},
   LIGHTNING:{extra:0,tanks:1,tankKg:1000,ag:[]},TORNADO3:{extra:1,tanks:2,tankKg:1500,ag:[]},KFIR:{extra:2,tanks:3,tankKg:900,ag:['PAVE4']},F15E:{extra:3,tanks:3,tankKg:1820,ag:['JDAM','SDB']},
   F15I:{extra:3,tanks:3,tankKg:1820,ag:['JDAM','SDB']},F16I:{extra:1,tanks:3,tankKg:1130,ag:['JDAM']},F5E:{extra:1,tanks:3,tankKg:900,ag:[]},F14B:{extra:0,tanks:2,tankKg:1000,ag:[]},MIG23ML:{extra:1,tanks:2,tankKg:800,ag:['FAB500']},MIG25PD:{extra:0,tanks:0,tankKg:0,ag:[]},J8F:{extra:1,tanks:2,tankKg:900,ag:['LS6']},MIRAGEF1:{extra:1,tanks:2,tankKg:1100,ag:[]},M2000:{extra:2,tanks:3,tankKg:1700,ag:['LS6']},J7G:{extra:1,tanks:2,tankKg:400,ag:['LS6']},J11B:{extra:1,tanks:0,tankKg:0,ag:['YJ91','LS6']},J15:{extra:1,tanks:0,tankKg:0,ag:['YJ91','LS6']},J16:{extra:2,tanks:2,tankKg:1600,ag:['YJ91','LS6']},SU30SM:{extra:2,tanks:2,tankKg:1600,ag:['KH31P','KAB500S','FAB500']}});
@@ -3131,7 +3251,7 @@ function photoCapture(){photoGrab=false;let url;try{url=glCanvas.toDataURL('imag
 /* ---------------- radar cross-section: detection range scales with RCS^(1/4) (radar equation) and with aspect ----------------
    frontal RCS in m², public estimates where they exist, otherwise game estimates; external stores add to it */
 const RCS={F16:1.2,F16B70:1.2,F15C:10,F15EX:8,FA18E:1,GRIPEN:.5,GRIPENE:.4,TYPHOON:.5,RAFALE:.5,MIG29:5,MIG29UPG:5,MIG29K:3,MIG35:3,SU27:15,SU33:15,SU35:3,J10C:1.5,J20:.05,CRUISE:.1,BOMBER:60,TRANSPORT:40};
-rosterFill(RCS,{F4E:6,FA18C:1.5,F15E:8,F35A:.02,F22A:.01,SU57:.1,F104G:1.5,MIG21:2,SU30SM:12,J35F:3,JA37:4,LIGHTNING:5,TORNADO3:5,KFIR:3,F2A:1.2,F35B:.02,F35DE:.02,F35AJ:.02,F35BJ:.02,F35I:.015,EF2K1:.6,EF2K3:.5,J7G:2,J11B:15,J15:15,J16:6,MIG29G:5});
+rosterFill(RCS,{F8E:4,F100D:5,MIG19PT:3,MIG21F13:1.8,HUNTER:4,MIRAGE3C:3,F4E:6,FA18C:1.5,F15E:8,F35A:.02,F22A:.01,SU57:.1,F104G:1.5,MIG21:2,SU30SM:12,J35F:3,JA37:4,LIGHTNING:5,TORNADO3:5,KFIR:3,F2A:1.2,F35B:.02,F35DE:.02,F35AJ:.02,F35BJ:.02,F35I:.015,EF2K1:.6,EF2K3:.5,J7G:2,J11B:15,J15:15,J16:6,MIG29G:5});
 const REF_RCS=5;   // radar ranges in the jet data are quoted against a ~5 m² fighter
 function storesRCS(ac){if(ac.id==='J20')return 0;return (ac.srN+ac.mrN)*.04+(AG.load||[]).reduce((a,l)=>a+l.n*.12,0)+(ac.tanks&&!P.tanksGone?ac.tanks*.4:0)}
 function playerRCS(){return (RCS[AC.id]??3)+storesRCS(AC)}
@@ -3292,7 +3412,7 @@ const FIGHTERS=['F16','F16B70','F15C','F15EX','FA18E','GRIPEN','GRIPENE','TYPHOO
 FIGHTERS.push(...ROSTER_IDS);
 Object.assign(BANDITS,{F4E:'F-4E Phantom II',FA18C:'F/A-18C',F15E:'F-15E',F35A:'F-35A',F22A:'F-22A',MIG21:'MiG-21bis',SU30SM:'Su-30SM',SU57:'Su-57',F104G:'F-104G',F4F:'F-4F ICE',MIG29G:'MiG-29G',EF2K1:'EF2000 T1',EF2K3:'EF2000 T3',F35DE:'F-35A (Luftwaffe)',
   F4EJ:'F-4EJ',F4EJK:'F-4EJ Kai',F4EIL:'F-4E (IAF)',F15J:'F-15J',F15JK:'F-15J Kai',F2A:'F-2A',F35AJ:'F-35A (JASDF)',F35B:'F-35B',F35BJ:'F-35B (JASDF)',KFIR:'Kfir C.7',F4E2K:'Kurnass 2000',F15BAZ:'F-15C Baz',F16BARAK:'F-16C Barak',F16I:'F-16I Sufa',F15I:"F-15I Ra'am",F35I:'F-35I Adir',
-  J35F:'J 35F Draken',JA37:'JA 37 Viggen',LIGHTNING:'Lightning F.6',PHANTOM2:'Phantom FGR.2',TORNADO3:'Tornado F.3',J7G:'J-7G',F5E:'F-5E',F14B:'F-14B',MIG23ML:'MiG-23ML',MIG25PD:'MiG-25PD',J8F:'J-8F',MIRAGEF1:'Mirage F1C',M2000:'Mirage 2000-5F',J11B:'J-11B',J15:'J-15',J16:'J-16'});
+  J35F:'J 35F Draken',JA37:'JA 37 Viggen',LIGHTNING:'Lightning F.6',PHANTOM2:'Phantom FGR.2',TORNADO3:'Tornado F.3',J7G:'J-7G',F5E:'F-5E',F14B:'F-14B',MIG23ML:'MiG-23ML',MIG25PD:'MiG-25PD',J8F:'J-8F',F8E:'F-8E Crusader',F100D:'F-100D Super Sabre',MIG19PT:'MiG-19PT',MIG21F13:'MiG-21F-13',HUNTER:'Hunter F.6',MIRAGE3C:'Mirage IIIC',MIRAGEF1:'Mirage F1C',M2000:'Mirage 2000-5F',J11B:'J-11B',J15:'J-15',J16:'J-16'});
 {const m=BANDITS.MIXED;delete BANDITS.MIXED;BANDITS.MIXED=m}
 // matchmaking: bandits are only ever fighters within MM_BR of the battle rating of the jet you fly (Career and Free play alike)
 const MM_BR=1;
@@ -4632,9 +4752,10 @@ const NODES={
   LIGHTNING:{n:'GBR',r:1,br:9.3},PHANTOM2:{n:'GBR',r:2,br:12.0,req:'LIGHTNING'},TORNADO3:{n:'GBR',r:3,br:13.0,req:'PHANTOM2'},TYPHOON:{n:'GBR',r:5,br:14.7,req:'TORNADO3'},F35B:{n:'GBR',r:5,br:14.0,req:'TYPHOON'},
   J7G:{n:'CHN',r:1,br:11.3},J10C:{n:'CHN',r:5,br:14.3,req:'J7G'},J11B:{n:'CHN',r:5,br:13.7,req:'J7G'},J15:{n:'CHN',r:4,br:14.7,req:'J11B'},J16:{n:'CHN',r:5,br:14.7,req:'J11B'},J20:{n:'CHN',r:5,br:14.0,req:'J10C'},
   MIRAGEF1:{n:'FRA',r:1,br:12.0},M2000:{n:'FRA',r:3,br:14.0,req:'MIRAGEF1'},RAFALE:{n:'FRA',r:5,br:14.7,req:'M2000'},
-  F5E:{n:'USA',r:2,br:11.0,req:'F4E'},F14B:{n:'USA',r:3,br:13.0,req:'F4E'},MIG23ML:{n:'RUS',r:2,br:11.7,req:'MIG21'},MIG25PD:{n:'RUS',r:3,br:11.0,req:'MIG23ML'},J8F:{n:'CHN',r:2,br:13.0,req:'J7G'}};
+  F5E:{n:'USA',r:2,br:11.0,req:'F4E'},F14B:{n:'USA',r:3,br:13.0,req:'F4E'},MIG23ML:{n:'RUS',r:2,br:11.7,req:'MIG21'},MIG25PD:{n:'RUS',r:3,br:11.0,req:'MIG23ML'},J8F:{n:'CHN',r:2,br:13.0,req:'J7G'},
+  F100D:{n:'USA',r:1,br:9.3},F8E:{n:'USA',r:1,br:10.7,req:'F100D'},MIG19PT:{n:'RUS',r:1,br:9.3},MIG21F13:{n:'RUS',r:1,br:9.3,req:'MIG19PT'},HUNTER:{n:'GBR',r:1,br:10.0},MIRAGE3C:{n:'FRA',r:1,br:10.0}};
 // War Thunder wiki reference (Realistic battles, stock-to-reference column): [max speed km/h, climb m/s, turn time s, BR]; shown beside the flight-model figures in the hangar spec sheet (wiki.warthunder.com, Oct 2026)
-const WTREF={F4E:[2058,160.6,28.3,11.3],F16:[2108,260.4,20.8,13.7],F15C:[2542,235.2,23.1,13.7],FA18C:[1807,178,24.2,14.0],F15E:[2658,275.8,22,14.0],F16B70:[2116,267,20.8,14.3],FA18E:[1729,167.1,24,14.3],MIG21:[2177,191.3,38.5,11.0],MIG29:[2357,275.1,20.8,12.7],SU27:[2396,195.2,23.5,13.7],MIG29UPG:[2261,257.7,23.5,13.3],SU33:[2203,168.5,25.5,13.0],MIG29K:[2203,285.7,23.4,13.7],SU30SM:[2212,170,25.1,14.3],MIG35:[2203,285,22.4,14.3],F104G:[2342,229,35.9,11.0],F4F:[2058,162.9,28.3,11.0],MIG29G:[2357,270.4,20.6,13.0],EF2K1:[2097,252.1,20.8,14.3],EF2K3:[2097,252.1,20.8,14.3],F4EJ:[2255,141.9,28.2,11.0],F4EJK:[2255,141.9,28.2,12.3],F15J:[2533,263.3,22.9,12.7],F15JK:[2524,263.8,23,13.7],F2A:[1922,242.8,19.5,13.7],F4EIL:[2058,160.6,28.3,11.3],KFIR:[2322,184.5,28.4,12.0],F4E2K:[2058,160.6,28.3,12.3],F15BAZ:[2524,285.2,21.6,13.7],F16BARAK:[2058,229.4,23.9,13.7],F16I:[2058,247.5,21.8,13.7],F15I:[2657,276.4,22,14.0],J35F:[2127,149.8,26.7,10.3],JA37:[1924,168.6,26.6,12.0],GRIPEN:[2185,213.6,25.1,13.7],GRIPENE:[2209,214.5,25.6,14.3],LIGHTNING:[2240,124.3,27.8,9.3],PHANTOM2:[2190,176.1,27.8,12.0],TORNADO3:[2256,168,29.4,13.0],TYPHOON:[2097,252.1,20.8,14.7],J7G:[2313,153.4,25.3,11.3],J10C:[2108,252.2,21.2,14.3],J11B:[2388,195.3,25.2,13.7],J15:[2384,200.6,24.9,14.7],J16:[2410,212.9,23.4,14.7],MIRAGEF1:[2177,126.8,28.7,12.0],M2000:[2246,156.3,26.3,14.0],RAFALE:[1855,237.9,21,14.7],F5E:[1753,130.7,27.2,11.0],F14B:[2191,195.9,24.8,13.0],MIG23ML:[2339,196.8,33.9,11.7],MIG25PD:[2942,86.1,31.4,11.0],J8F:[2227,182.4,28.4,13.0]};
+const WTREF={F8E:[2094,108.6,30.3,10.7],F100D:[1419,88.3,41.2,9.3],MIG19PT:[1426,159.4,32.8,9.3],MIG21F13:[2211,98,34.6,9.3],HUNTER:[1139,54.5,26.7,10],MIRAGE3C:[2091,107.4,29.6,10],F4E:[2058,160.6,28.3,11.3],F16:[2108,260.4,20.8,13.7],F15C:[2542,235.2,23.1,13.7],FA18C:[1807,178,24.2,14.0],F15E:[2658,275.8,22,14.0],F16B70:[2116,267,20.8,14.3],FA18E:[1729,167.1,24,14.3],MIG21:[2177,191.3,38.5,11.0],MIG29:[2357,275.1,20.8,12.7],SU27:[2396,195.2,23.5,13.7],MIG29UPG:[2261,257.7,23.5,13.3],SU33:[2203,168.5,25.5,13.0],MIG29K:[2203,285.7,23.4,13.7],SU30SM:[2212,170,25.1,14.3],MIG35:[2203,285,22.4,14.3],F104G:[2342,229,35.9,11.0],F4F:[2058,162.9,28.3,11.0],MIG29G:[2357,270.4,20.6,13.0],EF2K1:[2097,252.1,20.8,14.3],EF2K3:[2097,252.1,20.8,14.3],F4EJ:[2255,141.9,28.2,11.0],F4EJK:[2255,141.9,28.2,12.3],F15J:[2533,263.3,22.9,12.7],F15JK:[2524,263.8,23,13.7],F2A:[1922,242.8,19.5,13.7],F4EIL:[2058,160.6,28.3,11.3],KFIR:[2322,184.5,28.4,12.0],F4E2K:[2058,160.6,28.3,12.3],F15BAZ:[2524,285.2,21.6,13.7],F16BARAK:[2058,229.4,23.9,13.7],F16I:[2058,247.5,21.8,13.7],F15I:[2657,276.4,22,14.0],J35F:[2127,149.8,26.7,10.3],JA37:[1924,168.6,26.6,12.0],GRIPEN:[2185,213.6,25.1,13.7],GRIPENE:[2209,214.5,25.6,14.3],LIGHTNING:[2240,124.3,27.8,9.3],PHANTOM2:[2190,176.1,27.8,12.0],TORNADO3:[2256,168,29.4,13.0],TYPHOON:[2097,252.1,20.8,14.7],J7G:[2313,153.4,25.3,11.3],J10C:[2108,252.2,21.2,14.3],J11B:[2388,195.3,25.2,13.7],J15:[2384,200.6,24.9,14.7],J16:[2410,212.9,23.4,14.7],MIRAGEF1:[2177,126.8,28.7,12.0],M2000:[2246,156.3,26.3,14.0],RAFALE:[1855,237.9,21,14.7],F5E:[1753,130.7,27.2,11.0],F14B:[2191,195.9,24.8,13.0],MIG23ML:[2339,196.8,33.9,11.7],MIG25PD:[2942,86.1,31.4,11.0],J8F:[2227,182.4,28.4,13.0]};
 const RP_COST=[0,0,4000,10000,20000,34000], SL_PRICE=[0,0,25000,70000,150000,280000], ROMAN=['','I','II','III','IV','V'];
 // modules: [key, name, cost tier, effect, requires, family]. A stock aircraft flies with penalties; the first module of each family removes one, the second goes beyond stock.
 // Each is researched with the RP earned in that aircraft, then bought with Silver Lions.
@@ -4645,7 +4766,7 @@ const MODS=[['afr1','Airframe',1,'Removes the stock roll-rate penalty (-10 %)',n
   ['wpn2','Missile seekers II',4,'+6 % missile range, +5 % missile agility','wpn1','Weapons']];
 const STOCK={thr:.94,roll:.9,cm:.5,mr:.9,ag:.9};
 const CREW=[['g','Anti-g training','+0.25 g tolerance per level',8000],['f','Flight skill','+2 % roll rate per level',8000],['d','Ground crew','−8 % repair cost per level',6000]];
-const PROG_START=['F4E','MIG21','F104G','F4EJ','F4EIL','J35F','LIGHTNING','J7G','MIRAGEF1'];
+const PROG_START=['F4E','MIG21','F104G','F4EJ','F4EIL','J35F','LIGHTNING','J7G','MIRAGEF1','F100D','MIG19PT','HUNTER','MIRAGE3C'];
 let prog={sl:30000,frp:0,rp:{},res:{},own:{},mods:{},crew:{g:0,f:0,d:0},sorties:0,fresh:true};
 try{const v=JSON.parse(localStorage.getItem('vsProg')||'null');if(v&&typeof v.sl==='number'){prog=Object.assign(prog,v,{fresh:false});prog.crew=Object.assign({g:0,f:0,d:0},v.crew)}}catch(e){}
 for(const k of ['rp','res','own','mods'])if(!prog[k]||typeof prog[k]!=='object')prog[k]={};
@@ -5772,13 +5893,13 @@ function hgLeave(){if(!hgSaved)return;const s=hgSaved;hgSaved=null;hgScene.remov
 /* ---------- Tech tree tab in the hangar ---------- */
 let progSel=null;
 const fmtN=n=>Number(n).toLocaleString('en-US');
-const nodeState=id=>progOwned(id)?'own':progRes(id)?'res':progResearchable(id)?'can':'lock';
+const nodeState=id=>!careerOn||progOwned(id)?'own':progRes(id)?'res':progResearchable(id)?'can':'lock';
 function progWallet(){$('hgWallet').textContent=careerOn?fmtN(prog.sl)+' SL · '+fmtN(prog.frp)+' free RP':''}
 function progDetail(id){
   const n=NODES[id],d=AC_DEFS[id],st=nodeState(id),nat=NATIONS[n.n],req=n.req?AC_DEFS[n.req].name:null,tw=d.T_AB/(d.MASS*G);
   let h='<div class="tdet"><h3>'+d.name+'</h3><p class="hgNote">'+nat.n+' · rank '+ROMAN[n.r]+' · BR '+n.br.toFixed(1)+' · thrust/weight '+tw.toFixed(2)+' · +'+d.gmax+' g · corner '+d.corner+' kt<br>'+d.srFull+' × '+d.srN+' · '+d.mrFull+' × '+d.mrN+'</p>';
-  if(st==='own'){h+='<div class="row"><button class="ghost" data-act="use" data-id="'+id+'">Use in hangar</button></div>';
-    h+='<p class="hgNote">'+MODS.filter(m=>hasMod(id,m[0])).length+' of '+MODS.length+' modules installed. Open the Mods tab to research more.</p>'}
+  if(st==='own'){const cur=id===AC.id;h+='<div class="row"><button class="primary" data-act="use" data-id="'+id+'"'+(cur?' disabled':'')+'>'+(cur?'Selected':'Select aircraft')+'</button></div>';
+    h+=careerOn?'<p class="hgNote">'+MODS.filter(m=>hasMod(id,m[0])).length+' of '+MODS.length+' modules installed. Open the Mods tab to research more.</p>':'<p class="hgNote">Free play: every aircraft is unlocked with all modules.</p>'}
   else if(st==='res'){const c=SL_PRICE[n.r];h+='<div class="row"><button class="primary" data-act="buy" data-id="'+id+'"'+(prog.sl>=c?'':' disabled')+'>Buy · '+fmtN(c)+' SL</button></div><p class="hgNote">Researched. You have '+fmtN(prog.sl)+' Silver Lions.</p>'}
   else if(st==='can'){const c=RP_COST[n.r];h+='<div class="row"><button class="primary" data-act="research" data-id="'+id+'"'+(progPool(n.req)>=c?'':' disabled')+'>Research · '+fmtN(c)+' RP</button></div><p class="hgNote">Paid from the '+fmtN(prog.rp[n.req]||0)+' RP earned in the '+req+' plus '+fmtN(prog.frp)+' free RP.</p>'}
   else h+='<p class="hgNote">Locked: research the '+req+' first.</p>';
@@ -5808,20 +5929,20 @@ const TN_W=88,TN_H=60,TN_GX=14,TN_GY=8;
 function treeLayout(nk){const ids=Object.keys(NODES).filter(i=>NODES[i].n===nk),pos={};let nr=0;
   const place=(id,row,minC)=>{const c=Math.max(NODES[id].r-1,minC);pos[id]={c,r:row};ids.filter(k=>NODES[k].req===id).sort((a,b)=>NODES[a].r-NODES[b].r).forEach((k,i)=>place(k,i===0?row:nr++,c+1))};   // a child always sits right of its parent
   for(const root of ids.filter(i=>!NODES[i].req||NODES[NODES[i].req].n!==nk))place(root,nr++,0);return pos}
-function nodeText(i){const n=NODES[i],st=nodeState(i);return st==='own'?(SL_PRICE[n.r]?'Owned · '+fmtN(SL_PRICE[n.r])+' SL':'Owned'):st==='res'?'Researched · '+fmtN(SL_PRICE[n.r])+' SL':st==='can'?'Research · '+fmtN(RP_COST[n.r])+' RP':'Locked · '+fmtN(RP_COST[n.r])+' RP'}
+function nodeText(i){const n=NODES[i],st=nodeState(i);if(i===AC.id)return 'In hangar';return st==='own'?(!careerOn?'Unlocked':(SL_PRICE[n.r]?'Owned · '+fmtN(SL_PRICE[n.r])+' SL':'Owned')):st==='res'?'Researched · '+fmtN(SL_PRICE[n.r])+' SL':st==='can'?'Research · '+fmtN(RP_COST[n.r])+' RP':'Locked · '+fmtN(RP_COST[n.r])+' RP'}
 // the researchable node worth doing next: the cheapest one you can already afford, else the cheapest overall
 function nextResearch(){const c=Object.keys(NODES).filter(progResearchable);if(!c.length)return null;const cost=i=>RP_COST[NODES[i].r],ok=c.filter(i=>progPool(NODES[i].req)>=cost(i));return (ok.length?ok:c).sort((a,b)=>cost(a)-cost(b))[0]}
 function progRender(){const el=$('hgTree');progWallet();const had=document.activeElement&&el.contains(document.activeElement)?document.activeElement.dataset.id:null;
-  if(!careerOn){el.innerHTML='<p class="hgNote">Progression runs in <b>Career mode</b>. Fly sorties to earn Research Points and Silver Lions, research new aircraft down each nation\'s tree, buy them, install modules and train your crew. Bandits are matched to your aircraft\'s battle rating. Free play keeps every aircraft unlocked.</p><div class="row"><button class="primary" data-act="career" type="button">Switch to Career mode</button></div>';return}
   if(!progSel||!NODES[progSel])progSel=AC.id;const nx=nextResearch();
-  let h='<p class="hgNote">'+fmtN(prog.sl)+' Silver Lions · '+fmtN(prog.frp)+' free RP · '+prog.sorties+' career sorties. Tap an aircraft; arrow keys move between them.</p><div class="tree">';
+  let h=(careerOn?'<p class="hgNote">'+fmtN(prog.sl)+' Silver Lions · '+fmtN(prog.frp)+' free RP · '+prog.sorties+' career sorties. Tap an aircraft, then Select it; double-tap selects at once. Arrow keys move between them.</p>':
+    '<p class="hgNote">Free play: every aircraft is unlocked. Tap an aircraft, then Select it; double-tap selects at once. <button class="ghost" data-act="career" type="button">Switch to Career</button> to research and buy them instead.</p>')+'<div class="tree">';
   for(const nk in NATIONS){const pos=treeLayout(nk),ids=Object.keys(pos),mc=Math.max(...ids.map(i=>pos[i].c)),mr=Math.max(...ids.map(i=>pos[i].r)),W=(mc+1)*(TN_W+TN_GX)-TN_GX,Hh=(mr+1)*(TN_H+TN_GY)-TN_GY;
     const X=i=>pos[i].c*(TN_W+TN_GX),Y=i=>pos[i].r*(TN_H+TN_GY);
     const lines=ids.filter(i=>NODES[i].req&&pos[NODES[i].req]).map(i=>{const p=NODES[i].req,x1=X(p)+TN_W,y1=Y(p)+TN_H/2,x2=X(i),y2=Y(i)+TN_H/2,m=(x1+x2)/2,on=progRes(i);
       return '<path d="M'+x1+' '+y1+'C'+m+' '+y1+' '+m+' '+y2+' '+x2+' '+y2+'" class="'+(on?'on':progRes(p)?'nx':'')+'"/>'}).join('');
     h+='<div class="tnat" style="--nc:'+NATIONS[nk].c+'"><h4>'+NATIONS[nk].n+'</h4><div class="tgw"><div class="tgrid" style="width:'+W+'px;height:'+Hh+'px"><svg width="'+W+'" height="'+Hh+'" aria-hidden="true">'+lines+'</svg>'+
-      ids.map(i=>'<button type="button" class="tn '+nodeState(i)+(i===progSel?' sel':'')+(i===nx?' next':'')+'" data-id="'+i+'" style="left:'+X(i)+'px;top:'+Y(i)+'px;width:'+TN_W+'px;height:'+TN_H+'px" title="'+AC_DEFS[i].name+'"><b>'+AC_DEFS[i].name+'</b><small>'+ROMAN[NODES[i].r]+' · BR '+NODES[i].br.toFixed(1)+'</small><em>'+nodeText(i)+'</em></button>').join('')+'</div></div></div>'}
-  h+='</div>'+progDetail(progSel)+'<h4 class="hgSub">Crew training</h4>'+crewCards();
+      ids.map(i=>'<button type="button" class="tn '+nodeState(i)+(i===progSel?' sel':'')+(i===AC.id?' cur':'')+(i===nx?' next':'')+'" data-id="'+i+'" style="left:'+X(i)+'px;top:'+Y(i)+'px;width:'+TN_W+'px;height:'+TN_H+'px" title="'+AC_DEFS[i].name+'"><b>'+AC_DEFS[i].name+'</b><small>'+ROMAN[NODES[i].r]+' · BR '+NODES[i].br.toFixed(1)+'</small><em>'+nodeText(i)+'</em></button>').join('')+'</div></div></div>'}
+  h+='</div>'+progDetail(progSel)+(careerOn?'<h4 class="hgSub">Crew training</h4>'+crewCards():'');
   el.innerHTML=h;if(had){const b=el.querySelector('.tn[data-id="'+had+'"]');if(b)b.focus()}}
 // arrow keys move between aircraft by position
 $('hgTree').addEventListener('keydown',e=>{const k=e.key;if(['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].indexOf(k)<0)return;const cur=document.activeElement;if(!cur||!cur.classList.contains('tn'))return;
@@ -5829,12 +5950,14 @@ $('hgTree').addEventListener('keydown',e=>{const k=e.key;if(['ArrowLeft','ArrowR
   for(const n of all){if(n===cur)continue;const r=n.getBoundingClientRect(),x=r.left+r.width/2-cx,y=r.top+r.height/2-cy,pr=dx?x*dx:y*dy,sd=dx?Math.abs(y):Math.abs(x);if(pr<4)continue;const sc=pr+sd*2.2;if(sc<bs){bs=sc;best=n}}
   e.preventDefault();if(best)best.focus()});
 if(/[?&]test\b/.test(location.search))Object.assign(window.__vs||{},{ldCap,progModResearch,progModBuy,modCost,MODS,prog,progAward,NODES,pickBanditType});
+function progUse(id){if(!AC_DEFS[id]||nodeState(id)!=='own')return;AC=AC_DEFS[id];try{localStorage.setItem('viperAC',id)}catch(er){};progSel=id;applyAC();$('hgName').textContent=AC.name;progRender()}
+$('hgTree').addEventListener('dblclick',e=>{const t=e.target.closest('.tn');if(t)progUse(t.dataset.id)});
 $('hgTree').addEventListener('click',e=>{const t=e.target.closest('[data-id],[data-act]');if(!t)return;const id=t.dataset.id,act=t.dataset.act;
   if(!act){progSel=id;progRender();return}
   if(act==='career'){$('bMode').click();progRender();return}
   let ok=false;
   if(act==='research')ok=progResearch(id);else if(act==='buy')ok=progBuy(id);else if(act==='crew')ok=progCrew(t.dataset.k);
-  else if(act==='use'){AC=AC_DEFS[id];try{localStorage.setItem('viperAC',id)}catch(er){};applyAC();hgTab('load');return}
+  else if(act==='use'){progUse(id);return}
   if(ok){if(act==='crew'||act==='buy')applyAC();syncCareerUI();$('hgName').textContent=AC.name}progRender()});
 /* ---------------- AAA-style menu: title, main list, quick mission, campaign, online, training, settings, pilot, pause, debrief, loading ----------------
    The original cycle buttons live on, hidden, inside #legacy; every row below drives them (so their handlers, saved settings and tests keep working)

@@ -10,7 +10,7 @@ const path = require('path'), assert = require('assert');
   };
   // free play: the tab explains career mode and can switch it on
   let p = await open();
-  await p.click('#bHangar'); await p.click('.hgTabs button[data-tab=tree]'); assert.match(await p.textContent('#hgTree'), /Career mode/);
+  await p.click('#bHangar'); await p.click('.hgTabs button[data-tab=tree]'); assert.match(await p.textContent('#hgTree'), /Free play: every aircraft is unlocked/);
   await p.click('#hgTree [data-act=career]'); await p.waitForTimeout(300); assert(await p.isVisible('#hgTree .tree'), 'tree shows after switching to career'); await p.close();
   // career with some RP and Silver Lions banked
   p = await open({ viperMode: 'career', vsProg: JSON.stringify({ sl: 400000, frp: 3000, rp: { MIG21: 6000 }, sorties: 3 }) });

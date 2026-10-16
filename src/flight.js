@@ -339,10 +339,17 @@ function groundRoll(dt,rollIn,pitchIn){
 function checkTouchdown(){
   const g=groundH(P.pos.x,P.pos.z);
   if(P.pos.y>g+GEAR_H||P.onGround||P.vel.y>0)return false;
-  const ok=P.gear&&onRunway(P.pos.x,P.pos.z)&&P.vel.y>-4.2&&Math.abs(bankOf(P))<.22&&P.kcas<230&&P.fwd.y>-.12;
-  if(!ok){die(P.gear?'landing':'gearup');return true}
-  P.onGround=true; const sink=-P.vel.y; P.vel.y=0; P.pos.y=BASE_Y+GEAR_H;
-  message(sink<1.5?'GREASED IT':sink<2.8?'TOUCHDOWN':'FIRM TOUCHDOWN',1.6); recEvent('Touched down at '+Math.round(P.kcas)+' kt, sink '+sink.toFixed(1)+' m/s');
+  const sink=-P.vel.y, bank=Math.abs(bankOf(P));
+  // only a clearly wrong arrival destroys the jet (and the screen says why); a firm one costs gear damage instead, as in War Thunder
+  const bad=!P.gear?'GEAR UP':!onRunway(P.pos.x,P.pos.z)?'OFF THE RUNWAY':P.kcas>=280?'TOO FAST':sink>9?'SINK RATE TOO HIGH':bank>.35?'WINGS NOT LEVEL':P.fwd.y<-.2?'NOSE TOO LOW':null;
+  if(bad){message('CRASH · '+bad,2.4);recEvent('Crashed on landing: '+bad.toLowerCase());die(P.gear?'landing':'gearup');return true}
+  P.onGround=true; P.vel.y=0; P.pos.y=BASE_Y+GEAR_H;
+  const hard=sink>5.5||bank>.22||P.kcas>=240||P.fwd.y<-.12;
+  if(hard){const dmg=Math.round(clamp(15+Math.max(0,sink-5.5)*12+Math.max(0,P.kcas-240)*.4,15,70));P.hp-=dmg;hurtT=.5;shake=.6;sndHit();
+    message('HARD LANDING · GEAR DAMAGED',2);recEvent('Hard landing at '+Math.round(P.kcas)+' kt, sink '+sink.toFixed(1)+' m/s (-'+dmg+' % airframe)');
+    if(P.hp<=0){die('landing');return true}}
+  else message(sink<1.5?'GREASED IT':sink<2.8?'TOUCHDOWN':'FIRM TOUCHDOWN',1.6);
+  recEvent('Touched down at '+Math.round(P.kcas)+' kt, sink '+sink.toFixed(1)+' m/s');
   {const dt=dailyAdd('l',1);if(dt)message('DAILY TASK · '+dt,2.6)}
   if(trainHook)trainHook('touchdown'); return true;
 }
