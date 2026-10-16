@@ -379,7 +379,7 @@ function updateTerrain(cx,cz){
   for(let i=0;i<tPos.count;i++){
     const x=tBase[i*3]+cx,z=tBase[i*3+2]+cz,h=groundH(x,z); a[i*3+1]=h;
   }
-  tPos.needsUpdate=true; tGeo.computeVertexNormals(); placeTrees(cx,cz);
+  tPos.needsUpdate=true; tGeo.computeVertexNormals(); placeTrees(cx,cz); placeTowns(cx,cz);
 }
 /* water: rolling swell normals, Fresnel sky reflection and a sun glint path */
 const waterMat=new THREE.ShaderMaterial({fog:true,
@@ -432,6 +432,23 @@ function placeTrees(cx,cz){
     const k=.9+hs(i,j,4)*.8; sc.set(k,k*(.85+hs(i,j,5)*.4),k); q.setFromAxisAngle(UP,hs(i,j,6)*6.28); ps.set(x,h-1,z);
     m.compose(ps,q,sc); trees.setMatrixAt(n++,m)}
   trees.count=n; trees.instanceMatrix.needsUpdate=true}
+/* settlements: warm clusters of lights on gentle low ground, laid deterministically per 5 km cell and re-laid with the terrain; shown at dusk and night */
+const TOWN_MAX=1800, townPos=new Float32Array(TOWN_MAX*3), townCol=new Float32Array(TOWN_MAX*3), townGeo=new THREE.BufferGeometry();
+townGeo.setAttribute('position',new THREE.BufferAttribute(townPos,3).setUsage(THREE.DynamicDrawUsage)); townGeo.setAttribute('color',new THREE.BufferAttribute(townCol,3).setUsage(THREE.DynamicDrawUsage)); townGeo.setDrawRange(0,0);
+const townLights=new THREE.Points(townGeo,new THREE.PointsMaterial({size:2.6,sizeAttenuation:false,vertexColors:true,transparent:true,opacity:0,blending:THREE.AdditiveBlending,depthWrite:false,fog:false}));
+townLights.frustumCulled=false; townLights.visible=false; scene.add(townLights);
+function placeTowns(cx,cz){
+  if(MAP==='OCEAN'){townGeo.setDrawRange(0,0);return}
+  const CELL=5200,R=11000,hs=(i,j,k)=>{const v=Math.sin(i*91.7+j*263.1+k*57.3)*43758.5453;return v-Math.floor(v)}; let n=0;
+  for(let i=Math.floor((cx-R)/CELL);i<=Math.floor((cx+R)/CELL);i++)for(let j=Math.floor((cz-R)/CELL);j<=Math.floor((cz+R)/CELL);j++){
+    if(hs(i,j,1)>.62)continue; const x=(i+.15+hs(i,j,2)*.7)*CELL,z=(j+.15+hs(i,j,3)*.7)*CELL;
+    if(Math.hypot(x*1.6,z)<3600)continue;
+    const h=groundH(x,z); if(h<8||h>(MAP==='ALPINE'?900:260)||Math.abs(groundH(x+120,z)-h)>35||Math.abs(groundH(x,z+120)-h)>35)continue;
+    const cnt=Math.round(12+hs(i,j,4)*46),rad=140+hs(i,j,5)*320;
+    for(let k=0;k<cnt&&n<TOWN_MAX;k++){const a=hs(i,j,10+k)*6.283,r=rad*Math.pow(hs(i,j,80+k),.65),px=x+Math.cos(a)*r,pz=z+Math.sin(a)*r,py=groundH(px,pz);
+      if(py<3)continue;townPos[n*3]=px;townPos[n*3+1]=py+4;townPos[n*3+2]=pz;
+      const w=.7+hs(i,j,160+k)*.3;townCol[n*3]=1*w;townCol[n*3+1]=.82*w;townCol[n*3+2]=(.45+hs(i,j,240+k)*.2)*w;n++}}
+  townGeo.setDrawRange(0,n); townGeo.attributes.position.needsUpdate=true; townGeo.attributes.color.needsUpdate=true}
 water.frustumCulled=false; scene.add(water);
 // soft sprite clouds: a painted puff texture, lit tops and greyer bases
 /* cumulus puffs: many soft lobes, sunlit tops and blue-grey shaded bases baked into three texture variants */
@@ -1497,6 +1514,17 @@ for(let i=0;i<RAIN_N;i++){rainOff[i*3]=rand(-45,45);rainOff[i*3+1]=rand(-30,30);
 const rainGeo=new THREE.BufferGeometry(); rainGeo.setAttribute('position',new THREE.BufferAttribute(rainPos,3).setUsage(THREE.DynamicDrawUsage));
 const rain=new THREE.LineSegments(rainGeo,new THREE.LineBasicMaterial({color:0xc8d2dc,transparent:true,opacity:.35,depthWrite:false}));
 rain.frustumCulled=false; rain.visible=false; scene.add(rain);
+/* thunderstorms: in rain, bolts flash the whole scene in a short stutter, and the thunder arrives after distance / 340 s */
+const flashLt=new THREE.AmbientLight(0xdfe8ff,0); scene.add(flashLt);
+const LT={next:7,seq:[],t:0,force:false};
+function updateLightning(dt){
+  if(weather!=='RAIN'||!(state==='play'||state==='menu')){flashLt.intensity=0;LT.seq.length=0;return}
+  LT.next-=dt; if(LT.force||LT.next<=0){LT.force=false;LT.next=rand(6,16);LT.t=0;
+    LT.seq=[[0,.07,1],[.07,.13,0],[.13,.3,.7],[.3,.38,0],[.38,.46,.5]];                 // [from, to, strength] seconds
+    const dist=rand(1500,9000);setTimeout(()=>{if(state==='play')sndBoom(clamp(1-dist/11000,.12,.55))},dist/340*1000)}
+  let f=0;if(LT.seq.length){LT.t+=dt;for(const [a,b,s] of LT.seq)if(LT.t>=a&&LT.t<b)f=s;if(LT.t>LT.seq[LT.seq.length-1][1])LT.seq.length=0}
+  flashLt.intensity=f*1.7*LK;
+}
 function updateRain(dt){
   const sn=MAP==='ALPINE'; rain.material.color.setHex(sn?0xffffff:0xc8d2dc); rain.material.opacity=sn?.8:.35;
   const on=(weather==='RAIN'||(sn&&weather==='OVERCAST'))&&camera.position.y<DECK_Y&&(state==='play'||state==='menu'||state==='paused'||state==='replay'); rain.visible=on; if(!on)return;
@@ -1523,6 +1551,7 @@ function applyEnv(){
   glare.material.opacity=oc?0:E.glare; glare.material.color.setHex(E.sc);
   updateEnvMap();
   if(weather==='RAIN')scene.background.multiplyScalar(.82),scene.fog.color.multiplyScalar(.82),sky.material.uniforms.hor.value.multiplyScalar(.82),sky.material.uniforms.top.value.lerp(sky.material.uniforms.hor.value,.6);
+  townLights.visible=timeOfDay!=='DAY'; townLights.material.opacity=timeOfDay==='NIGHT'?(oc?.45:.95):.35;
   if(rwyLights){rwyLights.material.opacity=timeOfDay==='NIGHT'?1:timeOfDay==='DUSK'?.8:.45;rwyLights.material.size=timeOfDay==='NIGHT'?3.2:2.2}
   if(MAP==='DESERT'){const dc=new THREE.Color(timeOfDay==='NIGHT'?0x1a1612:0xd8c39b);scene.fog.color.lerp(dc,.45);scene.background.copy(scene.fog.color);sky.material.uniforms.hor.value.lerp(dc,.4);scene.fog.far*=.78;scene.fog.near*=.6;updateEnvMap()}
   if(MAP==='OCEAN'){WIND.multiplyScalar(1.6);turbK+=.1}
@@ -2896,7 +2925,9 @@ function resume(){recenterTilt();state='play';showOverlay(null);$('ctrls').hidde
 
 // Adaptive quality: if play stays under ~35 fps for ~3 s, step the graphics tier down once (not saved as the user's preference).
 let aqAvg=16,aqSlow=0,aqCool=0;
+const NO_AQ=/[?&]noaq\b/.test(location.search);   // dev/screenshots: keep the chosen quality
 function autoQuality(ms){
+  if(NO_AQ)return;
   if(state!=='play'||!(ms>0)||ms>250){aqSlow=0;return}   // ignore pauses and tab switches
   aqAvg+=(ms-aqAvg)*.05; aqCool=Math.max(0,aqCool-ms);
   if(aqAvg>28.5&&aqCool<=0){aqSlow+=ms;if(aqSlow>3000){const k=Object.keys(QUALS),i=k.indexOf(quality);aqSlow=0;aqCool=20000;if(i>0){setQuality(k[i-1],true);aqAvg=16;message('GRAPHICS LOWERED FOR FRAME RATE',2.5)}}}
@@ -4527,7 +4558,7 @@ function frame(now){
   waterMat.uniforms.t.value=now*.001; glare.position.copy(camera.position).addScaledVector(SUN_DIR,26000);
   pMat.uniforms.fogC.value.copy(scene.fog.color); pMat.uniforms.fogN.value=scene.fog.near; pMat.uniforms.fogF.value=scene.fog.far;
   if(boomLight.intensity>0)boomLight.intensity=Math.max(0,boomLight.intensity-(dt||.016)*7*LK);
-  updateShadow(); gust=1+.35*Math.sin(clock*.7)*Math.sin(clock*1.9+1); updateRain(dt||.016);
+  updateShadow(); gust=1+.35*Math.sin(clock*.7)*Math.sin(clock*1.9+1); updateRain(dt||.016); updateLightning(dt||.016);
   for(const cl of clouds){if(!cl.visible)continue;const d=cl.position.distanceTo(camera.position),o=clamp((d-380)/900,0,1)*.95;if(cl.userData.op!==o){cl.userData.op=o;for(const m of cl.userData.mats)m.opacity=o}}
   sndEngine(); sndExtra(); sndFlyby(); updateGlints(); updateFlareLight(); shadowFollow();
   renderer.clear(); renderer.render(scene,camera);
@@ -4645,5 +4676,5 @@ const _careerAward=careerAward;
 careerAward=function(){lbAdd();return _careerAward.apply(this,arguments)};
 
 /* ---------- test hook (only with ?test in the URL) ---------- */
-if(/[?&]test\b/.test(location.search))window.__vs={P,fly,dlz,flyout,AC_DEFS,V3,atm,clamp,lbAdd,showOverlay:k=>showOverlay(k),setScore:(n,k)=>{score=n;kills=k},get state(){return state},get AC(){return AC}};
+if(/[?&]test\b/.test(location.search))window.__vs={LT,townLights,flashLt,P,fly,dlz,flyout,AC_DEFS,V3,atm,clamp,lbAdd,showOverlay:k=>showOverlay(k),setScore:(n,k)=>{score=n;kills=k},get state(){return state},get AC(){return AC}};
 })();

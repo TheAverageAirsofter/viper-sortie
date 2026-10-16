@@ -135,7 +135,7 @@ function updateTerrain(cx,cz){
   for(let i=0;i<tPos.count;i++){
     const x=tBase[i*3]+cx,z=tBase[i*3+2]+cz,h=groundH(x,z); a[i*3+1]=h;
   }
-  tPos.needsUpdate=true; tGeo.computeVertexNormals(); placeTrees(cx,cz);
+  tPos.needsUpdate=true; tGeo.computeVertexNormals(); placeTrees(cx,cz); placeTowns(cx,cz);
 }
 /* water: rolling swell normals, Fresnel sky reflection and a sun glint path */
 const waterMat=new THREE.ShaderMaterial({fog:true,
@@ -188,6 +188,23 @@ function placeTrees(cx,cz){
     const k=.9+hs(i,j,4)*.8; sc.set(k,k*(.85+hs(i,j,5)*.4),k); q.setFromAxisAngle(UP,hs(i,j,6)*6.28); ps.set(x,h-1,z);
     m.compose(ps,q,sc); trees.setMatrixAt(n++,m)}
   trees.count=n; trees.instanceMatrix.needsUpdate=true}
+/* settlements: warm clusters of lights on gentle low ground, laid deterministically per 5 km cell and re-laid with the terrain; shown at dusk and night */
+const TOWN_MAX=1800, townPos=new Float32Array(TOWN_MAX*3), townCol=new Float32Array(TOWN_MAX*3), townGeo=new THREE.BufferGeometry();
+townGeo.setAttribute('position',new THREE.BufferAttribute(townPos,3).setUsage(THREE.DynamicDrawUsage)); townGeo.setAttribute('color',new THREE.BufferAttribute(townCol,3).setUsage(THREE.DynamicDrawUsage)); townGeo.setDrawRange(0,0);
+const townLights=new THREE.Points(townGeo,new THREE.PointsMaterial({size:2.6,sizeAttenuation:false,vertexColors:true,transparent:true,opacity:0,blending:THREE.AdditiveBlending,depthWrite:false,fog:false}));
+townLights.frustumCulled=false; townLights.visible=false; scene.add(townLights);
+function placeTowns(cx,cz){
+  if(MAP==='OCEAN'){townGeo.setDrawRange(0,0);return}
+  const CELL=5200,R=11000,hs=(i,j,k)=>{const v=Math.sin(i*91.7+j*263.1+k*57.3)*43758.5453;return v-Math.floor(v)}; let n=0;
+  for(let i=Math.floor((cx-R)/CELL);i<=Math.floor((cx+R)/CELL);i++)for(let j=Math.floor((cz-R)/CELL);j<=Math.floor((cz+R)/CELL);j++){
+    if(hs(i,j,1)>.62)continue; const x=(i+.15+hs(i,j,2)*.7)*CELL,z=(j+.15+hs(i,j,3)*.7)*CELL;
+    if(Math.hypot(x*1.6,z)<3600)continue;
+    const h=groundH(x,z); if(h<8||h>(MAP==='ALPINE'?900:260)||Math.abs(groundH(x+120,z)-h)>35||Math.abs(groundH(x,z+120)-h)>35)continue;
+    const cnt=Math.round(12+hs(i,j,4)*46),rad=140+hs(i,j,5)*320;
+    for(let k=0;k<cnt&&n<TOWN_MAX;k++){const a=hs(i,j,10+k)*6.283,r=rad*Math.pow(hs(i,j,80+k),.65),px=x+Math.cos(a)*r,pz=z+Math.sin(a)*r,py=groundH(px,pz);
+      if(py<3)continue;townPos[n*3]=px;townPos[n*3+1]=py+4;townPos[n*3+2]=pz;
+      const w=.7+hs(i,j,160+k)*.3;townCol[n*3]=1*w;townCol[n*3+1]=.82*w;townCol[n*3+2]=(.45+hs(i,j,240+k)*.2)*w;n++}}
+  townGeo.setDrawRange(0,n); townGeo.attributes.position.needsUpdate=true; townGeo.attributes.color.needsUpdate=true}
 water.frustumCulled=false; scene.add(water);
 // soft sprite clouds: a painted puff texture, lit tops and greyer bases
 /* cumulus puffs: many soft lobes, sunlit tops and blue-grey shaded bases baked into three texture variants */

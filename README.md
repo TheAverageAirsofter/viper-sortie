@@ -32,6 +32,7 @@ npm run smoke                # loads the game headless and reports console error
 `npm run build` also writes `dist/viper-sortie.cdn.html` (about 450 KB: readable game code inline, three.js from cdnjs; closest to the original single file, easiest to edit in chat) and `dist/viper-sortie.html` (about 1 MB, everything inlined, works offline). Edits made to a single file in chat are not automatically merged back into `src/`; to bring them back, ask Claude Code to port the change into `src/`.
 
 ## Notes
+- **Visuals added:** settlement lights on low, gentle ground at dusk and night (re-laid with the terrain, about 1,800 points max), and thunderstorm lightning in rain (a stuttering scene flash and thunder after distance / 340 s). `?noaq` in the URL turns off the automatic quality drop for screenshots.
 - **Realism details:** cannon rounds have quadratic drag fitted to the PGU-28 (about 1.4 s to 1 km, effective range roughly 1-1.5 km); the pipper and the AI's gun lead use the same ballistics. Angle of attack is shown on the HUD (linear lift curve to CLmax at about 26 deg). Explosions are heard after a speed-of-sound delay.
 - **Controls guide** labels every button on the first launch (replay it from the menu). **HUD text size** and **Mirror left/right** (in Move buttons) help with comfort and left-handed play.
 - **Best scores** are kept per mission on the device, and **Share result** uses the phone's share sheet (or copies the text).

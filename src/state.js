@@ -494,7 +494,9 @@ function resume(){recenterTilt();state='play';showOverlay(null);$('ctrls').hidde
 
 // Adaptive quality: if play stays under ~35 fps for ~3 s, step the graphics tier down once (not saved as the user's preference).
 let aqAvg=16,aqSlow=0,aqCool=0;
+const NO_AQ=/[?&]noaq\b/.test(location.search);   // dev/screenshots: keep the chosen quality
 function autoQuality(ms){
+  if(NO_AQ)return;
   if(state!=='play'||!(ms>0)||ms>250){aqSlow=0;return}   // ignore pauses and tab switches
   aqAvg+=(ms-aqAvg)*.05; aqCool=Math.max(0,aqCool-ms);
   if(aqAvg>28.5&&aqCool<=0){aqSlow+=ms;if(aqSlow>3000){const k=Object.keys(QUALS),i=k.indexOf(quality);aqSlow=0;aqCool=20000;if(i>0){setQuality(k[i-1],true);aqAvg=16;message('GRAPHICS LOWERED FOR FRAME RATE',2.5)}}}

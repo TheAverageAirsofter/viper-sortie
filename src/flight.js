@@ -62,6 +62,17 @@ for(let i=0;i<RAIN_N;i++){rainOff[i*3]=rand(-45,45);rainOff[i*3+1]=rand(-30,30);
 const rainGeo=new THREE.BufferGeometry(); rainGeo.setAttribute('position',new THREE.BufferAttribute(rainPos,3).setUsage(THREE.DynamicDrawUsage));
 const rain=new THREE.LineSegments(rainGeo,new THREE.LineBasicMaterial({color:0xc8d2dc,transparent:true,opacity:.35,depthWrite:false}));
 rain.frustumCulled=false; rain.visible=false; scene.add(rain);
+/* thunderstorms: in rain, bolts flash the whole scene in a short stutter, and the thunder arrives after distance / 340 s */
+const flashLt=new THREE.AmbientLight(0xdfe8ff,0); scene.add(flashLt);
+const LT={next:7,seq:[],t:0,force:false};
+function updateLightning(dt){
+  if(weather!=='RAIN'||!(state==='play'||state==='menu')){flashLt.intensity=0;LT.seq.length=0;return}
+  LT.next-=dt; if(LT.force||LT.next<=0){LT.force=false;LT.next=rand(6,16);LT.t=0;
+    LT.seq=[[0,.07,1],[.07,.13,0],[.13,.3,.7],[.3,.38,0],[.38,.46,.5]];                 // [from, to, strength] seconds
+    const dist=rand(1500,9000);setTimeout(()=>{if(state==='play')sndBoom(clamp(1-dist/11000,.12,.55))},dist/340*1000)}
+  let f=0;if(LT.seq.length){LT.t+=dt;for(const [a,b,s] of LT.seq)if(LT.t>=a&&LT.t<b)f=s;if(LT.t>LT.seq[LT.seq.length-1][1])LT.seq.length=0}
+  flashLt.intensity=f*1.7*LK;
+}
 function updateRain(dt){
   const sn=MAP==='ALPINE'; rain.material.color.setHex(sn?0xffffff:0xc8d2dc); rain.material.opacity=sn?.8:.35;
   const on=(weather==='RAIN'||(sn&&weather==='OVERCAST'))&&camera.position.y<DECK_Y&&(state==='play'||state==='menu'||state==='paused'||state==='replay'); rain.visible=on; if(!on)return;
@@ -88,6 +99,7 @@ function applyEnv(){
   glare.material.opacity=oc?0:E.glare; glare.material.color.setHex(E.sc);
   updateEnvMap();
   if(weather==='RAIN')scene.background.multiplyScalar(.82),scene.fog.color.multiplyScalar(.82),sky.material.uniforms.hor.value.multiplyScalar(.82),sky.material.uniforms.top.value.lerp(sky.material.uniforms.hor.value,.6);
+  townLights.visible=timeOfDay!=='DAY'; townLights.material.opacity=timeOfDay==='NIGHT'?(oc?.45:.95):.35;
   if(rwyLights){rwyLights.material.opacity=timeOfDay==='NIGHT'?1:timeOfDay==='DUSK'?.8:.45;rwyLights.material.size=timeOfDay==='NIGHT'?3.2:2.2}
   if(MAP==='DESERT'){const dc=new THREE.Color(timeOfDay==='NIGHT'?0x1a1612:0xd8c39b);scene.fog.color.lerp(dc,.45);scene.background.copy(scene.fog.color);sky.material.uniforms.hor.value.lerp(dc,.4);scene.fog.far*=.78;scene.fog.near*=.6;updateEnvMap()}
   if(MAP==='OCEAN'){WIND.multiplyScalar(1.6);turbK+=.1}
