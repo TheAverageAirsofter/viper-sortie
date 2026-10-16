@@ -506,7 +506,7 @@ function wingGeo(st,mirror){
     st.forEach(s=>sec(s,sg).forEach(p=>pos.push(...p)));
     for(let i=0;i<st.length-1;i++)for(let j=0;j<4;j++){const a=b0+i*4+j,b=b0+i*4+(j+1)%4,c=b0+(i+1)*4+j,d=b0+(i+1)*4+(j+1)%4;if(sg>0)idx.push(a,b,c,b,d,c);else idx.push(a,c,b,b,c,d)}
     const L=b0+(st.length-1)*4;if(sg>0)idx.push(L,L+1,L+2,L,L+2,L+3);else idx.push(L,L+2,L+1,L,L+3,L+2)}
-  const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));g.setIndex(idx);g.computeVertexNormals();return g}
+  const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));g.setIndex(idx);g.computeVertexNormals();g.userData.secN=4;return g}   // secN: four vertices per section, used to orient the paint normals
 // fin: sections {h, zle, zte, t} stacked upward from y=0, thickness along x
 function finGeo(st){const ws=st.map(s=>({x:s.h,zle:s.zle,zte:s.zte,t:s.t||.05,y:0}));const g=wingGeo(ws,false);
   const p=g.attributes.position;for(let i=0;i<p.count;i++){const x=p.getX(i),y=p.getY(i);p.setXYZ(i,y,x,p.getZ(i))}g.computeVertexNormals();return g}
@@ -577,7 +577,9 @@ function bakePaint(g,mat){g.updateMatrixWorld(true);const iv=new THREE.Matrix4()
   g.traverse(o=>{if(!o.isMesh||o.material!==mat||o.geometry.attributes.jp)return;const ge=o.geometry,p=ge.attributes.position,nn=ge.attributes.normal;M.multiplyMatrices(iv,o.matrixWorld);N.getNormalMatrix(M);
     const jp=new Float32Array(p.count*3),jn=new Float32Array(p.count*3),c=new THREE.Vector3(),w=new THREE.Vector3();
     for(let i=0;i<p.count;i++){v.fromBufferAttribute(p,i).applyMatrix4(M);jp[i*3]=v.x;jp[i*3+1]=v.y;jp[i*3+2]=v.z;c.add(v)}c.divideScalar(Math.max(1,p.count));
-    for(let i=0;i<p.count;i++){v.fromBufferAttribute(nn,i).applyMatrix3(N).normalize();w.set(jp[i*3]-c.x,(jp[i*3+1]-c.y)*3,jp[i*3+2]-c.z);if(v.dot(w)<0)v.negate();jn[i*3]=v.x;jn[i*3+1]=v.y;jn[i*3+2]=v.z}
+    const sN=ge.userData&&ge.userData.secN;   // wings, fins and control surfaces: face outward from their own section, so dihedral and anhedral don't flip the paint
+    for(let i=0;i<p.count;i++){let cx=c.x,cy=c.y,cz=c.z;if(sN){const k=i-i%sN;cx=cy=cz=0;for(let q=0;q<sN;q++){cx+=jp[(k+q)*3];cy+=jp[(k+q)*3+1];cz+=jp[(k+q)*3+2]}cx/=sN;cy/=sN;cz/=sN}
+      v.fromBufferAttribute(nn,i).applyMatrix3(N).normalize();w.set(jp[i*3]-cx,(jp[i*3+1]-cy)*3,jp[i*3+2]-cz);if(v.dot(w)<0)v.negate();jn[i*3]=v.x;jn[i*3+1]=v.y;jn[i*3+2]=v.z}
     ge.setAttribute('jp',new THREE.BufferAttribute(jp,3));ge.setAttribute('jn',new THREE.BufferAttribute(jn,3))})}
 // national markings and numbers, drawn once per design on a canvas
 const DECAL_TEX={};
@@ -638,6 +640,9 @@ function buildLoftJet(c,S,type){
   const cz=S.canopy[0],cut=add(loftGeo(rz!=null?g.getObjectByName('fuse').userData.st:fst,{skipTop:[cz-1.3,cz+1.4]}),body,'fuseCut');cut.visible=false;
   for(const p of S.parts||[]){const xs=p.x?[p.x,-p.x]:[0];for(const x of xs){const m=add(loftGeo(p.st,{n:p.n||12}),p.dark?dark:body);m.position.x=x;
       if(p.mouth){const [z,w,ht,hb,yc]=p.st[p.st.length-1];const mo=add(new THREE.PlaneGeometry(w*1.8,(ht+hb)*.9),black);mo.position.set(x,yc+(ht-hb)/2,z-.02)}}}
+  // control surfaces follow every station of a multi-section wing (one strip per segment) so they stay inside the planform
+  const segStrips=(st,lo,hi,frac,sd,mat,kind)=>{const x0=st[0].x,span=st[st.length-1].x-x0;if(!(span>0))return;
+    for(let i=0;i<st.length-1;i++){const a=st[i],b=st[i+1],fa=(a.x-x0)/span,fb=(b.x-x0)/span,l=Math.max(lo,fa),h=Math.min(hi,fb);if(h-l<.03)continue;g.add(hingeStrip(a,b,(l-fa)/(fb-fa),(h-fa)/(fb-fa),frac,sd,mat,kind))}};
   // flying surfaces: the biggest is the wing; stubby ones are strakes/LERX; the rest move (tailplanes behind, canards ahead)
   const ws=S.wings.map(w=>{const r=w.st[0],t=w.st[w.st.length-1];return{w,r,t,span:t.x-r.x,ch:r.zle-r.zte}});
   const main=ws.reduce((a,b)=>b.t.x>a.t.x?b:a);
@@ -646,8 +651,8 @@ function buildLoftJet(c,S,type){
   for(const o of ws){const mat=o.w.dark?dark:body;
     if(o.kind==='main'||o.kind==='fix'){add(wingGeo(o.w.st),mat);
       if(o.kind==='main')for(const s of [1,-1]){
-        if(hasStab){g.add(hingeStrip(o.r,o.t,.52,.94,.24,s,mat,'ail'));g.add(hingeStrip(o.r,o.t,.1,.5,.26,s,mat,'flap'))}
-        else{g.add(hingeStrip(o.r,o.t,.12,.5,.2,s,mat,'elv'));g.add(hingeStrip(o.r,o.t,.52,.95,.2,s,mat,'elv'))}}}
+        if(hasStab){segStrips(o.w.st,.52,.94,.24,s,mat,'ail');segStrips(o.w.st,.1,.5,.26,s,mat,'flap')}
+        else{segStrips(o.w.st,.12,.5,.2,s,mat,'elv');segStrips(o.w.st,.52,.95,.2,s,mat,'elv')}}}
     else for(const s of [1,-1]){const st=o.w.st.map(q=>Object.assign({},q,{x:q.x*s})),geo=wingGeo(st,false),pz=o.r.zle-o.ch*.42,piv=new THREE.Vector3(o.r.x*s,o.r.y||0,pz);
       geo.translate(-piv.x,-piv.y,-piv.z);const grp=new THREE.Group();grp.position.copy(piv);grp.name='cs';grp.userData={cs:o.kind,s,ax:[1,0,0]};add(geo,mat,null,grp);g.add(grp)}}
   // fins: rudders on the trailing edge; the J-20's fins are all-moving
