@@ -14,7 +14,7 @@ try{suLR=localStorage.getItem('vsR37')==='1';use120D=localStorage.getItem('vs120
 const AC_DEFS={
   F16:{id:'F16',name:'F-16C Block 50',eyebrow:'F-16C Block 50 · Callsign Viper 1',corner:350,
     S:27.87,MASS:12000,CLMAX:1.9,KIND:.12,T_AB:120000,T_MIL:65000,ram:.25,cdK:1,gmax:9,roll:4.2,   // 300 ft², 27,000 lbf AB
-    gunRate:100,gunRounds:500,muzzle:1030,gunDmg:1,gunSnd:1800,ammo:'PGU-28',                   // M61A1 20 mm, 6,000 rpm
+    gunRate:100,gunRounds:512,muzzle:1030,gunDmg:1,gunSnd:1800,ammo:'PGU-28',                   // M61A1 20 mm, 6,000 rpm
     srName:'9X',srFull:'AIM-9X',mrName:'120',mrFull:'AIM-120C',srN:2,mrN:4,
     sr:{burn:5,acc:160,cd:7e-5,gmax:50,life:25,fuze:9,gimbal:Math.PI/2,decoy:.08,minR:300,maxR:10000,cone:Math.PI/2,lockT:.8},
     mr:{burn:8,acc:150,cd:4.5e-5,gmax:40,life:60,fuze:12,gimbal:1.2,decoy:0,minR:1000,maxR:37000,cone:1.05,lockT:1.2},
@@ -140,7 +140,7 @@ AC_DEFS.F15C=Object.assign({},AC_DEFS.F16,{id:'F15C',name:'F-15C Eagle',eyebrow:
 // F-15EX Eagle II: 2× F110-GE-129 76.3 / 131 kN, 6,150 kg internal fuel, Mach 2.5, +9 g, APG-82(V)1 AESA, EPAWSS (AN/ALQ-250, no missile
 // warner per Wikipedia) with ALE-47, M61A1 500 rds, 12 air-to-air missiles typical
 AC_DEFS.F15EX=Object.assign({},AC_DEFS.F15C,{id:'F15EX',name:'F-15EX Eagle II',eyebrow:'F-15EX Eagle II · Callsign Eagle 1',corner:355,
-  MASS:23500,T_AB:262000,T_MIL:152600,ram:.45,cdK:1.12,supK:.1,gunRounds:500,fuelCap:6150,sfcAB:1.95,
+  MASS:23500,T_AB:262000,T_MIL:152600,ram:.45,cdK:1.12,supK:.1,gunRounds:512,fuelCap:6150,sfcAB:1.95,
   mrName:'120D',mrFull:'AIM-120D',srN:4,mrN:8,mr:Object.assign({},AC_DEFS.F16.mr),
   radar:{modes:['RWS','TWS'],name:'APG-82(V)1',range:150000},
   cm:{fixed:true,flares:60,chaff:60,decoys:0,maws:false,jam:'ECM',jamName:'EPAWSS (AN/ALQ-250)',cmds:'EPAWSS',
