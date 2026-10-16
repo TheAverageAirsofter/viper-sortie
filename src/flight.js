@@ -324,13 +324,13 @@ function groundRoll(dt,rollIn,pitchIn){
   const MS=P.mass||A.MASS, qd=.5*at.rho*v*v, nAero=qd*A.S*A.CLMAX/(MS*G);
   const T=thrust(A,throttle,at.sig,v/at.a,P.pos.y)*(P.thrK??1); P.lastT=T;
   const D=qd*A.S*(cd0(v/at.a,A)*A.cdK+(P.xcd||0)+(brake?.06:0));
-  const fr=(brake&&v>.5?.42:.025)*G;   // wheel brakes when BRK is held (wings roll level, so nearly all weight is on the wheels)
+  const off=!onRunway(P.pos.x,P.pos.z), fr=(brake&&v>.5?.42:off?.2:.025)*G;   // grass drags the wheels   // wheel brakes when BRK is held (wings roll level, so nearly all weight is on the wheels)
   v=Math.max(0,v+((T-D)/MS-fr)*dt);
   P.vel.set(Math.sin(hdg)*v,0,Math.cos(hdg)*v); P.pos.addScaledVector(P.vel,dt); P.pos.y=BASE_Y+GEAR_H;
   playerJet.quaternion.setFromAxisAngle(UP,hdg); axes(P);
   P.n=1; P.qd=qd; P.mach=v/at.a; P.kcas=v*Math.sqrt(at.sig)*1.944; P.nAero=nAero;
   if(pitchIn>.25&&nAero>1.05){P.onGround=false;P.vel.y=2.5+pitchIn*3;P.pos.y+=.4;P.airT=0;message('ROTATE · GEAR UP WHEN CLIMBING',1.6)}
-  if(!onRunway(P.pos.x,P.pos.z)){if(v>18){die('landing')}}
+  if(off&&Math.abs(groundH(P.pos.x,P.pos.z)-BASE_Y)>.5){message('CRASH · ROUGH TERRAIN',2);die('landing')}   // rolled off the flat airfield
   // rearm, refuel and repair after 4 s stopped on the runway
   if(v<1.5){P.stopT=(P.stopT||0)+dt; if(P.stopT>4&&!P.serviced){P.serviced=true;P.fuel=AC.fuelCap;P.hp=100;resetSystems();rearm();CM.flares=cmFlares();CM.chaff=cmChaff();syncCM();
       message('REARMED · REFUELED · REPAIRED',2.2);recEvent('Landed and turned around at the base');if(trainHook)trainHook('stopped')}}
@@ -341,12 +341,13 @@ function checkTouchdown(){
   if(P.pos.y>g+GEAR_H||P.onGround||P.vel.y>0)return false;
   const sink=-P.vel.y, bank=Math.abs(bankOf(P));
   // only a clearly wrong arrival destroys the jet (and the screen says why); a firm one costs gear damage instead, as in War Thunder
-  const bad=!P.gear?'GEAR UP':!onRunway(P.pos.x,P.pos.z)?'OFF THE RUNWAY':P.kcas>=280?'TOO FAST':sink>9?'SINK RATE TOO HIGH':bank>.35?'WINGS NOT LEVEL':P.fwd.y<-.2?'NOSE TOO LOW':null;
+  const rwy=onRunway(P.pos.x,P.pos.z), flat=Math.abs(g-BASE_Y)<.5;   // the airfield is flat grass all around the strip, so landing beside it is survivable
+  const bad=!P.gear?'GEAR UP':!flat?'ROUGH TERRAIN':P.kcas>=280?'TOO FAST':sink>9?'SINK RATE TOO HIGH':bank>.35?'WINGS NOT LEVEL':P.fwd.y<-.2?'NOSE TOO LOW':null;
   if(bad){message('CRASH · '+bad,2.4);recEvent('Crashed on landing: '+bad.toLowerCase());die(P.gear?'landing':'gearup');return true}
   P.onGround=true; P.vel.y=0; P.pos.y=BASE_Y+GEAR_H;
-  const hard=sink>5.5||bank>.22||P.kcas>=240||P.fwd.y<-.12;
-  if(hard){const dmg=Math.round(clamp(15+Math.max(0,sink-5.5)*12+Math.max(0,P.kcas-240)*.4,15,70));P.hp-=dmg;hurtT=.5;shake=.6;sndHit();
-    message('HARD LANDING · GEAR DAMAGED',2);recEvent('Hard landing at '+Math.round(P.kcas)+' kt, sink '+sink.toFixed(1)+' m/s (-'+dmg+' % airframe)');
+  const hard=sink>5.5||bank>.22||P.kcas>=240||P.fwd.y<-.12||!rwy;
+  if(hard){const dmg=Math.round(clamp(15+Math.max(0,sink-5.5)*12+Math.max(0,P.kcas-240)*.4+(rwy?0:20),15,70));P.hp-=dmg;hurtT=.5;shake=.6;sndHit();
+    message(rwy?'HARD LANDING · GEAR DAMAGED':'OFF-RUNWAY LANDING · GEAR DAMAGED',2);recEvent('Hard landing at '+Math.round(P.kcas)+' kt, sink '+sink.toFixed(1)+' m/s (-'+dmg+' % airframe)');
     if(P.hp<=0){die('landing');return true}}
   else message(sink<1.5?'GREASED IT':sink<2.8?'TOUCHDOWN':'FIRM TOUCHDOWN',1.6);
   recEvent('Touched down at '+Math.round(P.kcas)+' kt, sink '+sink.toFixed(1)+' m/s');
