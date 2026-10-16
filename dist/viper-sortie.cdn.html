@@ -224,7 +224,9 @@ body.hangar #ov{display:none!important}
 .tn.lock{opacity:.45}
 .tn.sel{outline:2px solid var(--paper);outline-offset:1px}
 .tn.cur{box-shadow:inset 0 0 0 2px var(--hud)}.tn.cur em{color:var(--hud)}
-.tdet h3{margin:4px 0;font:800 20px var(--f-display);text-transform:uppercase}
+.tdet{position:sticky;bottom:0;z-index:2;display:flex;align-items:center;gap:10px;flex-wrap:nowrap;background:rgba(8,16,20,.94);border-top:1px solid rgba(232,240,234,.25);padding:4px 10px;margin:0 -2px}
+.tdet .hgNote{display:none}.tdet .row{margin:0;flex:none}.tdet button{white-space:nowrap}
+.tdet h3{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin:0;font:800 17px var(--f-display);text-transform:uppercase}
 .hgT .ok{color:var(--hud);font-size:11px}
 .hgT button.ghost{font-size:11px;padding:6px 8px}
 button:disabled{opacity:.4;cursor:not-allowed}
@@ -6062,33 +6064,89 @@ const WAR_V={
   BMP2:{n:'BMP-2',team:'red',cls:'ifv',br:8.7,hp:5,spd:17,gun:[2200,.25,1000,.4,.004],aa:[1600,3,.6],look:'ifv',barrel:2.2,col:0x6a6046,hull:[3.1,1.1,6.7]},
   ZSU23:{n:'ZSU-23-4M4',team:'red',cls:'spaa',br:9.3,hp:4,spd:13,gun:[1800,.12,950,.25,.01],aa:[2600,14,1],look:'zsu23',barrel:2.6,col:0x655b42,hull:[3.1,1,6.5]},
   ZSU57:{n:'ZSU-57-2',team:'red',cls:'spaa',br:7.0,hp:5,spd:12,gun:[2200,.5,1000,1,.006],aa:[3000,4,2],look:'zsu57',barrel:4.2,col:0x6a6046,hull:[3.2,1,6.4]}};
-const WAR={on:false,units:[],sh:[],t:0};
+// crew, ammunition-rack vulnerability (1 = autoloader carousel in the hull, low = blow-out panels) and the gun's pivot (y, z) in the turret
+const WAR_X={M1A1:{crew:4,rack:.3,gy:.62,gz:2.25},LEO2A4:{crew:4,rack:.45,gy:.6,gz:2.1},CHAL:{crew:4,rack:.4,gy:.62,gz:2.2},M60A3:{crew:4,rack:.8,gy:.5,gz:1.7},M3:{crew:3,rack:.7,gy:.55,gz:.9},MARDER:{crew:3,rack:.6,gy:.55,gz:.9},
+  GEPARD:{crew:3,rack:.5,gy:.8,gz:1.6},M163:{crew:3,rack:.5,gy:.6,gz:.5},T80B:{crew:3,rack:1.3,gy:.5,gz:1.5},T72A:{crew:3,rack:1.4,gy:.5,gz:1.5},T62:{crew:4,rack:.9,gy:.5,gz:1.5},BMP2:{crew:3,rack:1,gy:.55,gz:.8},ZSU23:{crew:4,rack:.6,gy:.75,gz:1.4},ZSU57:{crew:6,rack:.8,gy:.55,gz:1.4}};
+for(const k in WAR_X)Object.assign(WAR_V[k],WAR_X[k]);
+const WAR={on:false,units:[],sh:[],t:0,debris:[]};
 const warMat=c=>new THREE.MeshLambertMaterial({color:c});
 const warShellMat={blue:new THREE.MeshBasicMaterial({color:0xfff4c0}),red:new THREE.MeshBasicMaterial({color:0xffb27a})};
 const warShellGeo=new THREE.BoxGeometry(.28,.28,7);
 for(let i=0;i<48;i++){const m=new THREE.Mesh(warShellGeo,warShellMat.blue);m.visible=false;m.frustumCulled=false;scene.add(m);WAR.sh.push({m,on:false,vel:new V3(),prev:new V3(),life:0,team:'blue',dmg:0,owner:null})}
+/* ---- models: parts are collected per material group and merged, so a vehicle costs about seven draw calls ---- */
+const _wm4=new THREE.Matrix4(),_wq=new THREE.Quaternion(),_we=new THREE.Euler(),_wv=new V3(),_ws=new V3();
+function wPart(list,geo,x,y,z,rx,ry,rz,sx,sy,sz){_we.set(rx||0,ry||0,rz||0);_wq.setFromEuler(_we);_wm4.compose(_wv.set(x,y,z),_wq,_ws.set(sx||1,sy||1,sz||1));const g=geo.index?geo.toNonIndexed():geo.clone();g.applyMatrix4(_wm4);list.push(g)}
+function wMerge(list,mat){if(!list.length)return null;const n=list.reduce((a,g)=>a+g.attributes.position.count,0),pos=new Float32Array(n*3),nor=new Float32Array(n*3);let o=0;
+  for(const g of list){pos.set(g.attributes.position.array,o*3);nor.set(g.attributes.normal.array,o*3);o+=g.attributes.position.count}
+  const G=new THREE.BufferGeometry();G.setAttribute('position',new THREE.BufferAttribute(pos,3));G.setAttribute('normal',new THREE.BufferAttribute(nor,3));return new THREE.Mesh(G,mat)}
+// a side-profile polygon (z, y) extruded across x: wedge hulls and sloped turrets
+function wPrism(pts,w){const sh=new THREE.Shape();pts.forEach((p,i)=>i?sh.lineTo(p[0],p[1]):sh.moveTo(p[0],p[1]));sh.closePath();const g=new THREE.ExtrudeGeometry(sh,{depth:w,bevelEnabled:false});g.translate(0,0,-w/2);g.rotateY(-Math.PI/2);return g}
+const wBox=(w,h,l)=>new THREE.BoxGeometry(w,h,l), wCyl=(r1,r2,h,n)=>new THREE.CylinderGeometry(r1,r2,h,n||10), wSph=()=>new THREE.SphereGeometry(1,14,9);
+const wBarrel=(r,len)=>new THREE.CylinderGeometry(r,r,len,8).rotateX(Math.PI/2).translate(0,0,len/2);
 function warBuild(d){
-  const g=new THREE.Group(),body=warMat(d.col),dk=warMat(0x24272a),H=d.hull,tur=new THREE.Group();
-  const add=(geo,mat,x,y,z,par)=>{const m=new THREE.Mesh(geo,mat);m.position.set(x,y,z);(par||g).add(m);return m};
-  add(new THREE.BoxGeometry(H[0],H[1],H[2]),body,0,.85+H[1]/2-.45,0);
-  for(const s of [-1,1])add(new THREE.BoxGeometry(.78,.95,H[2]+.5),dk,s*(H[0]/2+.08),.55,0);
-  tur.position.y=.85+H[1]-.1;g.add(tur);
-  const bar=(r,len,x,y,z)=>add(new THREE.CylinderGeometry(r,r,len,8).rotateX(Math.PI/2),dk,x,y,z+len/2,tur);
-  let top=1;
-  if(d.look==='box'){add(new THREE.BoxGeometry(3.1,.95,3.9),body,0,.5,-.2,tur);add(new THREE.BoxGeometry(2.5,.5,3.2),body,0,1.1,-.5,tur);add(new THREE.BoxGeometry(2.6,.7,1.2),body,0,.6,-2.1,tur);bar(.13,d.barrel,0,.55,1.7);top=1.4}
-  else if(d.look==='round'){add(new THREE.CylinderGeometry(1.25,1.45,.8,14),body,0,.4,0,tur);add(new THREE.CylinderGeometry(.5,.5,.35,10),body,.6,.95,0,tur);bar(.12,d.barrel,0,.45,1.3);add(new THREE.CylinderGeometry(.16,.16,1.1,8).rotateX(Math.PI/2),dk,0,.45,3.4,tur);top=1.15}
-  else if(d.look==='ifv'){add(new THREE.BoxGeometry(1.9,.75,2.1),body,0,.4,-.2,tur);bar(.06,d.barrel,.25,.5,1.0);if(d.n.indexOf('Bradley')>=0)add(new THREE.BoxGeometry(.7,.5,1.2),dk,-1.1,.7,-.2,tur);top=.8}
-  else if(d.look==='gepard'){add(new THREE.BoxGeometry(3.1,1.3,3.2),body,0,.65,-.2,tur);for(const x of [-1.25,1.25])bar(.07,d.barrel,x,.6,1.6);add(new THREE.CylinderGeometry(.85,.85,.16,14).rotateX(Math.PI/2),dk,0,1.7,-1.2,tur);add(new THREE.CylinderGeometry(.4,.4,.14,10).rotateX(Math.PI/2),dk,0,1.5,1.3,tur);top=1.35}
-  else if(d.look==='m163'){add(new THREE.CylinderGeometry(1.0,1.1,.7,12),body,0,.35,0,tur);for(let i=0;i<6;i++){const a=i*Math.PI/3;bar(.03,d.barrel,Math.cos(a)*.17,.55+Math.sin(a)*.17,.6)}top=.75}
-  else if(d.look==='zsu23'){add(new THREE.BoxGeometry(2.9,1.2,2.9),body,0,.6,-.2,tur);for(const x of [-.55,-.18,.18,.55])for(const y of [.55,.95])if(Math.abs(x)>.3||y<.8)bar(.05,d.barrel,x,y,1.2);add(new THREE.CylinderGeometry(.8,.8,.18,12).rotateX(Math.PI/2),dk,0,1.5,-1.2,tur);top=1.3}
-  else{add(new THREE.BoxGeometry(2.9,.8,3.2),body,0,.4,-.2,tur);for(const x of [-.45,.45])bar(.1,d.barrel,x,.55,1.4);top=.8}
-  add(new THREE.PlaneGeometry(2.2,2.2).rotateX(-Math.PI/2),new THREE.MeshBasicMaterial({color:d.team==='blue'?0x2b8cff:0xff3b30,side:THREE.DoubleSide}),0,top+.05,-.2,tur);   // roof panel: readable from the air
-  g.userData.tur=tur;return g}
+  const g=new THREE.Group(),W=d.hull[0],H1=d.hull[1],L=d.hull[2],body=warMat(d.col),tmat=warMat(new THREE.Color(d.col).multiplyScalar(.9).getHex()),dk=warMat(0x24272a),dk2=warMat(0x3a3d3a);
+  const hullG=[],sideL=[],sideR=[],turB=[],turD=[],gunG=[];
+  const tier=d.look==='ifv'||d.look==='m163';
+  // hull: sloped glacis and rear deck
+  const hp=d.look==='m163'?[[-L/2,.3],[-L/2,.3+H1],[L/2-1.0,.3+H1],[L/2,.3+H1*.6],[L/2,.3]]:tier?[[-L/2,.3],[-L/2,.3+H1],[L/2-1.5,.3+H1],[L/2,.3+H1*.55],[L/2,.3]]:[[-L/2,.3],[-L/2,.3+H1*.92],[-L/2+1.8,.3+H1],[L/2-2.0,.3+H1],[L/2,.3+H1*.5],[L/2,.3]];
+  wPart(hullG,wPrism(hp,W-.35),0,0,0);
+  if(!tier||d.look==='m163'){wPart(sideL,wBox(W*.55,.05,1.7),0,.3+H1+.04,-L/2+1.3);}                                       // engine deck grille (hull frame, dark)
+  // running gear: road wheels, sprocket, idler, track runs and skirts, one merged mesh per side
+  const nW=tier?5:6;
+  for(const [sd,list] of [[-1,sideL],[1,sideR]]){const x=sd*(W/2+.12);
+    wPart(list,wBox(.8,.95,L+.2),x,.6,0);wPart(list,wBox(.8,.1,L-.2),x,1.12,0);
+    for(let i=0;i<nW;i++){const z=-L/2+1.2+(L-2.4)*i/(nW-1);wPart(list,wCyl(.46,.46,.55,12),x+sd*-.12,.55,z,0,0,Math.PI/2)}
+    wPart(list,wCyl(.4,.4,.55,12),x-sd*.12,.6,-L/2+.45,0,0,Math.PI/2);wPart(list,wCyl(.36,.36,.55,12),x-sd*.12,.6,L/2-.35,0,0,Math.PI/2);
+    if(!tier&&d.team==='blue')wPart(list,wBox(.08,.55,L*.8),x+sd*.42,.95,0)}                                              // side skirts on the NATO tanks
+  const yT=.3+H1, T=turB, TD=turD;   // turret frame: y = 0 at the ring
+  const top={v:1};
+  switch(d.look){
+    case 'box':{
+      if(d.n.indexOf('Abrams')>=0){wPart(T,wPrism([[-2.5,0],[-2.5,.92],[-.7,1.06],[1.0,.96],[2.0,.72],[2.3,.35],[2.3,0]],3.3),0,0,0);wPart(T,wBox(3.2,.8,1.1),0,.45,-2.75);wPart(T,wBox(.7,.3,.9),-.75,1.1,-.3);wPart(TD,wCyl(.42,.42,.3,10),.75,1.15,-.2);wPart(TD,wBox(1.0,.7,.4),0,.5,2.35);top.v=1.2}
+      else if(d.n.indexOf('Leopard')>=0){wPart(T,wPrism([[-2.4,0],[-2.4,.95],[1.7,.95],[2.15,.78],[2.15,0]],3.4),0,0,0);for(const s of [-1,1])wPart(T,wBox(.55,.78,1.5),s*1.55,.45,1.55,0,-s*.55);wPart(T,wBox(3.1,.7,1.0),0,.45,-2.75);wPart(TD,wCyl(.4,.4,.3,10),.8,1.1,-.2);wPart(TD,wBox(.9,.6,.4),0,.5,2.2);top.v=1.05}
+      else{wPart(T,wPrism([[-2.6,0],[-2.6,.98],[1.4,1.05],[2.25,.78],[2.25,0]],3.5),0,0,0);wPart(T,wBox(3.3,.85,1.4),0,.5,-2.9);wPart(TD,wCyl(.42,.42,.3,10),.8,1.18,-.4);wPart(TD,wBox(1.1,.7,.4),0,.5,2.3);top.v=1.15}
+      break}
+    case 'round':{
+      const m60=d.n.indexOf('M60')>=0;wPart(T,wSph(),0,m60?.15:.05,.1,0,0,0,m60?1.5:1.6,m60?.85:.55,m60?2.0:1.85);
+      wPart(TD,wCyl(.46,.46,.32,10),m60?.65:.55,m60?1.0:.62,-.3);
+      if(!m60){wPart(TD,wBox(.5,.3,.6),-.75,.6,1.1);for(const s of [-1,1])for(let i=0;i<3;i++)wPart(TD,wCyl(.07,.07,.3,6),s*(.75+i*.15),.45,1.55,Math.PI/2,0,0);wPart(TD,wCyl(.05,.05,.7,6),.55,.9,-.3)}
+      else wPart(TD,wBox(.9,.3,.6),-.9,.55,-.2);
+      top.v=m60?1.1:.82;break}
+    case 'ifv':{
+      const brad=d.n.indexOf('Bradley')>=0,mard=d.n.indexOf('Marder')>=0;
+      wPart(T,wBox(brad?1.9:1.7,.85,2.0),brad?-.4:.35,.42,-.2);if(brad)wPart(TD,wBox(.7,.55,1.2),.95,.8,-.4);else if(mard)wPart(TD,wBox(.5,.4,.8),-.1,.9,-.3);else wPart(TD,wBox(.3,.35,.9),-.5,1.0,.1);
+      wPart(TD,wCyl(.3,.3,.18,8),brad?-.4:.35,.9,-.3);top.v=.9;break}
+    case 'gepard':{
+      wPart(T,wPrism([[-1.9,0],[-1.9,1.25],[1.1,1.35],[1.9,.95],[1.9,0]],3.3),0,0,0);
+      wPart(TD,wCyl(.06,.06,1.0,6),0,1.8,-1.0);wPart(TD,wCyl(.95,.95,.14,16),0,2.4,-1.0,Math.PI/2.4);wPart(TD,wCyl(.42,.42,.14,12),0,1.55,1.4,Math.PI/2.1);
+      for(const s of [-1,1])wPart(TD,wBox(.3,.35,.9),s*1.35,.6,1.2);top.v=1.4;break}
+    case 'm163':{
+      wPart(T,wCyl(.95,1.0,.65,14),0,.3,0);wPart(T,wBox(.15,.8,1.2),.9,.7,.3);wPart(T,wBox(.15,.8,1.2),-.9,.7,.3);wPart(TD,wBox(1.3,.3,.8),0,.5,-.8);top.v=.8;break}
+    case 'zsu23':{
+      wPart(T,wBox(2.9,1.2,2.9),0,.6,-.2);wPart(T,wBox(2.6,.2,1.0),0,1.25,.9,-.35);wPart(TD,wCyl(.06,.06,.8,6),0,1.6,-1.0);wPart(TD,wCyl(.85,.85,.14,14),0,2.1,-1.1,Math.PI/2.3);top.v=1.4;break}
+    default:{   // ZSU-57-2: open-topped turret with thin walls
+      for(const s of [-1,1])wPart(T,wBox(.12,.9,3.0),s*1.4,.45,-.2);wPart(T,wBox(2.9,.9,.12),0,.45,-1.7);wPart(T,wBox(2.9,.5,.12),0,.3,1.3);wPart(TD,wBox(2.6,.1,2.6),0,.05,-.2);top.v=.9}}
+  // gun: barrel(s) in their own group so they can elevate and recoil
+  const gg=new THREE.Group();gg.position.set(0,d.gy,d.gz);
+  if(d.look==='gepard')for(const s of [-1,1]){wPart(gunG,wBarrel(.075,d.barrel),s*1.35,d.gy*0-.15,-d.gz+1.2);wPart(gunG,wCyl(.1,.1,.35,8).rotateX(Math.PI/2),s*1.35,-.15,-d.gz+1.2+d.barrel,0,0,0)}
+  else if(d.look==='zsu23')for(const x of [-.55,-.18,.18,.55])for(const y of [-.2,.2])wPart(gunG,wBarrel(.05,d.barrel),x,y,0);
+  else if(d.look==='zsu57')for(const x of [-.45,.45])wPart(gunG,wBarrel(.1,d.barrel),x,0,0);
+  else if(d.look==='m163')for(let i=0;i<6;i++){const a=i*Math.PI/3;wPart(gunG,wBarrel(.03,d.barrel),Math.cos(a)*.17,Math.sin(a)*.17,0)}
+  else if(d.cls==='mbt'){const r=d.n.indexOf('T-')===0?.14:.13;wPart(gunG,wBarrel(r,d.barrel),0,0,0);wPart(gunG,wCyl(r*1.45,r*1.45,.9,10).rotateX(Math.PI/2),0,0,d.barrel*.62);   // bore evacuator
+    if(d.n.indexOf('Leopard')>=0||d.n.indexOf('Abrams')>=0||d.n.indexOf('Chall')>=0)wPart(gunG,wCyl(r*1.3,r*1.3,1.4,10).rotateX(Math.PI/2),0,0,.9)}
+  else wPart(gunG,wBarrel(.06,d.barrel),0,0,0);
+  if(d.look==='gepard')gg.position.set(0,.8,d.gz);
+  const hull=wMerge(hullG,body),sl=wMerge(sideL,dk),sr=wMerge(sideR,dk),tb=wMerge(turB,tmat),td=wMerge(turD,dk2),gn=wMerge(gunG,dk);
+  const tur=new THREE.Group();tur.position.y=yT;
+  g.add(hull);g.add(sl);g.add(sr);g.add(tur);tur.add(tb);if(td)tur.add(td);tur.add(gg);if(gn)gg.add(gn);
+  const mk=new THREE.Mesh(new THREE.PlaneGeometry(1.6,1.6).rotateX(-Math.PI/2),new THREE.MeshBasicMaterial({color:d.team==='blue'?0x2b8cff:0xff3b30,side:THREE.DoubleSide}));mk.position.set(0,top.v+.05,-.3);tur.add(mk);   // roof panel: readable from the air
+  g.userData={tur,gun:gg,gz:d.gz,sl,sr,yT,L};return g}
 function warSpawn(id,x,z,heading){
   const d=WAR_V[id],obj=warBuild(d);obj.position.set(x,Math.max(groundH(x,z),0)+.2,z);obj.rotation.y=heading;scene.add(obj);
   const kind=d.cls==='mbt'?'tank':d.cls==='ifv'?'ifv':'spaa';
-  const u={kind,team:d.team,type:d.n,def:d,obj,pos:obj.position,vel:new V3(),fwd:new V3(0,0,1),up:UP,right:new V3(1,0,0),alive:true,hp:d.hp,objective:false,offT:0,lockT:0,tgt:null,mslCd:99,shots:0,id:nextId(),gunAcc:0,seenT:-99,
-    war:true,heading,aim:null,scanT:rand(0,1),cd:rand(1,d.gun[1]+2),dustT:0,burnT:0,airAcc:0};
+  const u={kind,team:d.team,type:d.n,def:d,obj,pos:obj.position,vel:new V3(),fwd:new V3(0,0,1),up:UP,right:new V3(1,0,0),alive:true,hp:d.hp,hpSeen:d.hp,objective:false,offT:0,lockT:0,tgt:null,mslCd:99,shots:0,id:nextId(),gunAcc:0,seenT:-99,
+    war:true,heading,aim:null,scanT:rand(0,1),cd:rand(1,d.gun[1]+2),dustT:0,burnT:0,airAcc:0,rec:0,
+    mod:{trk:false,eng:false,gun:0,tur:false,fire:false,crew:d.crew,ammo:true},fireT:0,fireLeft:0,note:{}};
   WAR.units.push(u);if(d.team==='red')ground.push(u);return u}
 const warEnemy=u=>u.team==='blue'?'red':'blue';
 function warPick(u){let best=null,bd=6500;for(const o of WAR.units){if(!o.alive||o.team===u.team)continue;const d=Math.hypot(o.pos.x-u.pos.x,o.pos.z-u.pos.z);if(d<bd){bd=d;best=o}}return best}
@@ -6096,44 +6154,72 @@ const warAng=a=>{while(a>Math.PI)a-=2*Math.PI;while(a<-Math.PI)a+=2*Math.PI;retu
 function warFire(u,t){
   const d=u.def,from=new V3(u.pos.x,u.pos.y+2.4,u.pos.z),to=new V3(t.pos.x,t.pos.y+1.4,t.pos.z),dist=from.distanceTo(to);
   const s=WAR.sh.find(q=>!q.on)||WAR.sh[0],T=dist/d.gun[2],dir=to.sub(from);dir.y+=.5*9.81*T*T;                                    // aim up to drop onto the target
-  dir.addScaledVector(t.vel||new V3(),T*.8).normalize();const sp=d.gun[4]*2.6*(u.moving?2.2:1);dir.x+=rand(-sp,sp);dir.y+=rand(-sp,sp);dir.z+=rand(-sp,sp);dir.normalize();
+  dir.addScaledVector(t.vel||new V3(),T*.8).normalize();const sp=d.gun[4]*2.6*(u.moving?2.2:1)*(u.mod.gun===1?2.6:1)*(u.mod.crew<d.crew?1.25:1);dir.x+=rand(-sp,sp);dir.y+=rand(-sp,sp);dir.z+=rand(-sp,sp);dir.normalize();
   s.on=true;s.team=u.team;s.dmg=d.gun[3];s.owner=u;s.life=8;s.m.material=warShellMat[u.team];s.m.visible=true;s.m.position.copy(from);s.prev.copy(from);s.vel.copy(dir).multiplyScalar(d.gun[2]);s.m.quaternion.setFromUnitVectors(ZF,dir);
   const big=d.cls==='mbt';puff(from.x+dir.x*4,from.y+dir.y*4,from.z+dir.z*4,dir.x*30,dir.y*30+2,dir.z*30,1,.85,.5,1,big?9:3,big?30:10,.14);                  // muzzle flash
   if(big)puff(from.x,from.y,from.z,dir.x*8,3,dir.z*8,.5,.48,.44,.6,big?7:3,12,2.2);
-  const cd=camera.position.distanceTo(from);if(big&&cd<7000&&typeof sndBoom==='function')sndBoom(clamp(1-cd/7000,0,.45)*.8)}
+  u.rec=1;const cd=camera.position.distanceTo(from);if(big&&cd<7000&&typeof sndBoom==='function')sndBoom(clamp(1-cd/7000,0,.45)*.8)}
+/* ---- damage modules (War Thunder style): a hit can break the tracks, engine, gun, turret drive, kill crew, hit the ammunition rack or start a fire ---- */
+const WAR_NOTE={trk:'tracks damaged',eng:'engine damaged',fire:'engine on fire',gun:'gun barrel damaged',gun2:'gun destroyed',tur:'turret drive damaged',crew:'crewman killed',rack:'ammunition rack hit'};
+function warNote(u,k,txt){if(u.note[k])return;u.note[k]=1;if(u.team==='red'||u.def.cls==='mbt')feed((u.team==='blue'?'Blue ':'Red ')+u.def.n+': '+(txt||WAR_NOTE[k]),u.team==='red'?'hit':'loss')}
+function warModules(u,dmg,by){
+  const d=u.def,m=u.mod,heavy=dmg>=2;
+  for(let k=0;k<(heavy?2:1)&&u.alive;k++){const r=Math.random();
+    if(r<.14){if(!m.trk){m.trk=true;warNote(u,'trk')}}
+    else if(r<.28){if(!m.eng){m.eng=true;warNote(u,'eng');if(Math.random()<.5)warBurn(u)}else if(!m.fire&&Math.random()<.5)warBurn(u)}
+    else if(r<.40){if(m.gun<2){m.gun++;warNote(u,m.gun===1?'gun':'gun2')}}
+    else if(r<.52){if(!m.tur){m.tur=true;warNote(u,'tur')}}
+    else if(r<.68){m.crew--;warNote(u,'crew');if(m.crew<=0){warDie(u,by,'crew knocked out');return}}
+    else if(r<.82){warNote(u,'rack');if(Math.random()<(heavy?.55:.05)*d.rack){warDie(u,by,'ammunition detonated');return}}
+  }}
+function warBurn(u){if(u.mod.fire||!u.alive)return;u.mod.fire=true;u.fireLeft=rand(14,24);warNote(u,'fire')}
 function warDamage(u,dmg,by){if(!u.alive)return;u.hp-=dmg;puff(u.pos.x,u.pos.y+2,u.pos.z,0,4,0,.2,.2,.2,.7,8,10,2.5);if(u.hp<=0)warDie(u,by)}
-function warWreck(u){u.burnT=45;if(u.obj.userData.tur){u.obj.userData.tur.position.y+=.5;u.obj.userData.tur.rotation.z=.25}
-  u.obj.traverse(o=>{if(o.isMesh&&o.material&&o.material.color&&!o.material.isMeshBasicMaterial)o.material.color.setHex(0x1b1b1a)})}
-function warDie(u,by){u.alive=false;explode(new V3(u.pos.x,u.pos.y+2,u.pos.z),false);warWreck(u);
-  if(by&&by.def)feed((by.team==='blue'?'Blue ':'Red ')+by.def.n+' destroyed '+u.def.n,u.team==='red'?'kill':'loss')}
-function warClear(){for(const u of WAR.units)if(u.team==='blue')scene.remove(u.obj);WAR.units=[];for(const s of WAR.sh){s.on=false;s.m.visible=false}WAR.on=false}
+function warWreck(u){u.burnT=45;if(u.obj.userData.tur){u.obj.userData.tur.position.y+=.25;u.obj.userData.tur.rotation.z=.2}
+  u.obj.traverse(o=>{if(o.isMesh&&o.material&&o.material.color&&!o.material.isMeshBasicMaterial)o.material=o.material.clone(),o.material.color.setHex(0x1b1b1a)})}
+// the turret flies off when the ammunition goes up
+function warPop(u){const t=u.obj.userData.tur;if(!t||t.parent!==u.obj)return;u.obj.updateMatrixWorld(true);const wp=new V3();t.getWorldPosition(wp);u.obj.remove(t);t.position.copy(wp);t.rotation.set(0,u.heading,0);scene.add(t);
+  WAR.debris.push({o:t,vel:new V3(rand(-4,4),rand(16,22),rand(-4,4)),spin:new V3(rand(-1.5,1.5),rand(-1,1),rand(-1.5,1.5)),t:0})}
+function warDie(u,by,why){if(!u.alive)return;u.alive=false;const big=why==='ammunition detonated';explode(new V3(u.pos.x,u.pos.y+2,u.pos.z),big);
+  if(big)warPop(u);warWreck(u);
+  if(by&&by.def)feed((by.team==='blue'?'Blue ':'Red ')+by.def.n+' destroyed '+u.def.n+(why?' ('+why+')':''),u.team==='red'?'kill':'loss');else if(why)feed(u.def.n+': '+why,u.team==='red'?'kill':'loss')}
+const warFlags=u=>{const m=u.mod,a=[];if(m.trk)a.push('TRK');if(m.eng)a.push('ENG');if(m.gun)a.push(m.gun>1?'GUN X':'GUN');if(m.tur)a.push('TUR');if(u.def.crew&&m.crew<u.def.crew)a.push('CREW '+m.crew+'/'+u.def.crew);if(m.fire)a.push('FIRE');return a.join(' ')};
+function warClear(){for(const u of WAR.units)if(u.team==='blue')scene.remove(u.obj);WAR.units=[];for(const s of WAR.sh){s.on=false;s.m.visible=false}for(const x of WAR.debris)scene.remove(x.o);WAR.debris=[];WAR.on=false}
 function updateWar(dt){
   if(!WAR.on)return;
   if(state!=='play'){return}
   WAR.t+=dt;
+  for(const x of WAR.debris){if(x.t>6)continue;x.t+=dt;x.vel.y-=9.81*dt;x.o.position.addScaledVector(x.vel,dt);x.o.rotation.x+=x.spin.x*dt;x.o.rotation.y+=x.spin.y*dt;x.o.rotation.z+=x.spin.z*dt;const gh=Math.max(groundH(x.o.position.x,x.o.position.z),0)+.8;if(x.o.position.y<gh){x.o.position.y=gh;x.t=7}}
   for(const u of WAR.units){
     if(!u.alive){if(u.burnT>0){u.burnT-=dt;u.dustT-=dt;if(u.dustT<=0){u.dustT=.35;puff(u.pos.x+rand(-1,1),u.pos.y+2.5,u.pos.z+rand(-1,1),rand(-1,1),rand(6,10),rand(-1,1),.14,.14,.14,.6,rand(5,9),rand(6,12),rand(3,5),-.3)}}continue}
-    const d=u.def;u.cd-=dt;u.scanT-=dt;
-    if(u.scanT<=0){u.scanT=.8+Math.random()*.5;u.aim=warPick(u)}
+    const d=u.def,m=u.mod;u.cd-=dt;u.scanT-=dt;
+    // module effects from damage taken since last frame (also covers your bombs and gun, which only lower hp)
+    if(u.hp<u.hpSeen-1e-6){const dl=u.hpSeen-u.hp;u.hpSeen=u.hp;if(u.hp>0)warModules(u,dl,null);if(!u.alive)continue}
+    if(m.fire){u.fireT-=dt;u.hp-=.1*dt;u.hpSeen=u.hp;if(u.fireT<=0){u.fireT=.12;const rx=Math.sin(u.heading)*-3,rz=Math.cos(u.heading)*-3;puff(u.pos.x+rx+rand(-.4,.4),u.pos.y+2.4,u.pos.z+rz+rand(-.4,.4),rand(-1,1),rand(4,8),rand(-1,1),1,.55,.15,.9,rand(2,4),rand(3,6),rand(.5,.9),-.3);if(Math.random()<.4)puff(u.pos.x+rx,u.pos.y+3,u.pos.z+rz,rand(-1,1),rand(7,11),rand(-1,1),.12,.12,.12,.65,rand(4,8),rand(6,12),rand(2,4),-.3)}
+      u.fireLeft-=dt;if(u.fireLeft<=0){if(m.crew>0&&Math.random()<.55){m.fire=false;feed(d.n+': fire extinguished','info')}else u.fireLeft=8}
+      if(u.hp<=0){warDie(u,null,'burned out');continue}}
+    if(u.scanT<=0){u.scanT=.8+Math.random()*.5;u.aim=warPick(u);u.los=!u.aim||losClear(new V3(u.pos.x,u.pos.y+2.4,u.pos.z),new V3(u.aim.pos.x,u.aim.pos.y+1.4,u.aim.pos.z))}
     const t=u.aim&&u.aim.alive?u.aim:null;let dist=1e9,wantH=u.team==='blue'?0:Math.PI;
     if(t){const dx=t.pos.x-u.pos.x,dz=t.pos.z-u.pos.z;dist=Math.hypot(dx,dz);wantH=Math.atan2(dx,dz)}
-    u.moving=!t||dist>d.gun[0]*.78;
-    const dh=warAng(wantH-u.heading);u.heading+=clamp(dh,-dt*.45,dt*.45);u.obj.rotation.y=u.heading;
-    if(u.moving&&Math.abs(dh)<.9){const v=d.spd*.5;u.pos.x+=Math.sin(u.heading)*v*dt;u.pos.z+=Math.cos(u.heading)*v*dt;u.vel.set(Math.sin(u.heading)*v,0,Math.cos(u.heading)*v);
+    u.moving=!m.trk&&(!t||dist>d.gun[0]*.78||u.los===false);   // no line of sight (a ridge in between): keep advancing
+    const dh=warAng(wantH-u.heading);if(!m.trk)u.heading+=clamp(dh,-dt*.45,dt*.45);u.obj.rotation.y=u.heading;
+    if(u.moving&&Math.abs(dh)<.9){const v=d.spd*.5*(m.eng?.45:1);u.pos.x+=Math.sin(u.heading)*v*dt;u.pos.z+=Math.cos(u.heading)*v*dt;u.vel.set(Math.sin(u.heading)*v,0,Math.cos(u.heading)*v);
       u.dustT-=dt;if(u.dustT<=0){u.dustT=.3;puff(u.pos.x-Math.sin(u.heading)*3,u.pos.y+.4,u.pos.z-Math.cos(u.heading)*3,rand(-1,1),rand(1,2.5),rand(-1,1),.55,.5,.4,.35,rand(4,7),rand(5,9),rand(1.5,2.5),-.2)}}
     else u.vel.set(0,0,0);
     u.pos.y=Math.max(groundH(u.pos.x,u.pos.z),0)+.2;
-    // turret follows its target (in the hull's frame)
-    const tur=u.obj.userData.tur;let aimed=false;
-    if(t&&tur){const want=Math.atan2(t.pos.x-u.pos.x,t.pos.z-u.pos.z)-u.heading,cur=tur.rotation.y,dd=warAng(want-cur);tur.rotation.y=cur+clamp(dd,-dt*1.2,dt*1.2);aimed=Math.abs(dd)<.06}
-    if(t&&aimed&&u.cd<=0&&dist<d.gun[0]&&losClear(new V3(u.pos.x,u.pos.y+2.4,u.pos.z),new V3(t.pos.x,t.pos.y+1.4,t.pos.z))){u.cd=d.gun[1]*(.9+Math.random()*.25);warFire(u,t)}
+    // turret follows its target (in the hull's frame); the gun elevates and recoils
+    const ud=u.obj.userData,tur=ud.tur;let aimed=false;
+    if(t&&tur&&tur.parent===u.obj){const want=Math.atan2(t.pos.x-u.pos.x,t.pos.z-u.pos.z)-u.heading,cur=tur.rotation.y,dd=warAng(want-cur);tur.rotation.y=cur+clamp(dd,-dt*1.2*(m.tur?.25:1),dt*1.2*(m.tur?.25:1));aimed=Math.abs(dd)<.06;
+      if(ud.gun){const el=Math.atan2(t.pos.y-u.pos.y-1,Math.max(dist,50))+9.81*dist/(2*d.gun[2]*d.gun[2]);ud.gun.rotation.x+=(-clamp(el,-.12,.35)+(m.gun===1?.08:0)-ud.gun.rotation.x)*Math.min(1,dt*5)}}
+    if(ud.gun){u.rec=Math.max(0,u.rec-dt*2.5);ud.gun.position.z=d.gz-u.rec*.4}
+    const crewK=m.crew>0?d.crew/m.crew:9;
+    if(t&&aimed&&u.cd<=0&&m.gun<2&&dist<d.gun[0]&&u.los!==false){u.cd=d.gun[1]*(.9+Math.random()*.25)*(m.gun===1?1.6:1)*crewK;warFire(u,t)}
     // blue anti-aircraft (Gepard, Vulcan, IFV cannons): bursts at the nearest red fighter, with a hit chance that falls off with range
     if(u.team==='blue'&&d.aa){u.aaT=(u.aaT||0)-dt;if(u.aaT<=0){u.aaT=.35+Math.random()*.2;let bt=null,bdd=d.aa[0];for(const e of enemies){if(!e.alive||e.kind!=='fighter'||e.pos.y-u.pos.y<25)continue;const dd=e.pos.distanceTo(u.pos);if(dd<bdd){bdd=dd;bt=e}}
       if(bt){const ux=(bt.pos.x-u.pos.x)/bdd,uy=(bt.pos.y-u.pos.y)/bdd,uz=(bt.pos.z-u.pos.z)/bdd;for(let k=0;k<3;k++)puff(u.pos.x+ux*8*(k+1),u.pos.y+3+uy*8*(k+1),u.pos.z+uz*8*(k+1),ux*900,uy*900,uz*900,1,.8,.35,1,2.4,0,.55);
-        if(Math.random()<clamp(1-bdd/d.aa[0],.05,1)*.45*(d.cls==='spaa'?1:.35))hitAI(bt,d.aa[2],d.n,false)}}}
+        if(Math.random()<clamp(1-bdd/d.aa[0],.05,1)*.45*(d.cls==='spaa'?1:.35)*(m.gun>1?0:1))hitAI(bt,d.aa[2],d.n,false)}}}
     // red anti-aircraft: shoot at you inside range, like the AAA guns
-    if(u.team==='red'&&d.aa&&P.alive&&!P.scramble){const pd=u.pos.distanceTo(P.pos),agl=P.pos.y-Math.max(groundH(P.pos.x,P.pos.z),0);
-      if(pd<d.aa[0]&&P.pos.y-u.pos.y<2600&&agl>15){u.airAcc+=dt*d.aa[1];while(u.airAcc>=1){u.airAcc--;const tt=pd/970;_c.copy(P.pos).addScaledVector(P.vel,tt).sub(u.pos).normalize();const sp=d.cls==='spaa'?.018:.04;_c.x+=rand(-sp,sp);_c.y+=rand(-sp,sp);_c.z+=rand(-sp,sp);_c.normalize();
+    if(u.team==='red'&&d.aa&&m.gun<2&&P.alive&&!P.scramble){const pd=u.pos.distanceTo(P.pos),agl=P.pos.y-Math.max(groundH(P.pos.x,P.pos.z),0);
+      if(pd<d.aa[0]&&P.pos.y-u.pos.y<2600&&agl>15){u.airAcc+=dt*d.aa[1]/crewK;while(u.airAcc>=1){u.airAcc--;const tt=pd/970;_c.copy(P.pos).addScaledVector(P.vel,tt).sub(u.pos).normalize();const sp=d.cls==='spaa'?.018:.04;_c.x+=rand(-sp,sp);_c.y+=rand(-sp,sp);_c.z+=rand(-sp,sp);_c.normalize();
         const b=take(eBullets);b.on=true;b.life=3;b.m.visible=true;b.team='red';b.dmg=d.aa[2];b.m.position.copy(u.pos).setY(u.pos.y+3);b.vel.copy(_c).multiplyScalar(970);b.m.quaternion.setFromUnitVectors(ZF,_c)}}
       else u.airAcc=0}
   }
@@ -6141,9 +6227,11 @@ function updateWar(dt){
   for(const s of WAR.sh){if(!s.on)continue;s.prev.copy(s.m.position);s.vel.y-=9.81*dt;s.m.position.addScaledVector(s.vel,dt);s.life-=dt;
     s.m.quaternion.setFromUnitVectors(ZF,_s1.copy(s.vel).normalize());
     let hit=null;for(const o of WAR.units){if(!o.alive||o.team===s.team)continue;if(distSeg(_s2.set(o.pos.x,o.pos.y+1.4,o.pos.z),s.prev,s.m.position)<5){hit=o;break}}
-    if(hit){s.on=false;s.m.visible=false;const p=s.m.position;puff(p.x,p.y,p.z,0,3,0,1,.8,.4,1,10,22,.2);const wasRed=hit.team==='red';
-      if(wasRed){hit.hp-=s.dmg;puff(hit.pos.x,hit.pos.y+2,hit.pos.z,0,5,0,.2,.2,.2,.7,9,10,3);if(hit.hp<=0&&hit.alive){hit.alive=false;explode(new V3(hit.pos.x,hit.pos.y+2,hit.pos.z),false);warWreck(hit);if(s.owner&&s.owner.def)feed('Blue '+s.owner.def.n+' destroyed '+hit.def.n,'kill')}}
-      else warDamage(hit,s.dmg,s.owner);continue}
+    if(hit){s.on=false;s.m.visible=false;const p=s.m.position;puff(p.x,p.y,p.z,0,3,0,1,.8,.4,1,10,22,.2);
+      hit.hp-=s.dmg;puff(hit.pos.x,hit.pos.y+2,hit.pos.z,0,5,0,.2,.2,.2,.7,9,10,3);
+      if(hit.hp<=0&&hit.alive){hit.alive=false;explode(new V3(hit.pos.x,hit.pos.y+2,hit.pos.z),false);warWreck(hit);if(s.owner&&s.owner.def)feed((s.owner.team==='blue'?'Blue ':'Red ')+s.owner.def.n+' destroyed '+hit.def.n,hit.team==='red'?'kill':'loss')}
+      else if(hit.alive){hit.hpSeen=hit.hp+s.dmg;}   // the module roll runs next frame
+      continue}
     const gh=Math.max(groundH(s.m.position.x,s.m.position.z),0);
     if(s.m.position.y<gh+.3||s.life<=0){s.on=false;s.m.visible=false;if(s.life>0){const p=s.m.position;puff(p.x,gh+1,p.z,0,4,0,.5,.42,.32,.8,9,16,2,-.2)}}}
 }
@@ -6711,7 +6799,7 @@ function drawHUD(){
   if(WAR.on)for(const u of WAR.units){if(!u.alive)continue;const d=u.pos.distanceTo(P.pos);if(d>16000)continue;const p=proj(u.pos);if(!p.ok||p.x<20||p.x>W-20||p.y<20||p.y>H-20)continue;
     const col=u.team==='blue'?'#6fb7ff':THREAT,s=6;c.strokeStyle=col;c.lineWidth=1.5;
     if(u.team==='blue')c.strokeRect(p.x-s,p.y-s,s*2,s*2);else{c.beginPath();c.moveTo(p.x,p.y-s-1);c.lineTo(p.x+s+1,p.y);c.lineTo(p.x,p.y+s+1);c.lineTo(p.x-s-1,p.y);c.closePath();c.stroke()}
-    if(d<10000)txt(c,u.def.n+' '+nm(d),p.x,p.y+s+13,'center',col,10)}
+    if(d<10000)txt(c,u.def.n+' '+nm(d)+(warFlags(u)?' · '+warFlags(u):''),p.x,p.y+s+13,'center',col,10)}
   // radar target designator box (STT square, TWS bug triangle) + 9X seeker circle
   const rt=radarTarget();
   if(R.stt){const p=proj(R.stt.pos);if(p.ok){
@@ -7135,7 +7223,7 @@ const _careerAward=careerAward;
 careerAward=function(){lbAdd();return _careerAward.apply(this,arguments)};
 
 /* ---------- test hook (only with ?test in the URL) ---------- */
-if(/[?&]test\b/.test(location.search))window.__vs={setThr,HEAT,explode,puff,camera,LT,townLights,flashLt,P,fly,dlz,flyout,AC_DEFS,feed,WAR,WAR_V,warBuild,updateWar,warAlive,buildJet,PLAYER_COLORS,M2,V3,atm,clamp,lbAdd,showOverlay:k=>showOverlay(k),setScore:(n,k)=>{score=n;kills=k},get state(){return state},get enemies(){return enemies},missiles:()=>missiles.filter(m=>m.on),setAC:id=>{AC=AC_DEFS[id];applyAC()},wt:{   // weapon-test hooks: a clean sky, one drone, scripted launches
+if(/[?&]test\b/.test(location.search))window.__vs={setThr,HEAT,explode,puff,camera,LT,townLights,flashLt,P,fly,dlz,flyout,AC_DEFS,feed,WAR,WAR_V,warBuild,warSpawn,warModules,warDie,warFlags,updateWar,warAlive,buildJet,PLAYER_COLORS,M2,V3,atm,clamp,lbAdd,showOverlay:k=>showOverlay(k),setScore:(n,k)=>{score=n;kills=k},get state(){return state},get enemies(){return enemies},missiles:()=>missiles.filter(m=>m.on),setAC:id=>{AC=AC_DEFS[id];applyAC()},wt:{   // weapon-test hooks: a clean sky, one drone, scripted launches
   begin:id=>{AC=AC_DEFS[id];applyAC();startGame();return AC.id},
   clear:()=>{waveClearT=1e9;for(const e of enemies){e.alive=false;scene.remove(e.obj)}enemies.length=0;P.pos.set(0,6000,0);P.vel.set(0,0,250);throttle=.7;return state},
   target:(type,dz,away,speed)=>{const e=spawnFighter('red',type,new V3(0,6000,dz),new V3(0,6000,dz+(away?9999:-9999)),{ir:0,rdr:0,speed:speed||220});e.drone=true;return e.id},
@@ -7333,7 +7421,7 @@ const nodeState=id=>!careerOn||progOwned(id)?'own':progRes(id)?'res':progResearc
 function progWallet(){$('hgWallet').textContent=careerOn?fmtN(prog.sl)+' SL · '+fmtN(prog.frp)+' free RP':''}
 function progDetail(id){
   const n=NODES[id],d=AC_DEFS[id],st=nodeState(id),nat=NATIONS[n.n],req=n.req?AC_DEFS[n.req].name:null,tw=d.T_AB/(d.MASS*G);
-  let h='<div class="tdet"><h3>'+d.name+'</h3><p class="hgNote">'+nat.n+' · rank '+ROMAN[n.r]+' · BR '+n.br.toFixed(1)+' · thrust/weight '+tw.toFixed(2)+' · +'+d.gmax+' g · corner '+d.corner+' kt<br>'+d.srFull+' × '+d.srN+' · '+d.mrFull+' × '+d.mrN+'</p>';
+  let h='<div class="tdet" title="'+nat.n+' · rank '+ROMAN[n.r]+' · BR '+n.br.toFixed(1)+'"><h3>'+d.name+'</h3><p class="hgNote">'+nat.n+' · rank '+ROMAN[n.r]+' · BR '+n.br.toFixed(1)+' · thrust/weight '+tw.toFixed(2)+' · +'+d.gmax+' g · corner '+d.corner+' kt<br>'+d.srFull+' × '+d.srN+' · '+d.mrFull+' × '+d.mrN+'</p>';
   if(st==='own'){const cur=id===AC.id;h+='<div class="row"><button class="primary" data-act="use" data-id="'+id+'"'+(cur?' disabled':'')+'>'+(cur?'Selected':'Select aircraft')+'</button></div>';
     h+=careerOn?'<p class="hgNote">'+MODS.filter(m=>hasMod(id,m[0])).length+' of '+MODS.length+' modules installed. Open the Mods tab to research more.</p>':'<p class="hgNote">Free play: every aircraft is unlocked with all modules.</p>'}
   else if(st==='res'){const c=SL_PRICE[n.r];h+='<div class="row"><button class="primary" data-act="buy" data-id="'+id+'"'+(prog.sl>=c?'':' disabled')+'>Buy · '+fmtN(c)+' SL</button></div><p class="hgNote">Researched. You have '+fmtN(prog.sl)+' Silver Lions.</p>'}
@@ -7389,7 +7477,7 @@ if(/[?&]test\b/.test(location.search))Object.assign(window.__vs||{},{ldCap,progM
 function progUse(id){if(!AC_DEFS[id]||nodeState(id)!=='own')return;AC=AC_DEFS[id];try{localStorage.setItem('viperAC',id)}catch(er){};progSel=id;applyAC();$('hgName').textContent=AC.name;progRender()}
 $('hgTree').addEventListener('dblclick',e=>{const t=e.target.closest('.tn');if(t)progUse(t.dataset.id)});
 $('hgTree').addEventListener('click',e=>{const t=e.target.closest('[data-id],[data-act]');if(!t)return;const id=t.dataset.id,act=t.dataset.act;
-  if(!act){progSel=id;progRender();return}
+  if(!act){progSel=id;if(nodeState(id)==='own'&&id!==AC.id){progUse(id);message(AC_DEFS[id].name.toUpperCase()+' SELECTED',1.2);return}progRender();return}
   if(act==='career'){$('bMode').click();progRender();return}
   let ok=false;
   if(act==='research')ok=progResearch(id);else if(act==='buy')ok=progBuy(id);else if(act==='crew')ok=progCrew(t.dataset.k);

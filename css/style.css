@@ -219,7 +219,9 @@ body.hangar #ov{display:none!important}
 .tn.lock{opacity:.45}
 .tn.sel{outline:2px solid var(--paper);outline-offset:1px}
 .tn.cur{box-shadow:inset 0 0 0 2px var(--hud)}.tn.cur em{color:var(--hud)}
-.tdet h3{margin:4px 0;font:800 20px var(--f-display);text-transform:uppercase}
+.tdet{position:sticky;bottom:0;z-index:2;display:flex;align-items:center;gap:10px;flex-wrap:nowrap;background:rgba(8,16,20,.94);border-top:1px solid rgba(232,240,234,.25);padding:4px 10px;margin:0 -2px}
+.tdet .hgNote{display:none}.tdet .row{margin:0;flex:none}.tdet button{white-space:nowrap}
+.tdet h3{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin:0;font:800 17px var(--f-display);text-transform:uppercase}
 .hgT .ok{color:var(--hud);font-size:11px}
 .hgT button.ghost{font-size:11px;padding:6px 8px}
 button:disabled{opacity:.4;cursor:not-allowed}

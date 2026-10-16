@@ -6,7 +6,7 @@ const nodeState=id=>!careerOn||progOwned(id)?'own':progRes(id)?'res':progResearc
 function progWallet(){$('hgWallet').textContent=careerOn?fmtN(prog.sl)+' SL · '+fmtN(prog.frp)+' free RP':''}
 function progDetail(id){
   const n=NODES[id],d=AC_DEFS[id],st=nodeState(id),nat=NATIONS[n.n],req=n.req?AC_DEFS[n.req].name:null,tw=d.T_AB/(d.MASS*G);
-  let h='<div class="tdet"><h3>'+d.name+'</h3><p class="hgNote">'+nat.n+' · rank '+ROMAN[n.r]+' · BR '+n.br.toFixed(1)+' · thrust/weight '+tw.toFixed(2)+' · +'+d.gmax+' g · corner '+d.corner+' kt<br>'+d.srFull+' × '+d.srN+' · '+d.mrFull+' × '+d.mrN+'</p>';
+  let h='<div class="tdet" title="'+nat.n+' · rank '+ROMAN[n.r]+' · BR '+n.br.toFixed(1)+'"><h3>'+d.name+'</h3><p class="hgNote">'+nat.n+' · rank '+ROMAN[n.r]+' · BR '+n.br.toFixed(1)+' · thrust/weight '+tw.toFixed(2)+' · +'+d.gmax+' g · corner '+d.corner+' kt<br>'+d.srFull+' × '+d.srN+' · '+d.mrFull+' × '+d.mrN+'</p>';
   if(st==='own'){const cur=id===AC.id;h+='<div class="row"><button class="primary" data-act="use" data-id="'+id+'"'+(cur?' disabled':'')+'>'+(cur?'Selected':'Select aircraft')+'</button></div>';
     h+=careerOn?'<p class="hgNote">'+MODS.filter(m=>hasMod(id,m[0])).length+' of '+MODS.length+' modules installed. Open the Mods tab to research more.</p>':'<p class="hgNote">Free play: every aircraft is unlocked with all modules.</p>'}
   else if(st==='res'){const c=SL_PRICE[n.r];h+='<div class="row"><button class="primary" data-act="buy" data-id="'+id+'"'+(prog.sl>=c?'':' disabled')+'>Buy · '+fmtN(c)+' SL</button></div><p class="hgNote">Researched. You have '+fmtN(prog.sl)+' Silver Lions.</p>'}
@@ -62,7 +62,7 @@ if(/[?&]test\b/.test(location.search))Object.assign(window.__vs||{},{ldCap,progM
 function progUse(id){if(!AC_DEFS[id]||nodeState(id)!=='own')return;AC=AC_DEFS[id];try{localStorage.setItem('viperAC',id)}catch(er){};progSel=id;applyAC();$('hgName').textContent=AC.name;progRender()}
 $('hgTree').addEventListener('dblclick',e=>{const t=e.target.closest('.tn');if(t)progUse(t.dataset.id)});
 $('hgTree').addEventListener('click',e=>{const t=e.target.closest('[data-id],[data-act]');if(!t)return;const id=t.dataset.id,act=t.dataset.act;
-  if(!act){progSel=id;progRender();return}
+  if(!act){progSel=id;if(nodeState(id)==='own'&&id!==AC.id){progUse(id);message(AC_DEFS[id].name.toUpperCase()+' SELECTED',1.2);return}progRender();return}
   if(act==='career'){$('bMode').click();progRender();return}
   let ok=false;
   if(act==='research')ok=progResearch(id);else if(act==='buy')ok=progBuy(id);else if(act==='crew')ok=progCrew(t.dataset.k);
