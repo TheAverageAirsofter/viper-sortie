@@ -592,6 +592,7 @@ function decalTex(kind,txt,lowvis){const key=kind+'|'+(txt?txt.s+(txt.red?'r':''
     cr(cx-40,cy-30,22);cr(cx+40,cy-30,22);cr(cx,cy+42,22)}
   else if(kind==='raf'){disc(118,lv?'#7d8fa8':'#1d3f8a');disc(50,lv?'#c98f8f':'#c8102e')}
   else if(kind==='fra'){disc(118,lv?'#a35f62':'#c8102e');disc(82,lv?'#c9cdd1':'#ffffff');disc(46,lv?'#56698a':'#0b3d91')}
+  else if(kind==='ita'){disc(118,lv?'#8fa08f':'#009246');disc(80,lv?'#c9ccd0':'#ffffff');disc(44,lv?'#a35f62':'#ce2b37')}
   else if(kind==='ind'){disc(118,'#ff9933');disc(80,'#ffffff');disc(42,'#138808')}
   else if(kind==='ger'){c.fillStyle=lv?'#c9ccd0':'#ffffff';c.fillRect(cx-100,cy-36,200,72);c.fillRect(cx-36,cy-100,72,200);c.fillStyle=lv?'#3b4046':'#0a0a0a';c.fillRect(cx-92,cy-28,184,56);c.fillRect(cx-28,cy-92,56,184)}   // Balkenkreuz
   else if(kind==='jp'){disc(112,lv?'#9aa0a6':'#ffffff');disc(78,lv?'#8f4f56':'#bc002d')}   // hinomaru
@@ -660,7 +661,7 @@ function buildLoftJet(c,S,type){
         rg.userData={cs:'rud',s:i?-1:1,ax:new THREE.Vector3(0,B.h-A.h,B.zle-A.zle).normalize().toArray()};add(geo,body,null,rg);gr.add(rg)}
       // fin markings
       if(!ventral){const m=finAt(f.st,top*.55),ch=m.zle-m.zte,hw=(m.t||.05)*ch/2*.9+.015;
-        const fk=PS.nat==='rus'||PS.nat==='prc'?PS.nat:PS.nat==='fra'||PS.nat==='raf'||PS.nat==='swe'||PS.nat==='ind'?PS.nat:null;
+        const fk=PS.nat==='rus'||PS.nat==='prc'?PS.nat:PS.nat==='fra'||PS.nat==='raf'||PS.nat==='swe'||PS.nat==='ind'||PS.nat==='ita'?PS.nat:null;
         for(const sd of [1,-1]){
           if(fk){const sz=Math.min(ch*.5,1.05),d=add(new THREE.PlaneGeometry(sz,sz*(fk==='prc'?.62:1)),decalMat(fk,null,PS.lowvis),'decal',gr);d.position.set(sd*hw,m.h,m.zle-ch*.5);d.rotation.y=sd*Math.PI/2}
           if(PS.num){const t2=finAt(f.st,top*(fk?.24:.5)),c2=t2.zle-t2.zte,w2=Math.min(c2*.75,1.6),d=add(new THREE.PlaneGeometry(w2,w2*.5),decalMat('text',{s:PS.num},PS.lowvis),'decal',gr);
