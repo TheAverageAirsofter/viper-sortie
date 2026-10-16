@@ -43,7 +43,7 @@ function losClear(a,b){for(let i=1;i<8;i++){const t=i/8,x=a.x+(b.x-a.x)*t,z=a.z+
 function updateGround(dt){
   if(state!=='play'||!P.alive){for(const g of ground){g.lockT=0;g.tgt=null}return}
   const ewr=ground.some(g=>g.alive&&g.kind==='radar'&&!(g.offT>0));
-  for(const g of ground){if(!g.alive)continue;
+  for(const g of ground){if(!g.alive||g.war)continue;
     if(g.path){g.s=Math.min(g.s+g.spd*dt,g.path.len);const p=g.path,t=g.s/p.len;g.pos.set(p.a.x+(p.b.x-p.a.x)*t,0,p.a.z+(p.b.z-p.a.z)*t);g.pos.y=Math.max(groundH(g.pos.x,g.pos.z),0)+.2;g.obj.rotation.y=Math.atan2(p.b.x-p.a.x,p.b.z-p.a.z);g.vel.set(p.b.x-p.a.x,0,p.b.z-p.a.z).setLength(g.s<p.len?g.spd:0)}
     if(g.orbit){g.orbit.a+=g.spd/g.orbit.r*dt;g.pos.set(g.orbit.c.x+Math.cos(g.orbit.a)*g.orbit.r,.2,g.orbit.c.z+Math.sin(g.orbit.a)*g.orbit.r);g.obj.rotation.y=Math.atan2(-Math.sin(g.orbit.a),Math.cos(g.orbit.a));g.vel.set(-Math.sin(g.orbit.a),0,Math.cos(g.orbit.a)).multiplyScalar(g.spd);if(g.obj.userData.spin)g.obj.userData.spin.rotation.y+=dt*2}
     if(g.kind==='truck'||g.kind==='bunker')continue;
@@ -79,9 +79,9 @@ function launchSAM(g){
   m.m.position.copy(g.pos).setY(g.pos.y+4); m.prev.copy(m.m.position); m.vel.set(0,40,0).addScaledVector(g.fwd,20);
   recLaunch(m,'SAM site',P); message('SAM LAUNCH',1.8); buzz([60,50,60,50,60]); for(let i=0;i<5;i++)setTimeout(()=>sndBeep(1300,.06,.05),i*100);
 }
-function clearGround(){for(const g of ground)scene.remove(g.obj);ground=[]}
+function clearGround(){for(const g of ground)scene.remove(g.obj);ground=[];warClear()}
 function killGround(g){if(!g.alive)return;g.alive=false;explode(g.pos.clone().setY(g.pos.y+3),true);g.obj.rotation.z=.3;g.obj.position.y-=1;
-  kills++;score+=200*Math.max(1,wave);message(({sam:'SAM SITE DESTROYED',aaa:'AAA DESTROYED',radar:'EW RADAR DESTROYED',bunker:'BUNKER DESTROYED',truck:'TRUCK DESTROYED',ship:'FRIGATE SUNK'})[g.kind],1.6);recEvent('You destroyed '+({sam:'a SAM launcher',aaa:'an AAA gun',radar:'the early-warning radar',bunker:'the command bunker',truck:'a convoy truck',ship:'the frigate'})[g.kind]);if(g.kind==='ship'){g.obj.rotation.z=.25;g.obj.position.y=-4}if(typeof campaignKill==='function')campaignKill(g)}
+  kills++;score+=200*Math.max(1,wave);message(({sam:'SAM SITE DESTROYED',aaa:'AAA DESTROYED',radar:'EW RADAR DESTROYED',bunker:'BUNKER DESTROYED',truck:'TRUCK DESTROYED',ship:'FRIGATE SUNK',tank:'TANK DESTROYED',ifv:'IFV DESTROYED',spaa:'AA VEHICLE DESTROYED'})[g.kind],1.6);recEvent('You destroyed '+({sam:'a SAM launcher',aaa:'an AAA gun',radar:'the early-warning radar',bunker:'the command bunker',truck:'a convoy truck',ship:'the frigate',tank:'a '+g.type,ifv:'a '+g.type,spaa:'a '+g.type})[g.kind]);if(g.war)warWreck(g);if(g.kind==='ship'){g.obj.rotation.z=.25;g.obj.position.y=-4}if(typeof campaignKill==='function')campaignKill(g)}
 
 
 /* ---------------- air-to-ground: anti-radiation missiles, guided and unguided bombs ----------------
@@ -439,8 +439,9 @@ function setupShip(){const g=spawnGround('ship',19600,21200,true);g.orbit={c:new
 function setupCruise(){sortie={kind:'CRUISE',left:6,t:0,second:false};for(const x of [-6000,0,6000])spawnCruise(new V3(x,400,58000),new V3(x*.1,60,0))}
 function setupCAP(cz,n){for(let i=0;i<n;i+=2)spawnPair(pickBanditType(),new V3(rand(-6000,6000),rand(5000,8000),cz+rand(-3000,3000)),new V3(0,5000,0));sortie={kind:'CAP'}}
 function sortieStatus(){if(!sortie)return'';const left=ground.filter(g=>g.objective&&g.alive).length;
-  return sortie.kind==='CONVOY'?'TRUCKS LEFT '+ground.filter(g=>g.kind==='truck'&&g.alive).length:sortie.kind==='SHIP'?'FRIGATE '+(left?'AFLOAT':'SUNK'):sortie.kind==='CRUISE'?'CRUISE MISSILES '+(enemies.filter(e=>e.kind==='cruise').length+(sortie.second?0:3)):sortie.kind==='STRIKE'?'TARGETS LEFT '+left:'BANDITS '+enemies.length}
+  return sortie.kind==='GROUNDWAR'?warStatus():sortie.kind==='CONVOY'?'TRUCKS LEFT '+ground.filter(g=>g.kind==='truck'&&g.alive).length:sortie.kind==='SHIP'?'FRIGATE '+(left?'AFLOAT':'SUNK'):sortie.kind==='CRUISE'?'CRUISE MISSILES '+(enemies.filter(e=>e.kind==='cruise').length+(sortie.second?0:3)):sortie.kind==='STRIKE'?'TARGETS LEFT '+left:'BANDITS '+enemies.length}
 function sortieCheck(dt){if(!sortie)return;const k=sortie.kind;
+  if(k==='GROUNDWAR'){warCheck(dt);return}
   if(k==='CONVOY'){const tr=ground.filter(g=>g.kind==='truck');const dead=tr.filter(g=>!g.alive).length;if(dead>=sortie.need)endMission(true,'Convoy stopped');else if(tr.some(g=>g.alive&&g.s>=g.path.len))endMission(false,'The convoy got through')}
   else if(k==='SHIP'||k==='STRIKE'){if(!ground.some(g=>g.objective&&g.alive))endMission(true,k==='SHIP'?'Frigate sunk':'Target area destroyed')}
   else if(k==='CRUISE'){sortie.t+=dt;if(!sortie.second&&sortie.t>40){sortie.second=true;for(const x of [-3000,3000,9000])spawnCruise(new V3(x,400,60000),new V3(x*.1,60,0));radio(myCall()+', second salvo, '+braa(enemies[enemies.length-1])+'.')}

@@ -166,6 +166,11 @@ function drawHUD(){
       const a=Math.atan2(dy,dx),x=cx+Math.cos(a)*rx,y=cy+Math.sin(a)*ry;
       c.save();c.translate(x,y);c.rotate(a);c.beginPath();c.moveTo(12,0);c.lineTo(-6,-8);c.lineTo(-6,8);c.closePath();c.fill();c.restore()}
   }
+  // ground war: vehicle markers with names, blue squares and red diamonds
+  if(WAR.on)for(const u of WAR.units){if(!u.alive)continue;const d=u.pos.distanceTo(P.pos);if(d>16000)continue;const p=proj(u.pos);if(!p.ok||p.x<20||p.x>W-20||p.y<20||p.y>H-20)continue;
+    const col=u.team==='blue'?'#6fb7ff':THREAT,s=6;c.strokeStyle=col;c.lineWidth=1.5;
+    if(u.team==='blue')c.strokeRect(p.x-s,p.y-s,s*2,s*2);else{c.beginPath();c.moveTo(p.x,p.y-s-1);c.lineTo(p.x+s+1,p.y);c.lineTo(p.x,p.y+s+1);c.lineTo(p.x-s-1,p.y);c.closePath();c.stroke()}
+    if(d<10000)txt(c,u.def.n+' '+nm(d),p.x,p.y+s+13,'center',col,10)}
   // radar target designator box (STT square, TWS bug triangle) + 9X seeker circle
   const rt=radarTarget();
   if(R.stt){const p=proj(R.stt.pos);if(p.ok){

@@ -15,6 +15,7 @@ const MIS_ART={
   ESCORT:['#2d5c3a','#0e2416','<path d="M48 10l8 22 22 10-22-2-8 12-8-12-22 2 22-10z"/><circle cx="14" cy="14" r="2" fill="'+RED+'" stroke="none"/><circle cx="84" cy="16" r="2" fill="'+RED+'" stroke="none"/>'],
   '2V4':['#3a3a5c','#14142a','<circle cx="22" cy="24" r="3.5" fill="'+GRN+'"/><circle cx="22" cy="38" r="3.5" fill="'+GRN+'"/><circle cx="66" cy="18" r="3.5" fill="'+RED+'" stroke="'+RED+'"/><circle cx="78" cy="30" r="3.5" fill="'+RED+'" stroke="'+RED+'"/><circle cx="66" cy="38" r="3.5" fill="'+RED+'" stroke="'+RED+'"/><circle cx="82" cy="46" r="3.5" fill="'+RED+'" stroke="'+RED+'"/>'],
   '4SHIP':['#2d5c5c','#0e2424','<path d="M48 12l6 12h-12zM30 28l6 12h-12zM66 28l6 12h-12zM48 40l6 12h-12z"/>'],
+  GROUNDWAR:['#5a4e2d','#241f10','<path d="M6 46h84"/><rect x="10" y="34" width="16" height="8"/><path d="M26 36h12"/><rect x="58" y="34" width="16" height="8"/><path d="M58 36h-12"/><path d="M40 22l8 8M48 22l-8 8"/>'],
   CONVOY:['#5c5a2d','#242310','<path d="M8 44h80"/><rect x="12" y="34" width="14" height="9"/><rect x="34" y="34" width="14" height="9"/><rect x="56" y="34" width="14" height="9"/><path d="M76 40l8-4v8z"/>'],
   ANTISHIP:['#1e4a6a','#0b1c2c','<path d="M14 36h68l-8 10H24zM38 36v-8h16v8M46 28v-8"/><path d="M8 52q8-5 16 0t16 0t16 0t16 0" stroke-width="1.6"/>'],
   CRUISE:['#5c2d1e','#241009','<path d="M16 12l24 14M30 8l24 14M44 4l24 14"/><path d="M40 26l-7-1M54 22l-7-1M68 18l-7-1" stroke="'+RED+'"/><path d="M8 52h80"/>'],
@@ -28,7 +29,7 @@ const MAP_ART={
   OCEAN:['#2a6a9a','#0f2f4c','<path d="M0 22q12-6 24 0t24 0t24 0t24 0M0 36q12-6 24 0t24 0t24 0t24 0M0 50q12-6 24 0t24 0t24 0t24 0" stroke="#9fd4ff"/>']};
 const MIS_DESC={WAVES:'Endless bandit groups. Survive and rack up score.',STRIKE:'Take out the SAM and AAA site, then fly home.',INTERCEPT:'Four bombers inbound. Stop them before the release point.',
   RUSH:'Bandit rush: 8 kills in 5 minutes.',ESCORT:'Protect a C-130 across the sector.','2V4':'You and your wingman against four bandits.','4SHIP':'Lead a four-ship against six, with a SAM belt.',
-  CONVOY:'Stop at least 4 of 5 trucks before they escape.',ANTISHIP:'Sink the frigate NE of the base. It has SAMs.',CRUISE:'Cruise missiles inbound on the base. Shoot them down.',
+  GROUNDWAR:'Blue and red armour fight each other. Back the blue side from the air and destroy the red force.',CONVOY:'Stop at least 4 of 5 trucks before they escape.',ANTISHIP:'Sink the frigate NE of the base. It has SAMs.',CRUISE:'Cruise missiles inbound on the base. Shoot them down.',
   CAMPAIGN:'A moving front line. Losses stay lost.',ONLINE:'Dogfight other pilots in a shared room.',TRAINING:'Guided lessons: dogfighting, missile defence, landing, refuelling.'};
 const MAP_DESC={ISLANDS:'Green islands and sheltered bays.',DESERT:'Dry canyons and low valleys.',ALPINE:'Snowy peaks under heavy cloud.',OCEAN:'Open sea. Nothing to hide behind.'};
 const MAP_NAME=k=>({ISLANDS:'Islands',DESERT:'Desert canyons',ALPINE:'Snowy alps',OCEAN:'Open ocean'})[k]||k;
@@ -40,6 +41,7 @@ const MIS_BRIEF={WAVES:'Bandit groups arrive in waves from every bearing. Each w
   ESCORT:'A C-130 is crossing the sector. Keep it alive until it clears the far side; bandits will go for it first.',
   '2V4':'You and your wingman against four bandits. Call targets, split them and keep your wingman in the fight.',
   '4SHIP':'Lead a four-ship against six bandits behind a SAM belt. Command the flight and manage the threats.',
+  GROUNDWAR:'M1A1 Abrams, Leopard 2A4, Challenger and M60A3 tanks with Bradley and Marder IFVs hold the south. T-80B, T-72A and T-62 tanks, BMP-2s and two ZSU anti-aircraft tracks come from the north. The tanks fight on their own: kill the red armour with bombs, rockets and guns before it grinds the blue force down, and keep away from the ZSUs.',
   CONVOY:'Trucks are running for the border. Stop at least four of the five before they escape.',
   ANTISHIP:'A frigate sits north-east of the base with SAM cover. Find it, sink it and avoid the missile envelope.',
   CRUISE:'Cruise missiles are inbound on the base. They are fast and low. Shoot down as many as you can.'};
@@ -237,7 +239,7 @@ function diagram(){const m=MIS_ART[mission]||MIS_ART.WAVES,p=MAP_ART[MAP]||MAP_A
     '<path d="M26 82L150 46" stroke="#fff" stroke-width=".7" stroke-dasharray="3 3" opacity=".7"/><g fill="#fff" stroke="none"><path d="M26 78l5 8h-10z"/></g><text x="34" y="90" fill="#fff" font-size="6" letter-spacing="1" font-family="inherit">BASE</text>'+
     '<text x="170" y="98" fill="#fff" font-size="5.5" letter-spacing="1.2" font-family="inherit" opacity=".8">N &#8593;  50 KM</text></svg>'}
 // the enemy battle-rating range for the selected mission, as the bandit picker will use it
-const NO_FIGHTERS=['CONVOY','ANTISHIP','CRUISE'];
+const NO_FIGHTERS=['CONVOY','ANTISHIP','CRUISE','GROUNDWAR'];
 function enemyBR(){if(NO_FIGHTERS.indexOf(mission)>=0)return null;
   const v=banditPool().filter(k=>banditType==='MIXED'||k===banditType||banditPool().indexOf(banditType)<0).map(progBR);return{lo:Math.min(...v),hi:Math.max(...v)}}
 const kvs=a=>'<dl class="kvs">'+a.map(x=>'<div><dt>'+x[0]+'</dt><dd>'+x[1]+'</dd></div>').join('')+'</dl>';

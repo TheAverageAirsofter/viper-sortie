@@ -282,7 +282,7 @@ function buzz(p){try{if(hapticsOn&&navigator.vibrate)navigator.vibrate(p)}catch(
 let hapticsOn=true;
 function updateCombat(dt){
   for(const e of enemies) if(e.alive&&!e.remote) updateAI(e,dt);
-  updateNet(dt); updateGround(dt); updateTanker(dt); updateAG(dt); updateGCI(dt);
+  updateNet(dt); updateGround(dt); updateWar(dt); updateTanker(dt); updateAG(dt); updateGCI(dt);
   for(const f of friends) if(f.alive&&!f.remote) updateAI(f,dt);
   updateWeapons(dt);
   updateCM(dt);

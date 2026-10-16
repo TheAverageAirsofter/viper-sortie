@@ -10,6 +10,9 @@ In Career a stock aircraft flies with penalties (`STOCK` in progress.js: -6 % th
 Fonts (Barlow Condensed and Barlow, SIL OFL) are in `fonts/`; the full single-file build embeds them, the cdn build falls back to the Google Fonts link.
 Progression extras: battle presets (`PRESETS` in state.js: difficulty, HUD marker level, damage severity, reward multiplier fed into `careerAward`), `progAward` also returns a `breakdown` of named RP and Silver Lion lines for the itemised debrief, daily tasks (`DAILY` in progress.js), and `__vs.endTest({cause,score,kills,t,alive})` to simulate a finished sortie in tests.
 
+## Ground war
+`src/groundwar.js` (slice after combat): `WAR_V` lists the War Thunder ground vehicles (M1A1, Leopard 2A4, Challenger, M60A3, M3 Bradley, Marder vs T-80B, T-72A, T-62, BMP-2, ZSU-23-4M4, ZSU-57-2). Red units are pushed into the `ground` list so your weapons, TGP and wingmen treat them as targets; blue units stay in `WAR.units` only. `updateWar` runs from the main update, shells use their own pool, and the `GROUNDWAR` mission (`setupGroundWar`, `warCheck`) hooks into `sortieStatus` / `sortieCheck`.
+
 ## Aircraft roster
 Base jets are in `src/data.js`; `src/roster.js` (slice 3, right after render) defines the rest with `dv(base, id, name, callsign, overrides)`, their lofted models (`M2.<id>`, or `m2Alias` to share a hull) and the PAINT / PODS / PITS rows. Tables owned by later slices (GEAR_SPEC, ENG_SND, JET_HP, RCS, FIGHTERS, BANDITS) are filled with `rosterFill(table, rows)` from `ROSTER_LIKE` (copy a row from a similar jet). New aircraft also need a `NODES` row in `src/progress.js` (nation, rank, BR, `req`); a node with no `req` is a root and must be in `PROG_START`. Station counts in `cm.stations` must match the model's `r9` / `r120` nodes; `node tools/roster-test.js` checks this, flies every jet and spawns every type as a bandit.
 
@@ -38,6 +41,7 @@ node tools/hangar-test.js     # hangar: loadout, specs, aircraft, paint
 node tools/progress-test.js   # tech tree, research, buy, modules, crew, rewards
 node tools/menu-test.js       # every menu screen fits 844x390, rows, presets, top bar, itemised debrief, research grid, crew, daily tasks, phone nav, briefing
 node tools/roster-test.js     # every aircraft: data, stations, tables, a short sortie, and as a bandit
+node tools/war-test.js        # ground war: WT armour fights itself, kills, mission win
 node tools/weapons-test.js    # missile sanity for every type, live shots (rear-aspect seekers, SARH lock, AMRAAM, gun); slow (~8 min)
 node tools/dims-test.js       # model length and span against tools/real-dims.json (add a row for every new aircraft)
 node tools/visuals-test.js    # night lights, lightning, explosion, heat shimmer, every aircraft model
