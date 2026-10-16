@@ -28,6 +28,9 @@ node tools/ui-test.js        # headless UI checks
 npm run smoke                # loads the game headless and reports console errors (needs Chromium; set CHROME=/path)
 ```
 
+## Single-file versions (for pasting into Claude chat / publishing as an Artifact)
+`npm run build` also writes `dist/viper-sortie.cdn.html` (about 450 KB: readable game code inline, three.js from cdnjs; closest to the original single file, easiest to edit in chat) and `dist/viper-sortie.html` (about 1 MB, everything inlined, works offline). Edits made to a single file in chat are not automatically merged back into `src/`; to bring them back, ask Claude Code to port the change into `src/`.
+
 ## Notes
 - **Controls guide** labels every button on the first launch (replay it from the menu). **HUD text size** and **Mirror left/right** (in Move buttons) help with comfort and left-handed play.
 - **Best scores** are kept per mission on the device, and **Share result** uses the phone's share sheet (or copies the text).

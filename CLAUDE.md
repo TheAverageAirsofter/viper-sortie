@@ -9,6 +9,9 @@ Mobile-first 3D F-16 combat flight sim. Static site, no framework. See README.md
 - three.js is bundled by `npm run build:three` (esbuild) into `vendor/three.min.js`. Light intensities are scaled by `LK` (pi) because r165+ dropped legacy lights.
 - Bump the cache name in `sw.js` when shipped files change.
 
+## Single-file builds
+`npm run build` also writes `dist/viper-sortie.cdn.html` and `dist/viper-sortie.html` (everything inlined) for the paste-into-chat / Artifact workflow. If the user brings back a single-file edit made in chat, diff it against the matching dist file and port the change into `src/`, then rebuild.
+
 ## Checks (run before pushing)
 ```
 npm install

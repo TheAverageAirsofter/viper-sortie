@@ -8,7 +8,7 @@ renderer.setPixelRatio(DPR); renderer.autoClear=false;
 // keep the r128 look on newer three.js: linear output, no colour management, legacy light units
 if(THREE.ColorManagement)THREE.ColorManagement.enabled=false; if('outputColorSpace' in renderer)renderer.outputColorSpace=THREE.LinearSRGBColorSpace; if('useLegacyLights' in renderer)renderer.useLegacyLights=true;
 // r165+ removed legacy lights: light intensities are pi times lower, so scale ours back up to keep the same look (LK is 1 on older builds)
-const LK=('useLegacyLights' in renderer)?1:Math.PI;
+const LK=(parseInt(THREE.REVISION)>=165)?Math.PI:1;
 const scene=new THREE.Scene();
 const HORIZON=new THREE.Color(0xc6d9e5);
 scene.background=HORIZON;

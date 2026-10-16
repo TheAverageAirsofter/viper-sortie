@@ -3,13 +3,14 @@
   "private": true,
   "description": "Mobile-first 3D F-16 combat flight sim (static site, no build step)",
   "scripts": {
-    "build": "node tools/build.js",
+    "build": "node tools/build.js && node tools/build-single.js",
     "test": "node tools/build.js --check && node --test test/*.test.js",
     "smoke": "node tools/smoke.js",
     "serve": "python3 -m http.server 8080",
     "ui": "node tools/ui-test.js",
     "build:three": "node tools/build-three.js",
-    "sim": "node tools/sim-test.js"
+    "sim": "node tools/sim-test.js",
+    "build:single": "node tools/build-single.js"
   },
   "devDependencies": {
     "esbuild": "^0.28.2",
