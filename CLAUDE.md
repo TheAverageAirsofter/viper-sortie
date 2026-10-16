@@ -49,6 +49,7 @@ node tools/visuals-test.js    # night lights, lightning, explosion, heat shimmer
 Headless Chromium is at /opt/pw-browsers/chromium in the cloud sandbox (tools/launch.js finds it). Tests that click through gameplay set `vsTips` in localStorage to skip the controls guide.
 
 ## Android
+**Standing instruction from the owner: after every change that ships (anything under src/, css/, js/, index.html, tools that feed the build), push the branch and then run the "Android APK" workflow (`android.yml`, workflow_dispatch) with the next version number, so the public release APK is always current.** Find the latest release (v44 as of Oct 2026), use the next `vNN` as the `version` input and the working branch as the ref. Docs-only changes don't need a release. Tell the owner the run link and that it was queued.
 `.github/workflows/android.yml` builds the APK with Capacitor (debug-signed). Manual run or a `v*` tag publishes a GitHub Release. Release signing and the Play Store .aab need the four ANDROID_* secrets described in that file. The sandbox cannot build the APK (no Google Maven access); only GitHub Actions can.
 
 ## Settings stored in localStorage
