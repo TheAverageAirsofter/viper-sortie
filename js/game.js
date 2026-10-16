@@ -2602,7 +2602,9 @@ function startGame(){
   sortie=null; GCI.known.clear(); GCI.lines=[]; GCI.rtb=false; GCI.commitT=7; GCI.threatT=8; initCarrier(); setupMission(); if(mission!=='4SHIP'&&mission!=='ONLINE'&&mission!=='TRAINING')gciPicture(); for(const e of enemies)GCI.known.add(e.id); if(startOnRunway&&mission!=='ONLINE'&&mission!=='TRAINING'){if(startCV&&AC.carrier)placeOnCarrier();else placeOnRunway()} recenterTilt();
 }
 const FIGHTERS=['F16','F16B70','F15C','F15EX','FA18E','GRIPEN','GRIPENE','TYPHOON','RAFALE','MIG29','MIG29UPG','MIG29K','MIG35','SU27','SU33','SU35','J10C','J20'];
-function pickBanditType(){return banditType==='MIXED'?FIGHTERS[Math.random()*FIGHTERS.length|0]:banditType}
+function pickBanditType(){if(banditType!=='MIXED')return banditType;
+  let pool=FIGHTERS;if(careerOn){const b=progBR(AC.id),near=FIGHTERS.filter(f=>Math.abs(progBR(f)-b)<=1);if(near.length>1)pool=near}   // career: matchmaking within 1.0 BR
+  return pool[Math.random()*pool.length|0]}
 // spawn a fighter: team, aircraft type, position, heading toward a point, loadout
 function spawnFighter(team,type,pos,lookAt,opts={}){
   const obj=tmpl(team,type).clone(); obj.position.copy(pos); obj.lookAt(lookAt.x,pos.y,lookAt.z); scene.add(obj);
@@ -2973,6 +2975,7 @@ function showOverlay(kind){
     if(deathCause==='ejected'&&P.rescueText)$('ovLede').textContent=P.rescueText+'. '+(P.rescued?'You live to fly again; your career record keeps the streak.':'');
     stats.innerHTML=`<div class="stat"><span>Score</span><b>${score}</b></div><div class="stat"><span>${mission==='WAVES'?'Wave':'Time'}</span><b>${mission==='WAVES'?wave:fmtT(missionT)}</b></div><div class="stat"><span>Kills</span><b>${kills}</b></div><div class="stat"><span>Max G</span><b>${P.maxG.toFixed(1)}</b></div><div class="stat"><span>Best</span><b>${best}</b></div>`;
     if(lastAward){const d=document.createElement('div');d.className='stat';d.innerHTML='<span>XP</span><b></b>';d.querySelector('b').textContent='+'+lastAward.xp.toLocaleString();stats.appendChild(d);
+      if(lastAward.prog){const g=lastAward.prog;for(const [l,v] of [['Silver Lions','+'+g.sl.toLocaleString()],['Repair',g.rep?'−'+g.rep.toLocaleString():'none'],['Free RP','+'+g.fr.toLocaleString()]]){const e=document.createElement('div');e.className='stat';e.innerHTML='<span></span><b></b>';e.children[0].textContent=l;e.children[1].textContent=v;stats.appendChild(e)}}
       if(lastAward.promoted)$('ovLede').textContent='Promoted to '+lastAward.promoted+'!'+(lastAward.newJets.length?' Unlocked: '+lastAward.newJets.join(', ')+'.':'')+' '+$('ovLede').textContent}
     stats.hidden=false;keysEl.hidden=true;$('bStart').textContent='Fly again';$('bReplay').hidden=!canReplay(false);$('bReplay').textContent='Watch replay';$('debrief').hidden=false;openDebrief();$('bQuit').hidden=true;$('bAC').hidden=false;
   }
@@ -3178,7 +3181,7 @@ function updatePlayer(dt,auto){
   // pilot g tolerance
   if(!auto){
     P.maxG=Math.max(P.maxG,P.n);
-    const over=Math.max(0,P.n-6), under=Math.max(0,-P.n-2);
+    const over=Math.max(0,P.n-6-.25*crewLvl('g')), under=Math.max(0,-P.n-2);
     if(over>0||under>0)P.gStress+=(Math.pow(over,1.6)*.035+under*.08)*dt; else if(P.n<4.5)P.gStress=Math.max(0,P.gStress-.3*dt);
     if(P.gloc>0){P.gloc-=dt;if(P.gloc<=0)P.gStress=.6}
     else if(P.gStress>=1){P.gloc=5;message('G-LOC',2)}
@@ -3686,7 +3689,7 @@ function updateWeapons(dt){
 const CM_LOADS=[[2,2],[3,1],[4,0],[1,3],[0,4]];   // [flare canisters, chaff canisters]; 2+2 is the normal fit
 let cmLoad=0; try{cmLoad=clamp(+localStorage.getItem('viperCmLoad')||0,0,CM_LOADS.length-1)}catch(e){}
 // Gripen C dispenser capacities aren't published; fixed game values are used for it
-const cmFlares=()=>AC.cm.fixed?AC.cm.flares:CM_LOADS[cmLoad][0]*15, cmChaff=()=>AC.cm.fixed?AC.cm.chaff:CM_LOADS[cmLoad][1]*30;
+const cmFlares=()=>Math.round((AC.cm.fixed?AC.cm.flares:CM_LOADS[cmLoad][0]*15)*(AC.cmK||1)), cmChaff=()=>Math.round((AC.cm.fixed?AC.cm.chaff:CM_LOADS[cmLoad][1]*30)*(AC.cmK||1));
 const CM={flares:30,chaff:60,decoys:4,ecm:false,heat:0,auto:false,flrHeld:false,chfHeld:false,flrT:0,chfT:0,autoT:0,decoy:null,objs:[]};
 // bandit missiles: an older heat-seeker and a radar missile, both PN-guided and g-limited like yours
 const eMissiles=makePool(14,mslGeo,new THREE.MeshStandardMaterial({color:0xcfc6b8,flatShading:true}));
@@ -3915,6 +3918,52 @@ $('cDcy').addEventListener('click',deployDecoy);
 $('cAuto').addEventListener('click',()=>{CM.auto=!CM.auto;message(CM.auto?'CMDS AUTO':'CMDS MANUAL',.9);syncCM()});
 syncCM();
 
+
+/* ---------------- progression (War Thunder style): research points, silver lions, tech trees, modules, crew ----------------
+   Career mode only. RP earned in a sortie go to the aircraft you flew (and 10 % to Free RP); an aircraft is researched with RP from the
+   aircraft it descends from (or Free RP), then bought with Silver Lions. Modules and crew skills improve what you own. Bandits are picked near your BR. */
+const NATIONS={USA:{n:'United States',c:'#6fb7ff'},RUS:{n:'Russia',c:'#ff8a7a'},EUR:{n:'Europe',c:'#ffd166'},CHN:{n:'China',c:'#ff9d4e'}};
+const NODES={
+  F16:{n:'USA',r:1,br:11.3},F15C:{n:'USA',r:2,br:12.0,req:'F16'},F16B70:{n:'USA',r:3,br:12.3,req:'F15C'},FA18E:{n:'USA',r:3,br:12.0,req:'F15C'},F15EX:{n:'USA',r:4,br:13.0,req:'F16B70'},
+  MIG29:{n:'RUS',r:1,br:10.7},SU27:{n:'RUS',r:2,br:11.7,req:'MIG29'},MIG29UPG:{n:'RUS',r:3,br:11.7,req:'SU27'},SU33:{n:'RUS',r:3,br:11.7,req:'SU27'},MIG29K:{n:'RUS',r:3,br:11.3,req:'SU27'},MIG35:{n:'RUS',r:4,br:12.7,req:'MIG29UPG'},SU35:{n:'RUS',r:5,br:13.0,req:'MIG35'},
+  GRIPEN:{n:'EUR',r:1,br:11.3},GRIPENE:{n:'EUR',r:2,br:12.7,req:'GRIPEN'},RAFALE:{n:'EUR',r:3,br:12.7,req:'GRIPENE'},TYPHOON:{n:'EUR',r:4,br:12.7,req:'RAFALE'},
+  J10C:{n:'CHN',r:1,br:12.0},J20:{n:'CHN',r:4,br:13.3,req:'J10C'}};
+const RP_COST=[0,0,4000,10000,20000,34000], SL_PRICE=[0,0,25000,70000,150000,280000], ROMAN=['','I','II','III','IV','V'];
+const MODS=[['eng1','Engine I',1,'+4 % thrust'],['afr1','Airframe I',1,'+5 % roll rate'],['cms1','Countermeasures I',2,'+25 % flares and chaff'],['wpn1','Missiles I',2,'+6 % missile range, +5 % missile agility'],
+  ['eng2','Engine II',3,'+4 % thrust','eng1'],['afr2','Airframe II',3,'+5 % roll rate, +3 % lift','afr1']];
+const CREW=[['g','Anti-g training','+0.25 g tolerance per level',8000],['f','Flight skill','+2 % roll rate per level',8000],['d','Ground crew','−8 % repair cost per level',6000]];
+const PROG_START=['F16','MIG29','GRIPEN','J10C'];
+let prog={sl:30000,frp:0,rp:{},res:{},own:{},mods:{},crew:{g:0,f:0,d:0},sorties:0,fresh:true};
+try{const v=JSON.parse(localStorage.getItem('vsProg')||'null');if(v&&typeof v.sl==='number'){prog=Object.assign(prog,v,{fresh:false});prog.crew=Object.assign({g:0,f:0,d:0},v.crew)}}catch(e){}
+for(const k of ['rp','res','own','mods'])if(!prog[k]||typeof prog[k]!=='object')prog[k]={};
+for(const id of PROG_START){prog.res[id]=true;prog.own[id]=true}
+function progSave(){try{localStorage.setItem('vsProg',JSON.stringify(prog))}catch(e){}}
+// players who already earned jets by rank keep them
+function progMigrate(){if(!prog.fresh)return;prog.fresh=false;const ri=rankIdx(career.xp);if(career.xp>0){for(const id in NODES)if(UNLOCK[id]!=null&&UNLOCK[id]<=ri){prog.res[id]=true;prog.own[id]=true}prog.sl+=Math.round(career.xp*.8)}progSave()}
+const progOwned=id=>!!prog.own[id], progRes=id=>!!prog.res[id], progBR=id=>NODES[id]?NODES[id].br:11.5;
+const crewLvl=k=>careerOn?(prog.crew[k]||0):0, hasMod=(id,m)=>careerOn&&!!(prog.mods[id]&&prog.mods[id][m]);
+// modules and crew skill change the effective aircraft the whole game uses
+function modApply(id,e){if(!careerOn)return e;let thr=1,roll=1,lift=1,cm=1,mr=1,ag=1;
+  if(hasMod(id,'eng1'))thr*=1.04;if(hasMod(id,'eng2'))thr*=1.04;if(hasMod(id,'afr1'))roll*=1.05;if(hasMod(id,'afr2')){roll*=1.05;lift*=1.03}
+  if(hasMod(id,'cms1'))cm=1.25;if(hasMod(id,'wpn1')){mr=1.06;ag=1.05}roll*=Math.pow(1.02,crewLvl('f'));
+  if(thr===1&&roll===1&&lift===1&&cm===1&&mr===1)return e;
+  const sc=s=>s?Object.assign({},s,{maxR:s.maxR*mr,gmax:s.gmax*ag}):s;
+  return Object.assign({},e,{T_AB:e.T_AB*thr,T_MIL:e.T_MIL*thr,roll:e.roll*roll,CLMAX:e.CLMAX*lift,cmK:cm,sr:sc(e.sr),mr:sc(e.mr)})}
+// sortie rewards: RP to the aircraft flown, Free RP, Silver Lions, minus the repair bill if you lost the jet
+function progAward(rp,win,kills,survived,rescued){const id=AC.id,br=progBR(id);
+  const sl=Math.round(rp*1.8+kills*250+(win?1500:0)), rep=survived?0:Math.round(18*br*br*(1-.08*crewLvl('d'))*(rescued?.5:1)), fr=Math.round(rp*.1);
+  prog.rp[id]=(prog.rp[id]||0)+rp;prog.frp+=fr;prog.sl=Math.max(0,prog.sl+sl-rep);prog.sorties++;progSave();return {rp,fr,sl,rep}}
+function modCost(id,m){const r=NODES[id]?NODES[id].r:1;return {rp:m[2]*(600+700*(r-1)),sl:m[2]*(4000+4500*(r-1))}}
+function progResearchable(id){const n=NODES[id];return !progRes(id)&&n.req&&progRes(n.req)}
+function progPool(id){return (prog.rp[id]||0)+prog.frp}
+function progResearch(id){const n=NODES[id];if(!n||!progResearchable(id))return false;const c=RP_COST[n.r];if(progPool(n.req)<c)return false;
+  const take=Math.min(c,prog.rp[n.req]||0);prog.rp[n.req]=(prog.rp[n.req]||0)-take;prog.frp-=c-take;prog.res[id]=true;progSave();return true}
+function progBuy(id){const n=NODES[id];if(!n||!progRes(id)||progOwned(id))return false;const c=SL_PRICE[n.r];if(prog.sl<c)return false;prog.sl-=c;prog.own[id]=true;progSave();return true}
+function progMod(id,mk){const m=MODS.find(x=>x[0]===mk);if(!m||!progOwned(id)||hasMod(id,mk)||(m[4]&&!hasMod(id,m[4])))return false;const c=modCost(id,m);
+  if(progPool(id)<c.rp||prog.sl<c.sl)return false;const take=Math.min(c.rp,prog.rp[id]||0);prog.rp[id]=(prog.rp[id]||0)-take;prog.frp-=c.rp-take;prog.sl-=c.sl;
+  (prog.mods[id]||(prog.mods[id]={}))[mk]=true;progSave();return true}
+function crewCost(k){const c=CREW.find(x=>x[0]===k);return c[3]*((prog.crew[k]||0)+1)}
+function progCrew(k){const lv=prog.crew[k]||0;if(lv>=5||prog.sl<crewCost(k))return false;prog.sl-=crewCost(k);prog.crew[k]=lv+1;progSave();return true}
 /* ---------------- sortie recorder for the debrief ---------------- */
 const REC={t:0,acc:0,frames:[],events:[],msl:new Map()}; let mslSeq=0;
 function recReset(){REC.t=0;REC.acc=0;REC.frames=[];REC.events=[];REC.msl=new Map();mslSeq=0}
@@ -4162,7 +4211,8 @@ const DIFF_XP={ROOKIE:.5,REGULAR:1,VETERAN:1.5,ACE:2};
 let career={xp:0,sorties:0,kills:0,deaths:0,wins:0}, careerOn=false, careerDoc=null, lastAward=null;
 try{careerOn=localStorage.getItem('viperMode')==='career';const c=JSON.parse(localStorage.getItem('viperCareer')||'null');if(c&&typeof c.xp==='number')career=Object.assign(career,c)}catch(e){}
 const rankIdx=xp=>{let i=0;RANKS.forEach((r,j)=>{if(xp>=r[0])i=j});return i};
-const unlocked=id=>!careerOn||rankIdx(career.xp)>=UNLOCK[id];
+const unlocked=id=>!careerOn||progOwned(id);
+progMigrate();
 (async()=>{await capsReady; try{if(!dbApi||!userApi)return; const id=await userApi.id(); if(!id)return;
   careerDoc=dbApi.doc('data/users/'+id+'/career'); const snap=await careerDoc.get();
   if(snap.exists){const d=snap.data(); if(d&&typeof d.xp==='number'&&d.xp>=career.xp){career=Object.assign({},career,d);syncCareerUI()}}}catch(e){careerDoc=null}})();
@@ -4174,7 +4224,7 @@ function syncCareerUI(){
   const ri=rankIdx(career.xp), nx=RANKS[ri+1], nextJet=Object.keys(UNLOCK).find(k=>UNLOCK[k]===ri+1);
   pc.innerHTML='';const b=document.createElement('b');b.textContent=RANKS[ri][1];pc.appendChild(b);
   pc.appendChild(document.createTextNode(` · ${career.xp.toLocaleString()} XP · ${career.kills} kill${career.kills===1?'':'s'} · ${career.wins} mission${career.wins===1?'':'s'} won · ${career.sorties} sortie${career.sorties===1?'':'s'}`+
-    (nx?` · next: ${nextJet?AC_DEFS[nextJet].name+' at ':''}${nx[1]} (${nx[0].toLocaleString()} XP)`:' · all jets unlocked')));
+    ` · ${prog.sl.toLocaleString()} SL · ${prog.frp.toLocaleString()} free RP · Hangar > Tech tree to research and buy`));
   if(!unlocked(AC.id)){AC=AC_DEFS.F16;applyAC()}
 }
 function careerAward(){
@@ -4184,7 +4234,8 @@ function careerAward(){
   const xp=Math.round((50+score+(win?1000:0)+(P.alive?250:P.rescued?120:0))*mult);   // 50 for flying the sortie
   career.xp+=xp;career.sorties++;career.kills+=kills;if(!P.alive&&!P.rescued)career.deaths++;if(win)career.wins++;
   const after=rankIdx(career.xp), newJets=Object.keys(UNLOCK).filter(k=>UNLOCK[k]>before&&UNLOCK[k]<=after).map(k=>AC_DEFS[k].name);
-  lastAward={xp,promoted:after>before?RANKS[after][1]:null,newJets};
+  const pg=progAward(xp,win,kills,P.alive||!!P.rescued,!!P.rescued);
+  lastAward={xp,promoted:after>before?RANKS[after][1]:null,newJets:[],prog:pg};
   saveCareer(); syncCareerUI();
 }
 $('bMode').addEventListener('click',()=>{careerOn=!careerOn;try{localStorage.setItem('viperMode',careerOn?'career':'free')}catch(e){};syncCareerUI()});
@@ -4529,8 +4580,8 @@ function effAC(id){const b0=effAC0(id); let v=ldGet(id);
   const agKg=agList.reduce((a,[k,n])=>a+AGKG[k]*n+(AGW[k].perSt>1?Math.ceil(n/AGW[k].perSt)*145:0),0), tkFuel=v.tk*H.tankKg;
   const mass=(v.sr-d.sr)*srKg+(v.mr-d.mr)*mrKg+agKg+v.tk*(H.tankKg*.14)+tkFuel*.6;
   const scd=(v.sr-d.sr)*.0006+(v.mr-d.mr)*.0009+agList.reduce((a,[k,n])=>a+Math.ceil(n/(AGW[k].perSt||1))*.0015,0)+v.tk*.0025;
-  return Object.assign({},b0,{srN:v.sr,mrN:v.mr,agList,tanks:v.tk,tankFuel:tkFuel,MASS:b0.MASS+mass,scd:Math.max(-.004,scd),fuelCap:b0.fuelCap+tkFuel,
-    intFuel:b0.fuelCap,strike:agList.length>0,ld:v})}
+  return modApply(id,Object.assign({},b0,{srN:v.sr,mrN:v.mr,agList,tanks:v.tk,tankFuel:tkFuel,MASS:b0.MASS+mass,scd:Math.max(-.004,scd),fuelCap:b0.fuelCap+tkFuel,
+    intFuel:b0.fuelCap,strike:agList.length>0,ld:v}))}
 function effAC0(id){const b=AC_DEFS[id];
   if(id.startsWith('F16')&&use120D)return Object.assign({},b,{mrName:'120D',mrFull:'AIM-120D',
     mr:Object.assign({},b.mr,{maxR:56000,cd:3.5e-5,acc:155,dlR:100000,termR:18000}),
@@ -4789,7 +4840,7 @@ if(/[?&]test\b/.test(location.search))window.__vs={setThr,HEAT,explode,puff,came
 /* ---------- hangar: pick the aircraft, edit the loadout, change paint, read every spec; the jet turns on a turntable behind the panel ---------- */
 const hgEl=$('hangar');
 function hgTab(t){for(const b of hgEl.querySelectorAll('.hgTabs button'))b.classList.toggle('on',b.dataset.tab===t);
-  $('hgLoad').hidden=t!=='load';$('hgSpec').hidden=t!=='spec';$('hgPaint').hidden=t!=='paint';if(t==='spec')hgSpecs()}
+  $('hgLoad').hidden=t!=='load';$('hgSpec').hidden=t!=='spec';$('hgPaint').hidden=t!=='paint';$('hgTree').hidden=t!=='tree';if(t==='spec')hgSpecs();if(t==='tree')progRender();progWallet()}
 function hgOpen(t){if(state!=='menu'&&state!=='over')return;
   if(!HG.on){HG.on=true;HG.zoom=1;HG.el=.2;HG.ang=.7;HG.auto=true;document.body.classList.add('hangar');hgEl.hidden=false;projKey='';if(state==='menu')hgEnter()}
   hgTab(t||'load');$('hgName').textContent=AC.name;renderLd()}
@@ -4961,4 +5012,38 @@ function hgRefresh(){if(!hgSaved)return;
   if(pFlame)pFlame.scale.set(.01,.01,.01);setAB(playerJet,false);P.gearT=1;hgSign()}
 function hgLeave(){if(!hgSaved)return;const s=hgSaved;hgSaved=null;hgScene.remove(playerJet);scene.add(playerJet);
   P.pos.copy(s.pos);playerJet.quaternion.copy(s.q);P.vel.copy(s.vel);P.onGround=s.og;P.ci=s.ci;throttle=s.thr;setGear(s.gear);P.gearT=s.gearT;axes(P);camSnap=true}
+
+/* ---------- Tech tree tab in the hangar ---------- */
+let progSel=null;
+const fmtN=n=>Number(n).toLocaleString('en-US');
+const nodeState=id=>progOwned(id)?'own':progRes(id)?'res':progResearchable(id)?'can':'lock';
+function progWallet(){$('hgWallet').textContent=careerOn?fmtN(prog.sl)+' SL · '+fmtN(prog.frp)+' free RP':''}
+function progDetail(id){
+  const n=NODES[id],d=AC_DEFS[id],st=nodeState(id),nat=NATIONS[n.n],req=n.req?AC_DEFS[n.req].name:null,tw=d.T_AB/(d.MASS*G);
+  let h='<div class="tdet"><h3>'+d.name+'</h3><p class="hgNote">'+nat.n+' · rank '+ROMAN[n.r]+' · BR '+n.br.toFixed(1)+' · thrust/weight '+tw.toFixed(2)+' · +'+d.gmax+' g · corner '+d.corner+' kt<br>'+d.srFull+' × '+d.srN+' · '+d.mrFull+' × '+d.mrN+'</p>';
+  if(st==='own'){h+='<div class="row"><button class="ghost" data-act="use" data-id="'+id+'">Use in hangar</button></div>';
+    h+='<table class="hgT"><caption>Modules · '+fmtN(prog.rp[id]||0)+' RP on this aircraft</caption>'+MODS.map(m=>{const c=modCost(id,m),have=hasMod(id,m[0]),lockd=m[4]&&!hasMod(id,m[4]);
+      const btn=have?'<b class="ok">Installed</b>':lockd?'<small>needs '+MODS.find(x=>x[0]===m[4])[1]+'</small>':'<button class="ghost" data-act="mod" data-id="'+id+'" data-m="'+m[0]+'"'+(progPool(id)>=c.rp&&prog.sl>=c.sl?'':' disabled')+'>'+fmtN(c.rp)+' RP + '+fmtN(c.sl)+' SL</button>';
+      return '<tr><th>'+m[1]+'<small>'+m[3]+'</small></th><td>'+btn+'</td></tr>'}).join('')+'</table>'}
+  else if(st==='res'){const c=SL_PRICE[n.r];h+='<div class="row"><button class="primary" data-act="buy" data-id="'+id+'"'+(prog.sl>=c?'':' disabled')+'>Buy · '+fmtN(c)+' SL</button></div><p class="hgNote">Researched. You have '+fmtN(prog.sl)+' Silver Lions.</p>'}
+  else if(st==='can'){const c=RP_COST[n.r];h+='<div class="row"><button class="primary" data-act="research" data-id="'+id+'"'+(progPool(n.req)>=c?'':' disabled')+'>Research · '+fmtN(c)+' RP</button></div><p class="hgNote">Paid from the '+fmtN(prog.rp[n.req]||0)+' RP earned in the '+req+' plus '+fmtN(prog.frp)+' free RP.</p>'}
+  else h+='<p class="hgNote">Locked: research the '+req+' first.</p>';
+  return h+'</div>'}
+function progRender(){const el=$('hgTree');progWallet();
+  if(!careerOn){el.innerHTML='<p class="hgNote">Progression runs in <b>Career mode</b>. Fly sorties to earn Research Points and Silver Lions, research new aircraft down each nation\'s tree, buy them, install modules and train your crew. Bandits are matched to your aircraft\'s battle rating. Free play keeps every aircraft unlocked.</p><div class="row"><button class="primary" data-act="career" type="button">Switch to Career mode</button></div>';return}
+  if(!progSel||!NODES[progSel])progSel=AC.id;
+  let h='<p class="hgNote">'+fmtN(prog.sl)+' Silver Lions · '+fmtN(prog.frp)+' free RP · '+prog.sorties+' career sorties. Tap an aircraft.</p><div class="tree">';
+  for(const nk in NATIONS){const ids=Object.keys(NODES).filter(i=>NODES[i].n===nk).sort((a,b)=>NODES[a].r-NODES[b].r||(NODES[a].req===NODES[b].req?0:1));
+    h+='<div class="tnat" style="--nc:'+NATIONS[nk].c+'"><h4>'+NATIONS[nk].n+'</h4><div class="tnodes">'+ids.map(i=>'<button type="button" class="tn '+nodeState(i)+(i===progSel?' sel':'')+'" data-id="'+i+'"><b>'+AC_DEFS[i].name+'</b><small>'+ROMAN[NODES[i].r]+' · BR '+NODES[i].br.toFixed(1)+'</small></button>').join('')+'</div></div>'}
+  h+='</div>'+progDetail(progSel);
+  h+='<table class="hgT"><caption>Crew training · Silver Lions</caption>'+CREW.map(c=>{const lv=prog.crew[c[0]]||0;return '<tr><th>'+c[1]+' · level '+lv+' / 5<small>'+c[2]+'</small></th><td>'+(lv>=5?'<b class="ok">Maxed</b>':'<button class="ghost" data-act="crew" data-k="'+c[0]+'"'+(prog.sl>=crewCost(c[0])?'':' disabled')+'>'+fmtN(crewCost(c[0]))+' SL</button>')+'</td></tr>'}).join('')+'</table>';
+  el.innerHTML=h}
+if(/[?&]test\b/.test(location.search))Object.assign(window.__vs||{},{prog,progAward,NODES,pickBanditType});
+$('hgTree').addEventListener('click',e=>{const t=e.target.closest('[data-id],[data-act]');if(!t)return;const id=t.dataset.id,act=t.dataset.act;
+  if(!act){progSel=id;progRender();return}
+  if(act==='career'){$('bMode').click();progRender();return}
+  let ok=false;
+  if(act==='research')ok=progResearch(id);else if(act==='buy')ok=progBuy(id);else if(act==='mod')ok=progMod(id,t.dataset.m);else if(act==='crew')ok=progCrew(t.dataset.k);
+  else if(act==='use'){AC=AC_DEFS[id];try{localStorage.setItem('viperAC',id)}catch(er){};applyAC();hgTab('load');return}
+  if(ok){if(act==='mod'||act==='crew'||act==='buy')applyAC();syncCareerUI();$('hgName').textContent=AC.name}progRender()});
 })();

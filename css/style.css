@@ -198,3 +198,21 @@ body.hangar #ov{display:none!important}
 #hgChips div{display:flex;flex-wrap:wrap;gap:6px}
 #hgChips button{pointer-events:auto;font:700 11px/1 var(--f-hud);letter-spacing:.06em;padding:8px 10px;background:rgba(8,16,20,.7);color:var(--paper);border:1px solid rgba(232,240,234,.3);border-radius:6px;cursor:pointer}
 @media (max-aspect-ratio:1/1){#hgChips{right:12px;bottom:calc(58% + 8px)}}
+/* tech tree */
+.hgTabs button{padding:10px 4px;font-size:11px;letter-spacing:.04em}
+.hgWallet{color:var(--warn);margin-left:8px;letter-spacing:.06em}
+.tree{display:grid;gap:10px;margin:8px 0 12px}
+.tnat{border-left:3px solid var(--nc,#7dff9a);padding-left:8px}
+.tnat h4{margin:0 0 5px;font:700 11px var(--f-hud);letter-spacing:.16em;text-transform:uppercase;color:var(--nc)}
+.tnodes{display:flex;flex-wrap:wrap;gap:6px}
+.tn{font:12px/1.2 var(--f-hud);text-align:left;padding:7px 9px;min-width:104px;border-radius:6px;border:1px solid rgba(232,240,234,.25);background:rgba(8,16,20,.6);color:var(--paper);cursor:pointer}
+.tn b{display:block;font-size:12px}.tn small{display:block;color:rgba(232,240,234,.6);font-size:10px;margin-top:2px}
+.tn.own{border-color:var(--hud);background:rgba(125,255,154,.12)}
+.tn.res{border-color:var(--warn);background:rgba(255,179,71,.12)}
+.tn.can{border-color:#6fb7ff}
+.tn.lock{opacity:.45}
+.tn.sel{outline:2px solid var(--paper);outline-offset:1px}
+.tdet h3{margin:4px 0;font:800 20px var(--f-display);text-transform:uppercase}
+.hgT .ok{color:var(--hud);font-size:11px}
+.hgT button.ghost{font-size:11px;padding:6px 8px}
+button:disabled{opacity:.4;cursor:not-allowed}

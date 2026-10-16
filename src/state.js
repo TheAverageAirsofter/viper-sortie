@@ -69,7 +69,9 @@ function startGame(){
   sortie=null; GCI.known.clear(); GCI.lines=[]; GCI.rtb=false; GCI.commitT=7; GCI.threatT=8; initCarrier(); setupMission(); if(mission!=='4SHIP'&&mission!=='ONLINE'&&mission!=='TRAINING')gciPicture(); for(const e of enemies)GCI.known.add(e.id); if(startOnRunway&&mission!=='ONLINE'&&mission!=='TRAINING'){if(startCV&&AC.carrier)placeOnCarrier();else placeOnRunway()} recenterTilt();
 }
 const FIGHTERS=['F16','F16B70','F15C','F15EX','FA18E','GRIPEN','GRIPENE','TYPHOON','RAFALE','MIG29','MIG29UPG','MIG29K','MIG35','SU27','SU33','SU35','J10C','J20'];
-function pickBanditType(){return banditType==='MIXED'?FIGHTERS[Math.random()*FIGHTERS.length|0]:banditType}
+function pickBanditType(){if(banditType!=='MIXED')return banditType;
+  let pool=FIGHTERS;if(careerOn){const b=progBR(AC.id),near=FIGHTERS.filter(f=>Math.abs(progBR(f)-b)<=1);if(near.length>1)pool=near}   // career: matchmaking within 1.0 BR
+  return pool[Math.random()*pool.length|0]}
 // spawn a fighter: team, aircraft type, position, heading toward a point, loadout
 function spawnFighter(team,type,pos,lookAt,opts={}){
   const obj=tmpl(team,type).clone(); obj.position.copy(pos); obj.lookAt(lookAt.x,pos.y,lookAt.z); scene.add(obj);
@@ -440,6 +442,7 @@ function showOverlay(kind){
     if(deathCause==='ejected'&&P.rescueText)$('ovLede').textContent=P.rescueText+'. '+(P.rescued?'You live to fly again; your career record keeps the streak.':'');
     stats.innerHTML=`<div class="stat"><span>Score</span><b>${score}</b></div><div class="stat"><span>${mission==='WAVES'?'Wave':'Time'}</span><b>${mission==='WAVES'?wave:fmtT(missionT)}</b></div><div class="stat"><span>Kills</span><b>${kills}</b></div><div class="stat"><span>Max G</span><b>${P.maxG.toFixed(1)}</b></div><div class="stat"><span>Best</span><b>${best}</b></div>`;
     if(lastAward){const d=document.createElement('div');d.className='stat';d.innerHTML='<span>XP</span><b></b>';d.querySelector('b').textContent='+'+lastAward.xp.toLocaleString();stats.appendChild(d);
+      if(lastAward.prog){const g=lastAward.prog;for(const [l,v] of [['Silver Lions','+'+g.sl.toLocaleString()],['Repair',g.rep?'−'+g.rep.toLocaleString():'none'],['Free RP','+'+g.fr.toLocaleString()]]){const e=document.createElement('div');e.className='stat';e.innerHTML='<span></span><b></b>';e.children[0].textContent=l;e.children[1].textContent=v;stats.appendChild(e)}}
       if(lastAward.promoted)$('ovLede').textContent='Promoted to '+lastAward.promoted+'!'+(lastAward.newJets.length?' Unlocked: '+lastAward.newJets.join(', ')+'.':'')+' '+$('ovLede').textContent}
     stats.hidden=false;keysEl.hidden=true;$('bStart').textContent='Fly again';$('bReplay').hidden=!canReplay(false);$('bReplay').textContent='Watch replay';$('debrief').hidden=false;openDebrief();$('bQuit').hidden=true;$('bAC').hidden=false;
   }
@@ -645,7 +648,7 @@ function updatePlayer(dt,auto){
   // pilot g tolerance
   if(!auto){
     P.maxG=Math.max(P.maxG,P.n);
-    const over=Math.max(0,P.n-6), under=Math.max(0,-P.n-2);
+    const over=Math.max(0,P.n-6-.25*crewLvl('g')), under=Math.max(0,-P.n-2);
     if(over>0||under>0)P.gStress+=(Math.pow(over,1.6)*.035+under*.08)*dt; else if(P.n<4.5)P.gStress=Math.max(0,P.gStress-.3*dt);
     if(P.gloc>0){P.gloc-=dt;if(P.gloc<=0)P.gStress=.6}
     else if(P.gStress>=1){P.gloc=5;message('G-LOC',2)}

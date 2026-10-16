@@ -245,7 +245,8 @@ const DIFF_XP={ROOKIE:.5,REGULAR:1,VETERAN:1.5,ACE:2};
 let career={xp:0,sorties:0,kills:0,deaths:0,wins:0}, careerOn=false, careerDoc=null, lastAward=null;
 try{careerOn=localStorage.getItem('viperMode')==='career';const c=JSON.parse(localStorage.getItem('viperCareer')||'null');if(c&&typeof c.xp==='number')career=Object.assign(career,c)}catch(e){}
 const rankIdx=xp=>{let i=0;RANKS.forEach((r,j)=>{if(xp>=r[0])i=j});return i};
-const unlocked=id=>!careerOn||rankIdx(career.xp)>=UNLOCK[id];
+const unlocked=id=>!careerOn||progOwned(id);
+progMigrate();
 (async()=>{await capsReady; try{if(!dbApi||!userApi)return; const id=await userApi.id(); if(!id)return;
   careerDoc=dbApi.doc('data/users/'+id+'/career'); const snap=await careerDoc.get();
   if(snap.exists){const d=snap.data(); if(d&&typeof d.xp==='number'&&d.xp>=career.xp){career=Object.assign({},career,d);syncCareerUI()}}}catch(e){careerDoc=null}})();
@@ -257,7 +258,7 @@ function syncCareerUI(){
   const ri=rankIdx(career.xp), nx=RANKS[ri+1], nextJet=Object.keys(UNLOCK).find(k=>UNLOCK[k]===ri+1);
   pc.innerHTML='';const b=document.createElement('b');b.textContent=RANKS[ri][1];pc.appendChild(b);
   pc.appendChild(document.createTextNode(` · ${career.xp.toLocaleString()} XP · ${career.kills} kill${career.kills===1?'':'s'} · ${career.wins} mission${career.wins===1?'':'s'} won · ${career.sorties} sortie${career.sorties===1?'':'s'}`+
-    (nx?` · next: ${nextJet?AC_DEFS[nextJet].name+' at ':''}${nx[1]} (${nx[0].toLocaleString()} XP)`:' · all jets unlocked')));
+    ` · ${prog.sl.toLocaleString()} SL · ${prog.frp.toLocaleString()} free RP · Hangar > Tech tree to research and buy`));
   if(!unlocked(AC.id)){AC=AC_DEFS.F16;applyAC()}
 }
 function careerAward(){
@@ -267,7 +268,8 @@ function careerAward(){
   const xp=Math.round((50+score+(win?1000:0)+(P.alive?250:P.rescued?120:0))*mult);   // 50 for flying the sortie
   career.xp+=xp;career.sorties++;career.kills+=kills;if(!P.alive&&!P.rescued)career.deaths++;if(win)career.wins++;
   const after=rankIdx(career.xp), newJets=Object.keys(UNLOCK).filter(k=>UNLOCK[k]>before&&UNLOCK[k]<=after).map(k=>AC_DEFS[k].name);
-  lastAward={xp,promoted:after>before?RANKS[after][1]:null,newJets};
+  const pg=progAward(xp,win,kills,P.alive||!!P.rescued,!!P.rescued);
+  lastAward={xp,promoted:after>before?RANKS[after][1]:null,newJets:[],prog:pg};
   saveCareer(); syncCareerUI();
 }
 $('bMode').addEventListener('click',()=>{careerOn=!careerOn;try{localStorage.setItem('viperMode',careerOn?'career':'free')}catch(e){};syncCareerUI()});

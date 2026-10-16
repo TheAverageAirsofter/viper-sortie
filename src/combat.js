@@ -340,7 +340,7 @@ function updateWeapons(dt){
 const CM_LOADS=[[2,2],[3,1],[4,0],[1,3],[0,4]];   // [flare canisters, chaff canisters]; 2+2 is the normal fit
 let cmLoad=0; try{cmLoad=clamp(+localStorage.getItem('viperCmLoad')||0,0,CM_LOADS.length-1)}catch(e){}
 // Gripen C dispenser capacities aren't published; fixed game values are used for it
-const cmFlares=()=>AC.cm.fixed?AC.cm.flares:CM_LOADS[cmLoad][0]*15, cmChaff=()=>AC.cm.fixed?AC.cm.chaff:CM_LOADS[cmLoad][1]*30;
+const cmFlares=()=>Math.round((AC.cm.fixed?AC.cm.flares:CM_LOADS[cmLoad][0]*15)*(AC.cmK||1)), cmChaff=()=>Math.round((AC.cm.fixed?AC.cm.chaff:CM_LOADS[cmLoad][1]*30)*(AC.cmK||1));
 const CM={flares:30,chaff:60,decoys:4,ecm:false,heat:0,auto:false,flrHeld:false,chfHeld:false,flrT:0,chfT:0,autoT:0,decoy:null,objs:[]};
 // bandit missiles: an older heat-seeker and a radar missile, both PN-guided and g-limited like yours
 const eMissiles=makePool(14,mslGeo,new THREE.MeshStandardMaterial({color:0xcfc6b8,flatShading:true}));

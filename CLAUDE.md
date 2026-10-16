@@ -24,6 +24,7 @@ node tools/layout-test.js     # movable controls
 node tools/features-test.js   # controls guide, mirror, text size, leaderboard
 node tools/sim-test.js        # flight model and launch zones (uses the ?test hook)
 node tools/hangar-test.js     # hangar: loadout, specs, aircraft, paint
+node tools/progress-test.js   # tech tree, research, buy, modules, crew, rewards
 node tools/visuals-test.js    # night lights, lightning, explosion, heat shimmer, every aircraft model
 ```
 Headless Chromium is at /opt/pw-browsers/chromium in the cloud sandbox (tools/launch.js finds it). Tests that click through gameplay set `vsTips` in localStorage to skip the controls guide.
@@ -32,4 +33,4 @@ Headless Chromium is at /opt/pw-browsers/chromium in the cloud sandbox (tools/la
 `.github/workflows/android.yml` builds the APK with Capacitor (debug-signed). Manual run or a `v*` tag publishes a GitHub Release. Release signing and the Play Store .aab need the four ANDROID_* secrets described in that file. The sandbox cannot build the APK (no Google Maven access); only GitHub Actions can.
 
 ## Settings stored in localStorage
-viperQuality, viperPal, viperLayout, viperText, viperRange, viperMission, vsLb_<mission>, vsTips, vsSeen, plus the original viper* keys.
+vsProg (progression), viperQuality, viperPal, viperLayout, viperText, viperRange, viperMission, vsLb_<mission>, vsTips, vsSeen, plus the original viper* keys.

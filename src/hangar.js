@@ -2,7 +2,7 @@
 /* ---------- hangar: pick the aircraft, edit the loadout, change paint, read every spec; the jet turns on a turntable behind the panel ---------- */
 const hgEl=$('hangar');
 function hgTab(t){for(const b of hgEl.querySelectorAll('.hgTabs button'))b.classList.toggle('on',b.dataset.tab===t);
-  $('hgLoad').hidden=t!=='load';$('hgSpec').hidden=t!=='spec';$('hgPaint').hidden=t!=='paint';if(t==='spec')hgSpecs()}
+  $('hgLoad').hidden=t!=='load';$('hgSpec').hidden=t!=='spec';$('hgPaint').hidden=t!=='paint';$('hgTree').hidden=t!=='tree';if(t==='spec')hgSpecs();if(t==='tree')progRender();progWallet()}
 function hgOpen(t){if(state!=='menu'&&state!=='over')return;
   if(!HG.on){HG.on=true;HG.zoom=1;HG.el=.2;HG.ang=.7;HG.auto=true;document.body.classList.add('hangar');hgEl.hidden=false;projKey='';if(state==='menu')hgEnter()}
   hgTab(t||'load');$('hgName').textContent=AC.name;renderLd()}
