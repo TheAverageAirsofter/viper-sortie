@@ -49,8 +49,6 @@ function applyAC(){
 }
 function setMenuLabels(){$('campBox').hidden=mission!=='CAMPAIGN';if(mission==='CAMPAIGN')renderCamp();$('roomRow').hidden=mission!=='ONLINE';const on=mission==='ONLINE';$('bNetMode').hidden=!on;$('bTeam').hidden=!on||NET.mode!=='TEAMS';$('bNetMode').textContent='Online: '+(NET.mode==='TEAMS'?'teams':'free for all');$('bTeam').textContent='Team: '+({A:'auto',B:'blue',R:'red'})[NET.teamPref];$('lobby').hidden=!on||(state!=='menu'&&state!=='over');if(on)setTimeout(netLobby,0);const tr=mission==='TRAINING';$('bLesson').hidden=!tr;$('bLesson').textContent='Lesson: '+LESSONS[lesson];$('bBandit').hidden=mission==='ONLINE'||tr;$('bDiff').hidden=mission==='ONLINE'||tr;$('bDiff').textContent='Difficulty: '+DIFF[difficulty].name;$('bMission').textContent='Mission: '+MISSIONS[mission];$('bBandit').textContent='Bandits: '+BANDITS[banditType]}
 $('bMission').addEventListener('click',()=>{const k=Object.keys(MISSIONS);mission=k[(k.indexOf(mission)+1)%k.length];try{localStorage.setItem('viperMission',mission)}catch(e){};setMenuLabels();applyAC()});
-$('bRole').addEventListener('click',()=>{$('ldPanel').hidden=!$('ldPanel').hidden;renderLd()});
-$('ldDone').addEventListener('click',()=>{$('ldPanel').hidden=true});
 const ldApply=v=>{ldSet(AC.id,v);applyAC()};
 $('ldAA').addEventListener('click',()=>ldApply(ldDefault(AC.id)));
 $('ldST').addEventListener('click',()=>ldApply(ldStrike(AC.id)));
@@ -72,7 +70,7 @@ function renderLd(){
   if(c.tanks)row('Drop tanks','+'+(H.tankKg/1000).toFixed(1)+' t fuel each · drag · JETT button',v.tk,v.tk>0,v.tk<c.tanks&&free>0,()=>v.tk--,()=>v.tk++);
   const e=effAC(id), m=e.MASS+.75*e.intFuel+e.tankFuel-.6*e.fuelCap+.6*e.fuelCap*0, tw=(e.T_AB/(m*G));
   $('ldSum').textContent=`Stations ${ldUsed(v)}/${c.hp+c.extra} · take-off weight ${(m/1000).toFixed(1)} t · thrust/weight ${tw.toFixed(2)} · fuel ${((.75*e.intFuel+e.tankFuel)/1000).toFixed(1)} t`+` · RCS ≈ ${((RCS[id]??3)+storesRCS(e)).toFixed(2)} m² (est.)`+(c.ag.length?'':' · no air-to-ground stores cleared');
-  $('bRole').textContent='Loadout: '+[v.sr+'× '+b.srFull,c.hp?v.mr+'× '+b.mrFull:null,...Object.entries(v.ag).filter(([,n])=>n).map(([k,n])=>n+'× '+AGW[k].sh),v.tk?v.tk+' tank'+(v.tk>1?'s':''):null].filter(Boolean).join(', ')+' ▾'}
+  $('bRole').textContent='Loadout: '+[v.sr+'× '+b.srFull,c.hp?v.mr+'× '+b.mrFull:null,...Object.entries(v.ag).filter(([,n])=>n).map(([k,n])=>n+'× '+AGW[k].sh),v.tk?v.tk+' tank'+(v.tk>1?'s':''):null].filter(Boolean).join(', ')+' ▸'}
 $('bBandit').addEventListener('click',()=>{const k=Object.keys(BANDITS);banditType=k[(k.indexOf(banditType)+1)%k.length];try{localStorage.setItem('viperBandit',banditType)}catch(e){};setMenuLabels()});
 $('cWing').addEventListener('click',wingCmd);
 $('cGci').addEventListener('click',()=>{audioInit();radio(gciName()+', '+myCall()+', bogey dope.','wing');setTimeout(gciBogeyDope,1200)});

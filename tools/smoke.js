@@ -9,7 +9,7 @@ const url = process.argv[2] || 'file://' + require('path').resolve(__dirname, '.
   p.on('console', m => { if (m.type() === 'error' && !/Failed to load resource/.test(m.text())) errs.push('console: ' + m.text()); });
   await p.route(/fonts\.(googleapis|gstatic)\.com/, r => r.abort());
   await p.goto(url); await p.waitForTimeout(3000);
-  const start = await p.$('#bStart, #ovStart, button.primary');
+  const start = await p.$('#bStart');
   console.log('start button:', start ? 'found' : 'none');
   if (start) { await start.click(); await p.waitForTimeout(5000); }
   console.log('state:', await p.evaluate(() => typeof state !== 'undefined' ? state : 'n/a'));

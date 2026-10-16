@@ -167,3 +167,29 @@ body.laying #ctrls #cm .cmb{pointer-events:none}
 #tips .tip b{color:var(--hud)}
 #tipsNote{position:fixed;left:50%;top:42%;transform:translate(-50%,-50%);margin:0;padding:8px 14px;border:1px solid var(--hud);border-radius:8px;background:rgba(8,16,20,.9);font:700 13px var(--f-hud);letter-spacing:.06em;color:var(--hud)}
 #lbBox{margin:8px 0}#lbList{margin:4px 0 0;padding-left:22px;font:12px/1.5 var(--f-hud);color:var(--paper);font-variant-numeric:tabular-nums}#lbList li.me{color:var(--hud)}
+/* hangar: aircraft, loadout, specs and paint; the 3D jet turns on the left (or top on a phone held upright) */
+#hangar{position:fixed;inset:0;z-index:7;display:flex;pointer-events:none}
+#hangar[hidden]{display:none}
+#hgView{position:absolute;inset:0 min(540px,50vw) 0 0;pointer-events:auto;touch-action:none;cursor:grab}
+.hgPanel{pointer-events:auto;margin-left:auto;position:relative;width:min(540px,50vw);height:100%;box-sizing:border-box;background:rgba(8,16,20,.86);border-left:1px solid rgba(125,255,154,.22);padding:max(12px,env(safe-area-inset-top,0px)) calc(14px + env(safe-area-inset-right,0px)) max(12px,env(safe-area-inset-bottom,0px)) 16px;display:flex;flex-direction:column;gap:10px;touch-action:pan-y}
+.hgHead{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+.hgHead h2{margin:2px 0 0;font:800 30px/.95 var(--f-display);text-transform:uppercase;color:var(--paper)}
+.hgTabs{display:flex;gap:6px}
+.hgTabs button{flex:1;font:700 12px/1 var(--f-hud);letter-spacing:.1em;text-transform:uppercase;padding:10px 8px;background:transparent;color:var(--paper);border:1px solid rgba(232,240,234,.25);border-radius:6px;cursor:pointer}
+.hgTabs button.on{background:var(--hud);color:var(--ink);border-color:var(--hud)}
+.hgBody{flex:1;overflow-y:auto;min-height:0;padding-right:4px;-webkit-overflow-scrolling:touch}
+.hgPane[hidden]{display:none}
+.hgPane .row{margin-bottom:8px}
+.hgT{width:100%;border-collapse:collapse;font:12px/1.35 var(--f-hud);margin:0 0 12px}
+.hgT caption{text-align:left;font:700 11px var(--f-hud);letter-spacing:.18em;text-transform:uppercase;color:var(--hud);padding:6px 0 4px;border-bottom:1px solid rgba(125,255,154,.3)}
+.hgT th{text-align:left;font-weight:400;color:var(--hud-dim);padding:3px 8px 3px 0;vertical-align:top;white-space:nowrap}
+.hgT td{text-align:right;color:var(--paper);padding:3px 0;font-variant-numeric:tabular-nums}
+.hgT td small{display:block;color:var(--hud-dim);font-size:10px}
+.hgNote{font:12px/1.5 var(--f-body);color:rgba(232,240,234,.7)}
+body.hangar #ov{display:none!important}
+@media (max-aspect-ratio:1/1){
+  #hangar{flex-direction:column}
+  #hgView{inset:0 0 58% 0}
+  .hgPanel{width:100%;height:58%;margin:auto 0 0;border-left:0;border-top:1px solid rgba(125,255,154,.22)}
+  .hgHead h2{font-size:24px}
+}

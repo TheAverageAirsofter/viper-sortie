@@ -13,6 +13,11 @@ function updateCamera(dt){
   if(v==='PADLOCK'&&!pt)v='CHASE';
   playerJet.visible=(alive||(state!=='menu'&&P.alive))&&v!=='COCKPIT';
   if(!alive){camera.up.set(0,1,0);if(P.ejected&&chute&&state!=='replay')camera.position.lerp(_a.copy(chute.position).add(_b.set(16,5,16)),1-Math.exp(-dt*3));camera.lookAt(P.pos);return}
+  if(HG.on&&state==='menu'){   // hangar turntable: the camera circles the jet in the jet's own frame, so it stays put on screen
+    playerJet.visible=true; if(!HG.drag)HG.ang+=dt*.3;
+    const sp=(typeof M2!=='undefined'&&M2[AC.id]&&M2[AC.id].L)||16, r=sp*1.35*HG.zoom;
+    _a.set(Math.sin(HG.ang)*r,sp*.16,Math.cos(HG.ang)*r).applyQuaternion(playerJet.quaternion).add(P.pos);
+    camera.position.copy(_a); camUp.copy(P.up); camera.up.copy(camUp); camera.lookAt(P.pos); camSnap=true; return}
   const q=playerJet.quaternion, k=camSnap?1:1-Math.exp(-dt*8); camSnap=false;
   if(look.id===null){const k2=Math.exp(-dt*3);look.yaw*=k2;look.pitch*=k2}
   if(v==='COCKPIT'){

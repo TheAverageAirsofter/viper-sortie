@@ -7,6 +7,7 @@ let enemies=[],wave=0,score=0,kills=0,waveClearT=0,gunAcc=0,gunSndT=0,hurtT=0,sh
 let lockTarget=null,lockT=0,lockDist=0,lockAng=0,can9=false,can120=false,toneT=0;
 let msgText='',msgT=0,clock=0,throttle=.8,thrSet=.8;
 let gunHeld=false,brake=false,fire9=false,fire120=false;
+const HG={on:false,ang:.7,zoom:1,drag:null};   // hangar: turntable camera around the player's jet
 const VIEWS=['CHASE','COCKPIT','PADLOCK','FLYBY']; let view=0; const flyCam=new V3(); let flyCamSet=false;
 const keys={};
 const REDUCED=!!(window.matchMedia&&matchMedia('(prefers-reduced-motion:reduce)').matches);
@@ -511,9 +512,9 @@ let W=1,H=1,INS={t:0,r:0,b:0,l:0};
 // cockpit uses a tighter field of view and a raised eye point so the HUD and the panel both fit
 let projKey='';
 function applyProj(){
-  const pit=VIEWS[view]==='COCKPIT', key=pit+'|'+W+'|'+H; if(key===projKey)return; projKey=key;
+  const pit=VIEWS[view]==='COCKPIT', key=pit+'|'+W+'|'+H+'|'+HG.on; if(key===projKey)return; projKey=key;
   const fov=pit?(W<H?74:58):(W<H?86:66);
-  for(const cam of [camera,cockCam]){cam.fov=fov;cam.aspect=W/H;if(pit)cam.setViewOffset(W,H,0,H*(W<H?.07:.16),W,H);else cam.clearViewOffset();cam.updateProjectionMatrix()}
+  for(const cam of [camera,cockCam]){cam.fov=fov;cam.aspect=W/H;if(pit)cam.setViewOffset(W,H,0,H*(W<H?.07:.16),W,H);else if(HG.on)cam.setViewOffset(W,H,W<H?0:W*.2,W<H?H*.2:0,W,H);else cam.clearViewOffset();cam.updateProjectionMatrix()}
   pMat.uniforms.scale.value=H*DPR/2/Math.tan(fov*Math.PI/360);
 }
 function resize(){

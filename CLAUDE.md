@@ -23,6 +23,8 @@ node tools/rush-test.js       # Bandit rush mission
 node tools/layout-test.js     # movable controls
 node tools/features-test.js   # controls guide, mirror, text size, leaderboard
 node tools/sim-test.js        # flight model and launch zones (uses the ?test hook)
+node tools/hangar-test.js     # hangar: loadout, specs, aircraft, paint
+node tools/visuals-test.js    # night lights, lightning, explosion, heat shimmer, every aircraft model
 ```
 Headless Chromium is at /opt/pw-browsers/chromium in the cloud sandbox (tools/launch.js finds it). Tests that click through gameplay set `vsTips` in localStorage to skip the controls guide.
 

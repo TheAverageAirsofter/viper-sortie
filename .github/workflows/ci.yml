@@ -19,4 +19,5 @@ jobs:
       - run: node tools/layout-test.js     # movable controls
       - run: node tools/features-test.js   # controls guide, mirror layout, text size, leaderboard
       - run: node tools/sim-test.js        # flight model and launch-zone behaviour
+      - run: node tools/hangar-test.js     # hangar: loadout, specs, aircraft, paint
       - run: node tools/visuals-test.js    # night settlement lights, rain lightning
