@@ -40,3 +40,15 @@ test('flyout: range is longer at altitude (thin air)', () => {
 test('flyout: stops once spent and slow', () => {
   const f = flyout({ life: 200, burn: 2, acc: 50, cd: 1e-3, sus: 0, vCap: 0 }, 0, 200); assert.ok(f.S.length < 200 / .25);
 });
+
+const { gunTof, gunDrag } = require('../js/physics.js');
+test('gun: PGU-28 reaches 1 km in about 1.4 s at sea level', () => near(gunTof(1000, 1030, 1), 1.41, .08));
+test('gun: time of flight is longer than the no-drag value and shorter in thin air', () => {
+  assert.ok(gunTof(1000, 1030, 1) > 1000 / 1030); assert.ok(gunTof(1000, 1030, .3) < gunTof(1000, 1030, 1));
+});
+test('gun: drag slows a round and never reverses it', () => {
+  assert.ok(gunDrag(1000, 1, .01) < 1); assert.ok(gunDrag(1000, 1, .01) > 0); assert.equal(gunDrag(1000, 1, 5), 0);
+});
+test('gun: integrating gunDrag reproduces gunTof', () => {
+  let v = 1030, x = 0, t = 0; while (x < 1000) { v *= gunDrag(v, 1, .001); x += v * .001; t += .001; } near(t, gunTof(1000, 1030, 1), .02);
+});

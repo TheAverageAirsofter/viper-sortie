@@ -1349,7 +1349,8 @@ function explode(p,big,noRec){
     puff(p.x,p.y,p.z,d.x,d.y,d.z,1,rand(.38,.7),.1,1,rand(8,20)*(big?1.6:1),30,rand(.4,1.0))}
   for(let i=0;i<n*.6;i++){const d=new V3(rand(-1,1),rand(-.5,1),rand(-1,1)).multiplyScalar(rand(10,50));const s=rand(.24,.4);
     puff(p.x,p.y,p.z,d.x,d.y+10,d.z,s*1.05,s,s*.95,.62,rand(14,24)*(big?1.5:1),45,rand(1.8,3.6))}
-  sndBoom(clamp(1-p.distanceTo(camera.position)/6000,0.05,1)*(big?1:.5));
+  const dist=p.distanceTo(camera.position), vol=clamp(1-dist/6000,0.05,1)*(big?1:.5), lag=Math.min(dist/340,12);   // you see it first, then hear it
+  if(lag<.15||state==='replay')sndBoom(vol); else setTimeout(()=>{if(state==='play')sndBoom(vol)},lag*1000);
 }
 
 /* ---------------- pools ---------------- */
@@ -1452,6 +1453,7 @@ function fly(j,dt,rollIn,pitchIn,yawIn,thr,brake){
   j.n+=(clamp(nCmd,nLo,nHi)-j.n)*Math.min(1,dt*7);   // FLCS g-onset
   j.n=clamp(j.n,nLo,nHi);
   const CL=j.n*MS*G/(qd*A.S+1);
+  j.alpha=clamp(26*CL/A.CLMAX,-20,45);   // degrees: linear lift curve reaching CLmax at ~26 deg (the F-16 FLCS limits alpha to about 25)
   const over=A.vne?Math.max(0,j.kcas-A.vne)/50:0;   // past the low-level airspeed limit drag climbs steeply
   const D=qd*A.S*(cd0(j.mach,A)*A.cdK*(1+over*over*4)+A.KIND*CL*CL*(CL>A.CLMAX?1+(CL-A.CLMAX)*1.5:1)+(brake?.06:0)+(j.xcd||0));
   const T=thrust(A,thr,at.sig,j.mach,j.pos.y)*(j.thrK??1); j.lastT=T;
@@ -3185,7 +3187,7 @@ function updateAI(e,dt){
   if(dT<sk(e).gunR&&off<.05&&(e.ac.gunRounds??1)>0){
     e.gunAcc+=dt*(e.ac.gunRate/4);
     while(e.gunAcc>=1){e.gunAcc--;
-      const t=dT/(e.ac.muzzle); _c.copy(tg.pos).addScaledVector(tg.vel,t*.8).sub(e.pos).normalize();
+      const t=gunTof(dT,e.ac.muzzle,atm(e.pos.y).sig); _c.copy(tg.pos).addScaledVector(tg.vel,t*.8).sub(e.pos).normalize();
       const sp=sk(e).spread;_c.x+=rand(-sp,sp);_c.y+=rand(-sp,sp);_c.z+=rand(-sp,sp);_c.normalize();
       const b=take(eBullets);b.on=true;b.life=1.6;b.m.visible=true;b.team=e.team;b.dmg=e.ac.gunDmg;
       b.m.position.copy(e.pos).addScaledVector(e.fwd,9);b.vel.copy(e.vel).addScaledVector(_c,e.ac.muzzle);
@@ -3486,7 +3488,7 @@ function updateWeapons(dt){
     if(ground.length)for(const g of ground)if(g.alive&&distSeg(_s1.copy(g.pos).setY(g.pos.y+2),b.prev,b.m.position)<9){kill(b);g.hp-=AC.gunDmg;puff(b.m.position.x,b.m.position.y,b.m.position.z,0,0,0,1,.8,.3,1,5,16,.25);if(g.hp<=0)killGround(g);break}
     if(!b.on)continue;
     b.life-=dt; if(b.life<=0){kill(b);continue}
-    b.prev.copy(b.m.position); b.vel.y-=G*dt; b.m.position.addScaledVector(b.vel,dt);
+    b.prev.copy(b.m.position); b.vel.y-=G*dt; b.vel.multiplyScalar(gunDrag(b.vel.length(),atm(b.m.position.y).sig,dt)); b.m.position.addScaledVector(b.vel,dt);
     for(const e of enemies){ if(!e.alive)continue;
       if(distSeg(e.pos,b.prev,b.m.position)<(e.kind==='fighter'?7:14)){kill(b);const p=b.m.position;puff(p.x,p.y,p.z,0,0,0,1,.8,.3,1,5,16,.25);
         hitAI(e,AC.gunDmg,'GUNS',true);break}}
@@ -3531,7 +3533,7 @@ function updateWeapons(dt){
   // AI rounds: red rounds hit you and your friends, blue (wingman) rounds hit bandits
   for(const b of eBullets){ if(!b.on)continue;
     b.life-=dt; if(b.life<=0){kill(b);continue}
-    b.prev.copy(b.m.position); b.vel.y-=G*dt; b.m.position.addScaledVector(b.vel,dt);
+    b.prev.copy(b.m.position); b.vel.y-=G*dt; b.vel.multiplyScalar(gunDrag(b.vel.length(),atm(b.m.position.y).sig,dt)); b.m.position.addScaledVector(b.vel,dt);
     if(b.team==='ghost')continue;
     if(b.team==='red'){
       if(state==='play'&&P.alive&&distSeg(P.pos,b.prev,b.m.position)<6){
@@ -4187,8 +4189,8 @@ function drawHUD(){
   if(fpm.ok){c.beginPath();c.arc(fpm.x,fpm.y,6,0,Math.PI*2);c.stroke();
     c.beginPath();c.moveTo(fpm.x-14,fpm.y);c.lineTo(fpm.x-6,fpm.y);c.moveTo(fpm.x+6,fpm.y);c.lineTo(fpm.x+14,fpm.y);c.moveTo(fpm.x,fpm.y-6);c.lineTo(fpm.x,fpm.y-12);c.stroke()}
   // LCOS gun pipper: where rounds will be at target range, corrected for own turn rate
-  const gunR=lockTarget&&lockDist<2500?lockDist:900, tof=gunR/AC.muzzle;
-  _e.copy(P.fwd).multiplyScalar(AC.muzzle*tof); _e.y-=.5*G*tof*tof;
+  const gunR=lockTarget&&lockDist<2500?lockDist:900, tof=gunTof(gunR,AC.muzzle,atm(P.pos.y).sig);
+  _e.copy(P.fwd).multiplyScalar(gunR); _e.y-=.5*G*tof*tof;
   const w=omega.length(); if(w>1e-4)_e.applyAxisAngle(_c.copy(omega).divideScalar(w),-w*tof);
   const pp=proj(_d.copy(P.pos).add(_e));
   if(pp.ok){c.beginPath();c.arc(pp.x,pp.y,15,0,Math.PI*2);c.stroke();c.fillStyle=HUD;c.fillRect(pp.x-1.5,pp.y-1.5,3,3);
@@ -4264,6 +4266,7 @@ function drawHUD(){
     c.strokeRect(L,midY-15,76,30);txt(c,'KCAS',L,midY-26,'left',HUDD,10);txt(c,String(Math.round(P.kcas)),L+70,midY+1,'right',corner?HUD:P.kcas<200?WARN:HUD,16,700);
     txt(c,'M '+P.mach.toFixed(2),L,midY+28,'left',HUD,12);
     txt(c,'THR '+thrTxt,L,midY+46,'left',throttle>.81?WARN:HUDD,11,700);
+    {const al=P.alpha||0;txt(c,'AOA '+al.toFixed(1),L+64,midY-44,'left',Math.abs(al)>24?THREAT:Math.abs(al)>18?WARN:HUDD,11,700)}
     txt(c,'RDR '+(RADAR.stt?(RADAR.acqT<.5?'ACQ':'STT'):ACMS[RADAR.acm]?'ACM':RADAR.mode)+' '+RANGES[RADAR.rng],L,midY+62,'left',RADAR.stt?HUD:HUDD,11,700);
     txt(c,'G',L,midY-62,'left',HUDD,10);txt(c,P.n.toFixed(1),L+18,midY-62,'left',gcol,18,700);
     txt(c,'MAX '+P.maxG.toFixed(1),L,midY-44,'left',HUDD,10);

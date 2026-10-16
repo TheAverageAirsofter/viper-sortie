@@ -131,7 +131,7 @@ function updateAI(e,dt){
   if(dT<sk(e).gunR&&off<.05&&(e.ac.gunRounds??1)>0){
     e.gunAcc+=dt*(e.ac.gunRate/4);
     while(e.gunAcc>=1){e.gunAcc--;
-      const t=dT/(e.ac.muzzle); _c.copy(tg.pos).addScaledVector(tg.vel,t*.8).sub(e.pos).normalize();
+      const t=gunTof(dT,e.ac.muzzle,atm(e.pos.y).sig); _c.copy(tg.pos).addScaledVector(tg.vel,t*.8).sub(e.pos).normalize();
       const sp=sk(e).spread;_c.x+=rand(-sp,sp);_c.y+=rand(-sp,sp);_c.z+=rand(-sp,sp);_c.normalize();
       const b=take(eBullets);b.on=true;b.life=1.6;b.m.visible=true;b.team=e.team;b.dmg=e.ac.gunDmg;
       b.m.position.copy(e.pos).addScaledVector(e.fwd,9);b.vel.copy(e.vel).addScaledVector(_c,e.ac.muzzle);

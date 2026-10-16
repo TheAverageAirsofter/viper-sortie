@@ -276,7 +276,7 @@ function updateWeapons(dt){
     if(ground.length)for(const g of ground)if(g.alive&&distSeg(_s1.copy(g.pos).setY(g.pos.y+2),b.prev,b.m.position)<9){kill(b);g.hp-=AC.gunDmg;puff(b.m.position.x,b.m.position.y,b.m.position.z,0,0,0,1,.8,.3,1,5,16,.25);if(g.hp<=0)killGround(g);break}
     if(!b.on)continue;
     b.life-=dt; if(b.life<=0){kill(b);continue}
-    b.prev.copy(b.m.position); b.vel.y-=G*dt; b.m.position.addScaledVector(b.vel,dt);
+    b.prev.copy(b.m.position); b.vel.y-=G*dt; b.vel.multiplyScalar(gunDrag(b.vel.length(),atm(b.m.position.y).sig,dt)); b.m.position.addScaledVector(b.vel,dt);
     for(const e of enemies){ if(!e.alive)continue;
       if(distSeg(e.pos,b.prev,b.m.position)<(e.kind==='fighter'?7:14)){kill(b);const p=b.m.position;puff(p.x,p.y,p.z,0,0,0,1,.8,.3,1,5,16,.25);
         hitAI(e,AC.gunDmg,'GUNS',true);break}}
@@ -321,7 +321,7 @@ function updateWeapons(dt){
   // AI rounds: red rounds hit you and your friends, blue (wingman) rounds hit bandits
   for(const b of eBullets){ if(!b.on)continue;
     b.life-=dt; if(b.life<=0){kill(b);continue}
-    b.prev.copy(b.m.position); b.vel.y-=G*dt; b.m.position.addScaledVector(b.vel,dt);
+    b.prev.copy(b.m.position); b.vel.y-=G*dt; b.vel.multiplyScalar(gunDrag(b.vel.length(),atm(b.m.position.y).sig,dt)); b.m.position.addScaledVector(b.vel,dt);
     if(b.team==='ghost')continue;
     if(b.team==='red'){
       if(state==='play'&&P.alive&&distSeg(P.pos,b.prev,b.m.position)<6){

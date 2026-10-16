@@ -35,4 +35,8 @@ function flyout(spec,alt,v0){
   }
   return {S,V};
 }
-if(typeof module!=='undefined')module.exports={atm,cd0,thrust,flyout,clamp,T_IDLE};
+// 20-30 mm cannon rounds: drag grows with speed squared, dv/dt = -GUN_CD*sig*v^2 (fit to PGU-28: ~1.4 s to 1,000 m from 1,030 m/s).
+const GUN_CD=7e-4;
+function gunTof(d,v0,sig){const c=GUN_CD*(sig||1);return (Math.exp(c*d)-1)/(c*v0)}      // time of flight to range d
+function gunDrag(v,sig,dt){return Math.max(0,1-GUN_CD*(sig||1)*v*dt)}                    // multiply the bullet's velocity by this each step
+if(typeof module!=='undefined')module.exports={atm,cd0,thrust,flyout,gunTof,gunDrag,clamp,T_IDLE};

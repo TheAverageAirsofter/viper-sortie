@@ -117,8 +117,8 @@ function drawHUD(){
   if(fpm.ok){c.beginPath();c.arc(fpm.x,fpm.y,6,0,Math.PI*2);c.stroke();
     c.beginPath();c.moveTo(fpm.x-14,fpm.y);c.lineTo(fpm.x-6,fpm.y);c.moveTo(fpm.x+6,fpm.y);c.lineTo(fpm.x+14,fpm.y);c.moveTo(fpm.x,fpm.y-6);c.lineTo(fpm.x,fpm.y-12);c.stroke()}
   // LCOS gun pipper: where rounds will be at target range, corrected for own turn rate
-  const gunR=lockTarget&&lockDist<2500?lockDist:900, tof=gunR/AC.muzzle;
-  _e.copy(P.fwd).multiplyScalar(AC.muzzle*tof); _e.y-=.5*G*tof*tof;
+  const gunR=lockTarget&&lockDist<2500?lockDist:900, tof=gunTof(gunR,AC.muzzle,atm(P.pos.y).sig);
+  _e.copy(P.fwd).multiplyScalar(gunR); _e.y-=.5*G*tof*tof;
   const w=omega.length(); if(w>1e-4)_e.applyAxisAngle(_c.copy(omega).divideScalar(w),-w*tof);
   const pp=proj(_d.copy(P.pos).add(_e));
   if(pp.ok){c.beginPath();c.arc(pp.x,pp.y,15,0,Math.PI*2);c.stroke();c.fillStyle=HUD;c.fillRect(pp.x-1.5,pp.y-1.5,3,3);
@@ -194,6 +194,7 @@ function drawHUD(){
     c.strokeRect(L,midY-15,76,30);txt(c,'KCAS',L,midY-26,'left',HUDD,10);txt(c,String(Math.round(P.kcas)),L+70,midY+1,'right',corner?HUD:P.kcas<200?WARN:HUD,16,700);
     txt(c,'M '+P.mach.toFixed(2),L,midY+28,'left',HUD,12);
     txt(c,'THR '+thrTxt,L,midY+46,'left',throttle>.81?WARN:HUDD,11,700);
+    {const al=P.alpha||0;txt(c,'AOA '+al.toFixed(1),L+64,midY-44,'left',Math.abs(al)>24?THREAT:Math.abs(al)>18?WARN:HUDD,11,700)}
     txt(c,'RDR '+(RADAR.stt?(RADAR.acqT<.5?'ACQ':'STT'):ACMS[RADAR.acm]?'ACM':RADAR.mode)+' '+RANGES[RADAR.rng],L,midY+62,'left',RADAR.stt?HUD:HUDD,11,700);
     txt(c,'G',L,midY-62,'left',HUDD,10);txt(c,P.n.toFixed(1),L+18,midY-62,'left',gcol,18,700);
     txt(c,'MAX '+P.maxG.toFixed(1),L,midY-44,'left',HUDD,10);

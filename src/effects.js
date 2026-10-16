@@ -69,7 +69,8 @@ function explode(p,big,noRec){
     puff(p.x,p.y,p.z,d.x,d.y,d.z,1,rand(.38,.7),.1,1,rand(8,20)*(big?1.6:1),30,rand(.4,1.0))}
   for(let i=0;i<n*.6;i++){const d=new V3(rand(-1,1),rand(-.5,1),rand(-1,1)).multiplyScalar(rand(10,50));const s=rand(.24,.4);
     puff(p.x,p.y,p.z,d.x,d.y+10,d.z,s*1.05,s,s*.95,.62,rand(14,24)*(big?1.5:1),45,rand(1.8,3.6))}
-  sndBoom(clamp(1-p.distanceTo(camera.position)/6000,0.05,1)*(big?1:.5));
+  const dist=p.distanceTo(camera.position), vol=clamp(1-dist/6000,0.05,1)*(big?1:.5), lag=Math.min(dist/340,12);   // you see it first, then hear it
+  if(lag<.15||state==='replay')sndBoom(vol); else setTimeout(()=>{if(state==='play')sndBoom(vol)},lag*1000);
 }
 
 /* ---------------- pools ---------------- */
