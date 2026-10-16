@@ -14,6 +14,10 @@ const path = require('path'), assert = require('assert');
     for (let i = 0; i < 4000; i++) { V.updateWar(.1); shells = Math.max(shells, V.WAR.sh.filter(s => s.on).length); }
     return { shells, lost: lost0 - (V.warAlive('red') + V.warAlive('blue')) }; });
   assert(r.shells > 0, 'shells are fired'); assert(r.lost > 0, 'vehicles are destroyed by other vehicles ' + JSON.stringify(r));
+  // the Gepard covers the blue force: a bandit parked over it takes fire
+  const aa = await p.evaluate(() => { const V = __vs, g = V.WAR.units.find(u => u.def.n === 'Gepard 1A2' && u.alive), e = V.enemies.find(x => x.alive && x.kind === 'fighter'); if (!g || !e) return { skip: true };
+    const hp0 = e.hp; for (let i = 0; i < 300 && e.alive && e.hp >= hp0; i++) { e.pos.set(g.pos.x + 600, g.pos.y + 900, g.pos.z); V.updateWar(.1); } return { hit: !e.alive || e.hp < hp0 }; });
+  assert(aa.skip || aa.hit, 'the Gepard shoots at a bandit overhead ' + JSON.stringify(aa));
   // killing every red vehicle (as bombs would) wins the mission
   await p.evaluate(() => { __vs.WAR.units.filter(u => u.team === 'red').forEach(u => { u.alive = false; }); });
   await p.waitForTimeout(1500);

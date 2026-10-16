@@ -3825,7 +3825,7 @@ function setupMission(){
   if(mission==='WAVES'){message('WAVES · CLEAR EACH GROUP OF BANDITS',2.4);return}
   if(mission==='CAMPAIGN'){setupCampaign();return}
   if(mission==='CONVOY'){P.pos.set(0,6000,0);P.vel.set(0,0,240);setupConvoy(rand(-4000,4000),34000);spawnPair(pickBanditType(),new V3(0,7000,52000),new V3(0,5000,0));message('CONVOY · STOP AT LEAST 4 OF THE 5 TRUCKS BEFORE THEY GET THROUGH',3);return}
-  if(mission==='GROUNDWAR'){setupGroundWar();spawnPair(pickBanditType(),new V3(sortie.center.x,7000,sortie.center.z+16000),new V3(0,5000,0));message('GROUND WAR · SUPPORT THE BLUE ARMOUR · DESTROY THE '+sortie.need+' RED VEHICLES · ZSU-23-4 AND ZSU-57-2 WILL SHOOT AT YOU',3.6);return}
+  if(mission==='GROUNDWAR'){setupGroundWar();spawnPair(pickBanditType(),new V3(sortie.center.x,7000,sortie.center.z+16000),new V3(0,5000,0));message('GROUND WAR · SUPPORT THE BLUE ARMOUR (GEPARD COVERS IT) · DESTROY THE '+sortie.need+' RED VEHICLES · ZSU-23-4 AND ZSU-57-2 WILL SHOOT AT YOU',3.6);return}
   if(mission==='ANTISHIP'){P.pos.set(0,6000,0);P.vel.set(0,0,240);setupShip();spawnPair(pickBanditType(),new V3(19600,7000,36000),new V3(0,5000,0));message('ANTI-SHIP · SINK THE FRIGATE NE OF THE BASE · IT HAS SAMS',3);return}
   if(mission==='CRUISE'){P.pos.set(0,5000,6000);P.vel.set(0,0,240);setupCruise();message('CRUISE MISSILES INBOUND FROM THE NORTH · LOW AND FAST · PROTECT THE BASE',3.2);return}
   if(mission==='STRIKE'){
@@ -5124,6 +5124,8 @@ const WAR_V={
   M60A3:{n:'M60A3 TTS',team:'blue',cls:'mbt',br:9.0,hp:7,spd:12,gun:[2800,6.5,1490,2.5,.0016],look:'round',barrel:5.6,col:0x5f6a49,hull:[3.4,1,6.9]},
   M3:{n:'M3 Bradley',team:'blue',cls:'ifv',br:8.3,hp:5,spd:17,gun:[2200,.3,1100,.35,.004],aa:[1500,3,.6],look:'ifv',barrel:2.4,col:0x58623f,hull:[3.0,1.3,6.4]},
   MARDER:{n:'Marder 1A3',team:'blue',cls:'ifv',br:8.0,hp:5,spd:18,gun:[2000,.3,1050,.3,.004],aa:[1500,3,.5],look:'ifv',barrel:2.0,col:0x5b6244,hull:[3.1,1.2,6.7]},
+  GEPARD:{n:'Gepard 1A2',team:'blue',cls:'spaa',br:9.7,hp:5,spd:14,gun:[2500,.15,1175,.4,.006],aa:[4500,10,1.2],look:'gepard',barrel:3.2,col:0x55613f,hull:[3.4,1,7.2]},
+  M163:{n:'M163 Vulcan',team:'blue',cls:'spaa',br:7.3,hp:3,spd:17,gun:[1800,.1,1030,.2,.008],aa:[2200,12,.7],look:'m163',barrel:1.6,col:0x5b6244,hull:[2.7,1.3,4.9]},
   T80B:{n:'T-80B',team:'red',cls:'mbt',br:10.7,hp:8,spd:15,gun:[3000,7,1780,3,.0013],look:'round',barrel:6.0,col:0x6a5f45,hull:[3.4,.9,6.9]},
   T72A:{n:'T-72A',team:'red',cls:'mbt',br:9.3,hp:8,spd:13,gun:[2900,7,1780,3,.0014],look:'round',barrel:6.0,col:0x655b42,hull:[3.4,.9,6.9]},
   T62:{n:'T-62',team:'red',cls:'mbt',br:8.7,hp:7,spd:12,gun:[2600,8,1600,2.5,.0016],look:'round',barrel:5.6,col:0x6a6046,hull:[3.3,.9,6.6]},
@@ -5146,6 +5148,8 @@ function warBuild(d){
   if(d.look==='box'){add(new THREE.BoxGeometry(3.1,.95,3.9),body,0,.5,-.2,tur);add(new THREE.BoxGeometry(2.5,.5,3.2),body,0,1.1,-.5,tur);add(new THREE.BoxGeometry(2.6,.7,1.2),body,0,.6,-2.1,tur);bar(.13,d.barrel,0,.55,1.7);top=1.4}
   else if(d.look==='round'){add(new THREE.CylinderGeometry(1.25,1.45,.8,14),body,0,.4,0,tur);add(new THREE.CylinderGeometry(.5,.5,.35,10),body,.6,.95,0,tur);bar(.12,d.barrel,0,.45,1.3);add(new THREE.CylinderGeometry(.16,.16,1.1,8).rotateX(Math.PI/2),dk,0,.45,3.4,tur);top=1.15}
   else if(d.look==='ifv'){add(new THREE.BoxGeometry(1.9,.75,2.1),body,0,.4,-.2,tur);bar(.06,d.barrel,.25,.5,1.0);if(d.n.indexOf('Bradley')>=0)add(new THREE.BoxGeometry(.7,.5,1.2),dk,-1.1,.7,-.2,tur);top=.8}
+  else if(d.look==='gepard'){add(new THREE.BoxGeometry(3.1,1.3,3.2),body,0,.65,-.2,tur);for(const x of [-1.25,1.25])bar(.07,d.barrel,x,.6,1.6);add(new THREE.CylinderGeometry(.85,.85,.16,14).rotateX(Math.PI/2),dk,0,1.7,-1.2,tur);add(new THREE.CylinderGeometry(.4,.4,.14,10).rotateX(Math.PI/2),dk,0,1.5,1.3,tur);top=1.35}
+  else if(d.look==='m163'){add(new THREE.CylinderGeometry(1.0,1.1,.7,12),body,0,.35,0,tur);for(let i=0;i<6;i++){const a=i*Math.PI/3;bar(.03,d.barrel,Math.cos(a)*.17,.55+Math.sin(a)*.17,.6)}top=.75}
   else if(d.look==='zsu23'){add(new THREE.BoxGeometry(2.9,1.2,2.9),body,0,.6,-.2,tur);for(const x of [-.55,-.18,.18,.55])for(const y of [.55,.95])if(Math.abs(x)>.3||y<.8)bar(.05,d.barrel,x,y,1.2);add(new THREE.CylinderGeometry(.8,.8,.18,12).rotateX(Math.PI/2),dk,0,1.5,-1.2,tur);top=1.3}
   else{add(new THREE.BoxGeometry(2.9,.8,3.2),body,0,.4,-.2,tur);for(const x of [-.45,.45])bar(.1,d.barrel,x,.55,1.4);top=.8}
   add(new THREE.PlaneGeometry(2.2,2.2).rotateX(-Math.PI/2),new THREE.MeshBasicMaterial({color:d.team==='blue'?0x2b8cff:0xff3b30,side:THREE.DoubleSide}),0,top+.05,-.2,tur);   // roof panel: readable from the air
@@ -5193,6 +5197,10 @@ function updateWar(dt){
     const tur=u.obj.userData.tur;let aimed=false;
     if(t&&tur){const want=Math.atan2(t.pos.x-u.pos.x,t.pos.z-u.pos.z)-u.heading,cur=tur.rotation.y,dd=warAng(want-cur);tur.rotation.y=cur+clamp(dd,-dt*1.2,dt*1.2);aimed=Math.abs(dd)<.06}
     if(t&&aimed&&u.cd<=0&&dist<d.gun[0]&&losClear(new V3(u.pos.x,u.pos.y+2.4,u.pos.z),new V3(t.pos.x,t.pos.y+1.4,t.pos.z))){u.cd=d.gun[1]*(.9+Math.random()*.25);warFire(u,t)}
+    // blue anti-aircraft (Gepard, Vulcan, IFV cannons): bursts at the nearest red fighter, with a hit chance that falls off with range
+    if(u.team==='blue'&&d.aa){u.aaT=(u.aaT||0)-dt;if(u.aaT<=0){u.aaT=.35+Math.random()*.2;let bt=null,bdd=d.aa[0];for(const e of enemies){if(!e.alive||e.kind!=='fighter'||e.pos.y-u.pos.y<25)continue;const dd=e.pos.distanceTo(u.pos);if(dd<bdd){bdd=dd;bt=e}}
+      if(bt){const ux=(bt.pos.x-u.pos.x)/bdd,uy=(bt.pos.y-u.pos.y)/bdd,uz=(bt.pos.z-u.pos.z)/bdd;for(let k=0;k<3;k++)puff(u.pos.x+ux*8*(k+1),u.pos.y+3+uy*8*(k+1),u.pos.z+uz*8*(k+1),ux*900,uy*900,uz*900,1,.8,.35,1,2.4,0,.55);
+        if(Math.random()<clamp(1-bdd/d.aa[0],.05,1)*.45*(d.cls==='spaa'?1:.35))hitAI(bt,d.aa[2],d.n,false)}}}
     // red anti-aircraft: shoot at you inside range, like the AAA guns
     if(u.team==='red'&&d.aa&&P.alive&&!P.scramble){const pd=u.pos.distanceTo(P.pos),agl=P.pos.y-Math.max(groundH(P.pos.x,P.pos.z),0);
       if(pd<d.aa[0]&&P.pos.y-u.pos.y<2600&&agl>15){u.airAcc+=dt*d.aa[1];while(u.airAcc>=1){u.airAcc--;const tt=pd/970;_c.copy(P.pos).addScaledVector(P.vel,tt).sub(u.pos).normalize();const sp=d.cls==='spaa'?.018:.04;_c.x+=rand(-sp,sp);_c.y+=rand(-sp,sp);_c.z+=rand(-sp,sp);_c.normalize();
@@ -5213,8 +5221,8 @@ function updateWar(dt){
 function setupGroundWar(){
   warClear();WAR.on=true;WAR.t=0;
   const [cx,cz]=findLand(rand(-3000,3000),31000),gap=1900;
-  const blue=['M1A1','M1A1','LEO2A4','LEO2A4','CHAL','M60A3','M3','MARDER'],red=['T80B','T80B','T80B','T72A','T72A','T62','BMP2','BMP2','ZSU23','ZSU57'];
-  blue.forEach((id,i)=>{const k=i%4,r=i>>2;warSpawn(id,cx+(k-1.5)*140+rand(-20,20),cz-gap-r*110,0)});
+  const blue=['M1A1','M1A1','LEO2A4','LEO2A4','CHAL','M60A3','M3','MARDER','GEPARD','M163'],red=['T80B','T80B','T80B','T72A','T72A','T62','BMP2','BMP2','ZSU23','ZSU57'];
+  blue.forEach((id,i)=>{const k=i%5,r=i>>2;warSpawn(id,cx+(k-2)*140+rand(-20,20),cz-gap-r*110,0)});
   red.forEach((id,i)=>{const k=i%5,r=i>>2;warSpawn(id,cx+(k-2)*140+rand(-20,20),cz+gap+r*110,Math.PI)});
   sortie={kind:'GROUNDWAR',center:new V3(cx,0,cz),need:red.length};
   P.pos.set(0,5500,0);P.vel.set(0,0,240)}
@@ -6197,7 +6205,7 @@ const _careerAward=careerAward;
 careerAward=function(){lbAdd();return _careerAward.apply(this,arguments)};
 
 /* ---------- test hook (only with ?test in the URL) ---------- */
-if(/[?&]test\b/.test(location.search))window.__vs={setThr,HEAT,explode,puff,camera,LT,townLights,flashLt,P,fly,dlz,flyout,AC_DEFS,feed,WAR,WAR_V,warBuild,updateWar,warAlive,buildJet,PLAYER_COLORS,M2,V3,atm,clamp,lbAdd,showOverlay:k=>showOverlay(k),setScore:(n,k)=>{score=n;kills=k},get state(){return state},missiles:()=>missiles.filter(m=>m.on),setAC:id=>{AC=AC_DEFS[id];applyAC()},wt:{   // weapon-test hooks: a clean sky, one drone, scripted launches
+if(/[?&]test\b/.test(location.search))window.__vs={setThr,HEAT,explode,puff,camera,LT,townLights,flashLt,P,fly,dlz,flyout,AC_DEFS,feed,WAR,WAR_V,warBuild,updateWar,warAlive,buildJet,PLAYER_COLORS,M2,V3,atm,clamp,lbAdd,showOverlay:k=>showOverlay(k),setScore:(n,k)=>{score=n;kills=k},get state(){return state},get enemies(){return enemies},missiles:()=>missiles.filter(m=>m.on),setAC:id=>{AC=AC_DEFS[id];applyAC()},wt:{   // weapon-test hooks: a clean sky, one drone, scripted launches
   begin:id=>{AC=AC_DEFS[id];applyAC();startGame();return AC.id},
   clear:()=>{waveClearT=1e9;for(const e of enemies){e.alive=false;scene.remove(e.obj)}enemies.length=0;P.pos.set(0,6000,0);P.vel.set(0,0,250);throttle=.7;return state},
   target:(type,dz,away,speed)=>{const e=spawnFighter('red',type,new V3(0,6000,dz),new V3(0,6000,dz+(away?9999:-9999)),{ir:0,rdr:0,speed:speed||220});e.drone=true;return e.id},
@@ -6500,7 +6508,7 @@ const MIS_BRIEF={WAVES:'Bandit groups arrive in waves from every bearing. Each w
   ESCORT:'A C-130 is crossing the sector. Keep it alive until it clears the far side; bandits will go for it first.',
   '2V4':'You and your wingman against four bandits. Call targets, split them and keep your wingman in the fight.',
   '4SHIP':'Lead a four-ship against six bandits behind a SAM belt. Command the flight and manage the threats.',
-  GROUNDWAR:'M1A1 Abrams, Leopard 2A4, Challenger and M60A3 tanks with Bradley and Marder IFVs hold the south. T-80B, T-72A and T-62 tanks, BMP-2s and two ZSU anti-aircraft tracks come from the north. The tanks fight on their own: kill the red armour with bombs, rockets and guns before it grinds the blue force down, and keep away from the ZSUs.',
+  GROUNDWAR:'M1A1 Abrams, Leopard 2A4, Challenger and M60A3 tanks with Bradley and Marder IFVs, a Gepard and an M163 Vulcan hold the south (the Gepard shoots at bandits). T-80B, T-72A and T-62 tanks, BMP-2s and two ZSU anti-aircraft tracks come from the north. The tanks fight on their own: kill the red armour with bombs, rockets and guns before it grinds the blue force down, and keep away from the ZSUs.',
   CONVOY:'Trucks are running for the border. Stop at least four of the five before they escape.',
   ANTISHIP:'A frigate sits north-east of the base with SAM cover. Find it, sink it and avoid the missile envelope.',
   CRUISE:'Cruise missiles are inbound on the base. They are fast and low. Shoot down as many as you can.'};

@@ -116,7 +116,7 @@ function setupMission(){
   if(mission==='WAVES'){message('WAVES · CLEAR EACH GROUP OF BANDITS',2.4);return}
   if(mission==='CAMPAIGN'){setupCampaign();return}
   if(mission==='CONVOY'){P.pos.set(0,6000,0);P.vel.set(0,0,240);setupConvoy(rand(-4000,4000),34000);spawnPair(pickBanditType(),new V3(0,7000,52000),new V3(0,5000,0));message('CONVOY · STOP AT LEAST 4 OF THE 5 TRUCKS BEFORE THEY GET THROUGH',3);return}
-  if(mission==='GROUNDWAR'){setupGroundWar();spawnPair(pickBanditType(),new V3(sortie.center.x,7000,sortie.center.z+16000),new V3(0,5000,0));message('GROUND WAR · SUPPORT THE BLUE ARMOUR · DESTROY THE '+sortie.need+' RED VEHICLES · ZSU-23-4 AND ZSU-57-2 WILL SHOOT AT YOU',3.6);return}
+  if(mission==='GROUNDWAR'){setupGroundWar();spawnPair(pickBanditType(),new V3(sortie.center.x,7000,sortie.center.z+16000),new V3(0,5000,0));message('GROUND WAR · SUPPORT THE BLUE ARMOUR (GEPARD COVERS IT) · DESTROY THE '+sortie.need+' RED VEHICLES · ZSU-23-4 AND ZSU-57-2 WILL SHOOT AT YOU',3.6);return}
   if(mission==='ANTISHIP'){P.pos.set(0,6000,0);P.vel.set(0,0,240);setupShip();spawnPair(pickBanditType(),new V3(19600,7000,36000),new V3(0,5000,0));message('ANTI-SHIP · SINK THE FRIGATE NE OF THE BASE · IT HAS SAMS',3);return}
   if(mission==='CRUISE'){P.pos.set(0,5000,6000);P.vel.set(0,0,240);setupCruise();message('CRUISE MISSILES INBOUND FROM THE NORTH · LOW AND FAST · PROTECT THE BASE',3.2);return}
   if(mission==='STRIKE'){

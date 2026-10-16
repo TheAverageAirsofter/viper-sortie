@@ -41,7 +41,7 @@ const MIS_BRIEF={WAVES:'Bandit groups arrive in waves from every bearing. Each w
   ESCORT:'A C-130 is crossing the sector. Keep it alive until it clears the far side; bandits will go for it first.',
   '2V4':'You and your wingman against four bandits. Call targets, split them and keep your wingman in the fight.',
   '4SHIP':'Lead a four-ship against six bandits behind a SAM belt. Command the flight and manage the threats.',
-  GROUNDWAR:'M1A1 Abrams, Leopard 2A4, Challenger and M60A3 tanks with Bradley and Marder IFVs hold the south. T-80B, T-72A and T-62 tanks, BMP-2s and two ZSU anti-aircraft tracks come from the north. The tanks fight on their own: kill the red armour with bombs, rockets and guns before it grinds the blue force down, and keep away from the ZSUs.',
+  GROUNDWAR:'M1A1 Abrams, Leopard 2A4, Challenger and M60A3 tanks with Bradley and Marder IFVs, a Gepard and an M163 Vulcan hold the south (the Gepard shoots at bandits). T-80B, T-72A and T-62 tanks, BMP-2s and two ZSU anti-aircraft tracks come from the north. The tanks fight on their own: kill the red armour with bombs, rockets and guns before it grinds the blue force down, and keep away from the ZSUs.',
   CONVOY:'Trucks are running for the border. Stop at least four of the five before they escape.',
   ANTISHIP:'A frigate sits north-east of the base with SAM cover. Find it, sink it and avoid the missile envelope.',
   CRUISE:'Cruise missiles are inbound on the base. They are fast and low. Shoot down as many as you can.'};
