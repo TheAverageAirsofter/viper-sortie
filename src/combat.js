@@ -325,7 +325,7 @@ function updateWeapons(dt){
     if(b.team==='ghost')continue;
     if(b.team==='red'){
       if(state==='play'&&P.alive&&distSeg(P.pos,b.prev,b.m.position)<6){
-        kill(b);P.hp-=4*(b.dmg||1);if(Math.random()<.5)addHole(playerJet,1);hurtT=.35;shake=.4;sndHit();buzz(40);
+        kill(b);P.hp-=4*(b.dmg||1);if(clock-(P.fdT||-9)>1.5){P.fdT=clock;feed('You were hit by gunfire','loss')}if(Math.random()<.5)addHole(playerJet,1);hurtT=.35;shake=.4;sndHit();buzz(40);
         puff(P.pos.x,P.pos.y+1,P.pos.z,0,0,0,1,.7,.3,1,4,12,.2);
         if(Math.random()<.12*(b.dmg||1))damageSystem(1);
         if(P.hp<=0)die('shot');continue}
@@ -549,7 +549,7 @@ function updateEnemyMissiles(dt){
     let done=false;
     const fz=s.fuze;
     if(m.team==='red'&&state==='play'&&P.alive&&distSeg(P.pos,m.prev,p)<fz){
-      done=true;recMsl(m,'HIT','');explode(p,false);P.hp-=75;addHole(playerJet,5);hurtT=.8;shake=1.2;sndHit();buzz([120,60,200]);message('MISSILE HIT',1.2);damageSystem(2);if(P.hp<=0)die('missile');
+      done=true;recMsl(m,'HIT','');explode(p,false);P.hp-=75;addHole(playerJet,5);hurtT=.8;shake=1.2;sndHit();buzz([120,60,200]);message('MISSILE HIT',1.2);feed('Critical hit: you were struck by a missile','loss');damageSystem(2);if(P.hp<=0)die('missile');
     } else if(CM.decoy&&m.target===CM.decoy&&distSeg(CM.decoy.pos,m.prev,p)<fz){done=true;recMsl(m,'MISS','HIT YOUR TOWED DECOY');explode(p,false);cutDecoy();syncCM();message('DECOY HIT · DECOY LOST',1.4)}
     else if(m.target&&m.target.kind&&m.target!==P&&distSeg(m.target.pos,m.prev,p)<fz*(m.target.kind==='fighter'?1:1.8)){done=true;recMsl(m,'HIT','');explode(p,false);hitAI(m.target,5,m.name,false)}
     else if(m.target&&m.target.type&&!m.target.kind&&distSeg(m.target.pos,m.prev,p)<fz){done=true;explode(p,false);recMsl(m,'MISS',m.reason||'DECOYED')}

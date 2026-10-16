@@ -158,7 +158,8 @@ function drawHUD(){
     if(on){const s=e.kind==='fighter'?9:13;
       if(blue){c.beginPath();c.moveTo(p.x-s,p.y+s*.6);c.lineTo(p.x,p.y-s*.6);c.lineTo(p.x+s,p.y+s*.6);c.stroke();txt(c,e.kind==='transport'?'C-130':'TWO',p.x,p.y+20,'center',col,10,700)}
       else{c.beginPath();c.moveTo(p.x,p.y-s);c.lineTo(p.x+s,p.y);c.lineTo(p.x,p.y+s);c.lineTo(p.x-s,p.y);c.closePath();c.stroke();
-        if(MK>=2||d<9000)txt(c,(e.kind==='bomber'?'BMR ':'')+nm(d),p.x,p.y+20,'center',col,11);   // Realistic: range only when close
+        if(MK>=2||d<9000)txt(c,(e.kind==='bomber'?'BMR ':'')+nm(d),p.x,p.y+20,'center',col,11);
+        if(MK>=2&&!e.remote&&e.kind==='fighter'&&BANDITS[e.type])txt(c,BANDITS[e.type],p.x,p.y-18,'center',col,10,700);   // vehicle tag, like the War Thunder markers   // Realistic: range only when close
         if(e.remote&&MK>=2)txt(c,(e.name||'PILOT').toUpperCase().slice(0,14)+' · '+(AC_DEFS[e.type]?AC_DEFS[e.type].name:''),p.x,p.y-18,'center',col,10,700)}}
     else{_d.copy(e.pos).applyMatrix4(camera.matrixWorldInverse);
       let dx=_d.x,dy=-_d.y; if(Math.abs(dx)+Math.abs(dy)<1e-3)dy=1;
@@ -308,6 +309,9 @@ function drawHUD(){
      txt(c,cue+' · '+(nd/1000).toFixed(1)+' KM',W/2,H*.76,'center',col,13,700)}}
   drawAGHud(c); drawCarrierHud(c); drawRadioLines(c); drawTGPHud(c);
   if(P.kcas<160&&!P.onGround&&!(P.gear&&P.pos.y-BASE_Y<300)&&(clock*3%1)<.6)txt(c,'LOW SPEED',W/2,H*.68,'center',WARN,13,700);
+  {let n=0;const fx=INS.l+14,fy=H*.68;c.save();c.textAlign='left';c.shadowColor='rgba(0,0,0,.85)';c.shadowBlur=4;
+    for(const f of FEED){const age=clock-f.t;if(age>FEED_LIFE)continue;c.globalAlpha=Math.min(1,(FEED_LIFE-age)*1.2);
+      txt(c,f.text,fx,fy+n*17*TXTK,'left',f.kind==='kill'?'#ffd166':f.kind==='hit'?HUD:f.kind==='loss'?THREAT:'#b8c4cf',W<500?11:13,f.kind==='kill'?700:500);n++}c.restore()}
   if(msgT>0){c.save();c.globalAlpha=Math.min(1,msgT*2);txt(c,msgText,W/2,pit?H*.58:H*.3,'center',HUD,W<500?16:20,700);c.restore()}
   // grey-out / black-out / red-out
   const gs=P.gloc>0?1:clamp((P.gStress-.35)/.65,0,1);

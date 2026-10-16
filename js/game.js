@@ -3225,6 +3225,9 @@ const VIEWS=['CHASE','COCKPIT','PADLOCK','FLYBY']; let view=0; const flyCam=new 
 const keys={};
 const REDUCED=!!(window.matchMedia&&matchMedia('(prefers-reduced-motion:reduce)').matches);
 const srLive=document.getElementById('srLive');
+// kill feed (War Thunder style): short lines in the top-right corner that fade after a few seconds; kind picks the colour
+const FEED=[], FEED_LIFE=7;
+function feed(text,kind){FEED.push({t:clock,text,kind:kind||(/^You (killed|destroyed)/.test(text)?'kill':/^(Wingman|Your wingman|The C-130)/.test(text)?'loss':'info')});while(FEED.length>6)FEED.shift()}
 function message(t,dur){msgText=t;msgT=dur||1.6;if(srLive&&srLive.textContent!==t)srLive.textContent=t}   // mirrored to a screen-reader live region
 
 function rearm(){
@@ -3292,7 +3295,7 @@ Object.assign(BANDITS,{F4E:'F-4E Phantom II',FA18C:'F/A-18C',F15E:'F-15E',F35A:'
   J35F:'J 35F Draken',JA37:'JA 37 Viggen',LIGHTNING:'Lightning F.6',PHANTOM2:'Phantom FGR.2',TORNADO3:'Tornado F.3',J7G:'J-7G',F5E:'F-5E',F14B:'F-14B',MIG23ML:'MiG-23ML',MIG25PD:'MiG-25PD',J8F:'J-8F',MIRAGEF1:'Mirage F1C',M2000:'Mirage 2000-5F',J11B:'J-11B',J15:'J-15',J16:'J-16'});
 {const m=BANDITS.MIXED;delete BANDITS.MIXED;BANDITS.MIXED=m}
 // matchmaking: bandits are only ever fighters within MM_BR of the battle rating of the jet you fly (Career and Free play alike)
-const MM_BR=.7;
+const MM_BR=1;
 const banditPool=()=>{const b=progBR(AC.id),p=FIGHTERS.filter(f=>Math.abs(progBR(f)-b)<=MM_BR+1e-6);return p.length?p:[AC.id]};
 function pickBanditType(){const pool=banditPool();if(banditType!=='MIXED'&&pool.indexOf(banditType)>=0)return banditType;   // a fixed choice only counts while it is inside the window
   return pool[Math.random()*pool.length|0]}
@@ -3466,7 +3469,7 @@ function nextWave(){
 function hitAI(t,amt,how,byPlayer){
   if(!t.alive)return;
   if(t.remote){if(byPlayer)netClaimHit(t,how==='GUNS'?4*amt:75,how);puff(t.pos.x,t.pos.y,t.pos.z,0,0,0,.3,.3,.3,.8,14,20,2);return} t.hp-=amt;
-  if(t.hp>0){addHole(t.obj,amt>3?4:1);puff(t.pos.x,t.pos.y,t.pos.z,0,0,0,.3,.3,.3,.8,14,20,2);if(t.kind==='fighter'){t.gLim=Math.max(4,(t.gLim||7)*.8);t.rollK=(t.rollK??1)*.85}if(byPlayer&&t.kind==='bomber')message('BOMBER HIT',.8);return}
+  if(t.hp>0){addHole(t.obj,amt>3?4:1);puff(t.pos.x,t.pos.y,t.pos.z,0,0,0,.3,.3,.3,.8,14,20,2);if(t.kind==='fighter'){t.gLim=Math.max(4,(t.gLim||7)*.8);t.rollK=(t.rollK??1)*.85}if(byPlayer&&t.kind==='bomber')message('BOMBER HIT',.8);if(byPlayer&&clock-(t.fdT||-9)>1.5){t.fdT=clock;feed((t.hp<=1?'Critical hit: ':'Hit: ')+(AC_DEFS[t.type]?AC_DEFS[t.type].name:t.kind==='bomber'?'bomber':'target')+' ('+how.replace(' (WINGMAN)','').toLowerCase()+')','hit')}return}
   if(t.team==='red')killEnemy(t,how,byPlayer); else killFriend(t,how);
 }
 function killEnemy(e,how,byPlayer=true){
@@ -4369,7 +4372,7 @@ function updateWeapons(dt){
     if(b.team==='ghost')continue;
     if(b.team==='red'){
       if(state==='play'&&P.alive&&distSeg(P.pos,b.prev,b.m.position)<6){
-        kill(b);P.hp-=4*(b.dmg||1);if(Math.random()<.5)addHole(playerJet,1);hurtT=.35;shake=.4;sndHit();buzz(40);
+        kill(b);P.hp-=4*(b.dmg||1);if(clock-(P.fdT||-9)>1.5){P.fdT=clock;feed('You were hit by gunfire','loss')}if(Math.random()<.5)addHole(playerJet,1);hurtT=.35;shake=.4;sndHit();buzz(40);
         puff(P.pos.x,P.pos.y+1,P.pos.z,0,0,0,1,.7,.3,1,4,12,.2);
         if(Math.random()<.12*(b.dmg||1))damageSystem(1);
         if(P.hp<=0)die('shot');continue}
@@ -4593,7 +4596,7 @@ function updateEnemyMissiles(dt){
     let done=false;
     const fz=s.fuze;
     if(m.team==='red'&&state==='play'&&P.alive&&distSeg(P.pos,m.prev,p)<fz){
-      done=true;recMsl(m,'HIT','');explode(p,false);P.hp-=75;addHole(playerJet,5);hurtT=.8;shake=1.2;sndHit();buzz([120,60,200]);message('MISSILE HIT',1.2);damageSystem(2);if(P.hp<=0)die('missile');
+      done=true;recMsl(m,'HIT','');explode(p,false);P.hp-=75;addHole(playerJet,5);hurtT=.8;shake=1.2;sndHit();buzz([120,60,200]);message('MISSILE HIT',1.2);feed('Critical hit: you were struck by a missile','loss');damageSystem(2);if(P.hp<=0)die('missile');
     } else if(CM.decoy&&m.target===CM.decoy&&distSeg(CM.decoy.pos,m.prev,p)<fz){done=true;recMsl(m,'MISS','HIT YOUR TOWED DECOY');explode(p,false);cutDecoy();syncCM();message('DECOY HIT · DECOY LOST',1.4)}
     else if(m.target&&m.target.kind&&m.target!==P&&distSeg(m.target.pos,m.prev,p)<fz*(m.target.kind==='fighter'?1:1.8)){done=true;recMsl(m,'HIT','');explode(p,false);hitAI(m.target,5,m.name,false)}
     else if(m.target&&m.target.type&&!m.target.kind&&distSeg(m.target.pos,m.prev,p)<fz){done=true;explode(p,false);recMsl(m,'MISS',m.reason||'DECOYED')}
@@ -4630,6 +4633,8 @@ const NODES={
   J7G:{n:'CHN',r:1,br:11.3},J10C:{n:'CHN',r:5,br:14.3,req:'J7G'},J11B:{n:'CHN',r:5,br:13.7,req:'J7G'},J15:{n:'CHN',r:4,br:14.7,req:'J11B'},J16:{n:'CHN',r:5,br:14.7,req:'J11B'},J20:{n:'CHN',r:5,br:14.0,req:'J10C'},
   MIRAGEF1:{n:'FRA',r:1,br:12.0},M2000:{n:'FRA',r:3,br:14.0,req:'MIRAGEF1'},RAFALE:{n:'FRA',r:5,br:14.7,req:'M2000'},
   F5E:{n:'USA',r:2,br:11.0,req:'F4E'},F14B:{n:'USA',r:3,br:13.0,req:'F4E'},MIG23ML:{n:'RUS',r:2,br:11.7,req:'MIG21'},MIG25PD:{n:'RUS',r:3,br:11.0,req:'MIG23ML'},J8F:{n:'CHN',r:2,br:13.0,req:'J7G'}};
+// War Thunder wiki reference (Realistic battles, stock-to-reference column): [max speed km/h, climb m/s, turn time s, BR]; shown beside the flight-model figures in the hangar spec sheet (wiki.warthunder.com, Oct 2026)
+const WTREF={F4E:[2058,160.6,28.3,11.3],F16:[2108,260.4,20.8,13.7],F15C:[2542,235.2,23.1,13.7],FA18C:[1807,178,24.2,14.0],F15E:[2658,275.8,22,14.0],F16B70:[2116,267,20.8,14.3],FA18E:[1729,167.1,24,14.3],MIG21:[2177,191.3,38.5,11.0],MIG29:[2357,275.1,20.8,12.7],SU27:[2396,195.2,23.5,13.7],MIG29UPG:[2261,257.7,23.5,13.3],SU33:[2203,168.5,25.5,13.0],MIG29K:[2203,285.7,23.4,13.7],SU30SM:[2212,170,25.1,14.3],MIG35:[2203,285,22.4,14.3],F104G:[2342,229,35.9,11.0],F4F:[2058,162.9,28.3,11.0],MIG29G:[2357,270.4,20.6,13.0],EF2K1:[2097,252.1,20.8,14.3],EF2K3:[2097,252.1,20.8,14.3],F4EJ:[2255,141.9,28.2,11.0],F4EJK:[2255,141.9,28.2,12.3],F15J:[2533,263.3,22.9,12.7],F15JK:[2524,263.8,23,13.7],F2A:[1922,242.8,19.5,13.7],F4EIL:[2058,160.6,28.3,11.3],KFIR:[2322,184.5,28.4,12.0],F4E2K:[2058,160.6,28.3,12.3],F15BAZ:[2524,285.2,21.6,13.7],F16BARAK:[2058,229.4,23.9,13.7],F16I:[2058,247.5,21.8,13.7],F15I:[2657,276.4,22,14.0],J35F:[2127,149.8,26.7,10.3],JA37:[1924,168.6,26.6,12.0],GRIPEN:[2185,213.6,25.1,13.7],GRIPENE:[2209,214.5,25.6,14.3],LIGHTNING:[2240,124.3,27.8,9.3],PHANTOM2:[2190,176.1,27.8,12.0],TORNADO3:[2256,168,29.4,13.0],TYPHOON:[2097,252.1,20.8,14.7],J7G:[2313,153.4,25.3,11.3],J10C:[2108,252.2,21.2,14.3],J11B:[2388,195.3,25.2,13.7],J15:[2384,200.6,24.9,14.7],J16:[2410,212.9,23.4,14.7],MIRAGEF1:[2177,126.8,28.7,12.0],M2000:[2246,156.3,26.3,14.0],RAFALE:[1855,237.9,21,14.7],F5E:[1753,130.7,27.2,11.0],F14B:[2191,195.9,24.8,13.0],MIG23ML:[2339,196.8,33.9,11.7],MIG25PD:[2942,86.1,31.4,11.0],J8F:[2227,182.4,28.4,13.0]};
 const RP_COST=[0,0,4000,10000,20000,34000], SL_PRICE=[0,0,25000,70000,150000,280000], ROMAN=['','I','II','III','IV','V'];
 // modules: [key, name, cost tier, effect, requires, family]. A stock aircraft flies with penalties; the first module of each family removes one, the second goes beyond stock.
 // Each is researched with the RP earned in that aircraft, then bought with Silver Lions.
@@ -4694,7 +4699,7 @@ function dailyAdd(k,n){if(!careerOn||!(n>0))return null;dailyRoll();const t=DAIL
 const REC={t:0,acc:0,frames:[],events:[],msl:new Map()}; let mslSeq=0;
 function recReset(){REC.t=0;REC.acc=0;REC.frames=[];REC.events=[];REC.msl=new Map();mslSeq=0}
 function fmtT(t){t=Math.max(0,t|0);return Math.floor(t/60)+':'+String(t%60).padStart(2,'0')}
-function recEvent(text){REC.events.push({t:REC.t,text})}
+function recEvent(text){REC.events.push({t:REC.t,text});feed(text)}
 function tgtLabel(t){if(!t)return 'nothing (no lock)';if(t.kind==='sam')return 'a SAM site';if(t===P)return 'you';if(t.kind==='bomber')return 'a bomber';if(t.kind==='transport')return 'the C-130';if(t.team==='blue')return 'your wingman';return 'bandit '+t.id+' ('+(AC_DEFS[t.type]?AC_DEFS[t.type].name:'?')+')'}
 function recLaunch(m,who,target){m.rid=++mslSeq;
   REC.msl.set(m.rid,{id:m.rid,t:REC.t,who,name:m.name,target:tgtLabel(target),res:null,why:''});
@@ -5144,7 +5149,8 @@ function drawHUD(){
     if(on){const s=e.kind==='fighter'?9:13;
       if(blue){c.beginPath();c.moveTo(p.x-s,p.y+s*.6);c.lineTo(p.x,p.y-s*.6);c.lineTo(p.x+s,p.y+s*.6);c.stroke();txt(c,e.kind==='transport'?'C-130':'TWO',p.x,p.y+20,'center',col,10,700)}
       else{c.beginPath();c.moveTo(p.x,p.y-s);c.lineTo(p.x+s,p.y);c.lineTo(p.x,p.y+s);c.lineTo(p.x-s,p.y);c.closePath();c.stroke();
-        if(MK>=2||d<9000)txt(c,(e.kind==='bomber'?'BMR ':'')+nm(d),p.x,p.y+20,'center',col,11);   // Realistic: range only when close
+        if(MK>=2||d<9000)txt(c,(e.kind==='bomber'?'BMR ':'')+nm(d),p.x,p.y+20,'center',col,11);
+        if(MK>=2&&!e.remote&&e.kind==='fighter'&&BANDITS[e.type])txt(c,BANDITS[e.type],p.x,p.y-18,'center',col,10,700);   // vehicle tag, like the War Thunder markers   // Realistic: range only when close
         if(e.remote&&MK>=2)txt(c,(e.name||'PILOT').toUpperCase().slice(0,14)+' · '+(AC_DEFS[e.type]?AC_DEFS[e.type].name:''),p.x,p.y-18,'center',col,10,700)}}
     else{_d.copy(e.pos).applyMatrix4(camera.matrixWorldInverse);
       let dx=_d.x,dy=-_d.y; if(Math.abs(dx)+Math.abs(dy)<1e-3)dy=1;
@@ -5294,6 +5300,9 @@ function drawHUD(){
      txt(c,cue+' · '+(nd/1000).toFixed(1)+' KM',W/2,H*.76,'center',col,13,700)}}
   drawAGHud(c); drawCarrierHud(c); drawRadioLines(c); drawTGPHud(c);
   if(P.kcas<160&&!P.onGround&&!(P.gear&&P.pos.y-BASE_Y<300)&&(clock*3%1)<.6)txt(c,'LOW SPEED',W/2,H*.68,'center',WARN,13,700);
+  {let n=0;const fx=INS.l+14,fy=H*.68;c.save();c.textAlign='left';c.shadowColor='rgba(0,0,0,.85)';c.shadowBlur=4;
+    for(const f of FEED){const age=clock-f.t;if(age>FEED_LIFE)continue;c.globalAlpha=Math.min(1,(FEED_LIFE-age)*1.2);
+      txt(c,f.text,fx,fy+n*17*TXTK,'left',f.kind==='kill'?'#ffd166':f.kind==='hit'?HUD:f.kind==='loss'?THREAT:'#b8c4cf',W<500?11:13,f.kind==='kill'?700:500);n++}c.restore()}
   if(msgT>0){c.save();c.globalAlpha=Math.min(1,msgT*2);txt(c,msgText,W/2,pit?H*.58:H*.3,'center',HUD,W<500?16:20,700);c.restore()}
   // grey-out / black-out / red-out
   const gs=P.gloc>0?1:clamp((P.gStress-.35)/.65,0,1);
@@ -5569,7 +5578,7 @@ const _careerAward=careerAward;
 careerAward=function(){lbAdd();return _careerAward.apply(this,arguments)};
 
 /* ---------- test hook (only with ?test in the URL) ---------- */
-if(/[?&]test\b/.test(location.search))window.__vs={setThr,HEAT,explode,puff,camera,LT,townLights,flashLt,P,fly,dlz,flyout,AC_DEFS,buildJet,PLAYER_COLORS,M2,V3,atm,clamp,lbAdd,showOverlay:k=>showOverlay(k),setScore:(n,k)=>{score=n;kills=k},get state(){return state},missiles:()=>missiles.filter(m=>m.on),setAC:id=>{AC=AC_DEFS[id];applyAC()},wt:{   // weapon-test hooks: a clean sky, one drone, scripted launches
+if(/[?&]test\b/.test(location.search))window.__vs={setThr,HEAT,explode,puff,camera,LT,townLights,flashLt,P,fly,dlz,flyout,AC_DEFS,feed,buildJet,PLAYER_COLORS,M2,V3,atm,clamp,lbAdd,showOverlay:k=>showOverlay(k),setScore:(n,k)=>{score=n;kills=k},get state(){return state},missiles:()=>missiles.filter(m=>m.on),setAC:id=>{AC=AC_DEFS[id];applyAC()},wt:{   // weapon-test hooks: a clean sky, one drone, scripted launches
   begin:id=>{AC=AC_DEFS[id];applyAC();startGame();return AC.id},
   clear:()=>{waveClearT=1e9;for(const e of enemies){e.alive=false;scene.remove(e.obj)}enemies.length=0;P.pos.set(0,6000,0);P.vel.set(0,0,250);throttle=.7;return state},
   target:(type,dz,away,speed)=>{const e=spawnFighter('red',type,new V3(0,6000,dz),new V3(0,6000,dz+(away?9999:-9999)),{ir:0,rdr:0,speed:speed||220});e.drone=true;return e.id},
@@ -5647,6 +5656,9 @@ function hgSpecs(){
   h+=T('Performance (flight model)',[['Load factor limit','+'+e.gmax+' g / −3 g'],['Roll rate','≈ '+fx(e.roll*57.3)+' °/s at full control authority'],['Corner speed',fx(e.corner)+' kt'],
     ['Thrust / weight','AB '+fx(tw(e.T_AB),2)+' · MIL '+fx(tw(e.T_MIL),2),'at take-off weight'],['Wing loading',fx(m/e.S)+' kg/m²'],['1 g stall speed',fx(stall*1.944)+' kt','sea level, clean'],
     ['Top speed, sea level','Mach '+fx(sl.M,2),fx(sl.v*1.944)+' kt'],['Top speed, 10 km','Mach '+fx(hi.M,2),fx(hi.v*1.944)+' kt'],['Never-exceed (low level)',fx(e.vne)+' kt']]);
+  const wt=WTREF[e.id];
+  if(wt)h+=T('War Thunder reference (Realistic, wiki)',[['Battle rating','RB '+wt[3].toFixed(1)+(NODES[e.id]?' · rank '+ROMAN[NODES[e.id].r]:'')],['Max speed (reference)',fx(wt[0])+' km/h','game flight model: '+fx(hi.v*3.6)+' km/h at 10 km'],
+    ['Rate of climb',fx(wt[1],1)+' m/s'],['Turn time',fx(wt[2],1)+' s','full circle, sea level']]);
   h+=T('Weapons',[['Gun',e.ammo+' · '+fx(e.gunRate*60)+' rpm · '+fx(e.gunRounds)+' rounds','muzzle '+fx(e.muzzle)+' m/s, effective range about 1 km'],
     [e.srFull+' × '+v.sr,'to '+km(sr.maxR)+' (min '+fx(sr.minR)+' m)',seekerText(sr,false)+' · '+fx(sr.gmax)+' g · peak Mach '+fx(pk(sr,5000)/340,1)],
     c.hp?[e.mrFull+' × '+v.mr,'to '+km(mr.maxR)+' (min '+fx(mr.minR)+' m)',seekerText(mr,true)+' · '+fx(mr.gmax)+' g · peak Mach '+fx(pk(mr,8000)/295,1)]:null,

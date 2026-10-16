@@ -20,7 +20,7 @@ const path = require('path'), assert = require('assert');
   // specs
   await p.click('.hgTabs button[data-tab=spec]'); await p.waitForTimeout(400);
   const spec = await p.textContent('#hgSpec');
-  for (const w of ['Airframe', 'Performance', 'Weapons', 'Sensors', 'Defences', 'Wingspan', 'Thrust / weight', 'Top speed, sea level', 'AIM-120C', 'Detection range']) assert(spec.includes(w), 'specs mention ' + w);
+  for (const w of ['Airframe', 'Performance', 'Weapons', 'Sensors', 'Defences', 'Wingspan', 'Thrust / weight', 'Top speed, sea level', 'AIM-120C', 'Detection range', 'War Thunder reference']) assert(spec.includes(w), 'specs mention ' + w);
   await p.screenshot({ path: '/tmp/w/hg-spec.png' });
   // another aircraft: name and specs update
   await p.click('.hgTabs button[data-tab=load]'); await p.click('#bAC'); await p.waitForTimeout(700);

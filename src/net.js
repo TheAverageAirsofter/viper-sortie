@@ -2,7 +2,7 @@
 const REC={t:0,acc:0,frames:[],events:[],msl:new Map()}; let mslSeq=0;
 function recReset(){REC.t=0;REC.acc=0;REC.frames=[];REC.events=[];REC.msl=new Map();mslSeq=0}
 function fmtT(t){t=Math.max(0,t|0);return Math.floor(t/60)+':'+String(t%60).padStart(2,'0')}
-function recEvent(text){REC.events.push({t:REC.t,text})}
+function recEvent(text){REC.events.push({t:REC.t,text});feed(text)}
 function tgtLabel(t){if(!t)return 'nothing (no lock)';if(t.kind==='sam')return 'a SAM site';if(t===P)return 'you';if(t.kind==='bomber')return 'a bomber';if(t.kind==='transport')return 'the C-130';if(t.team==='blue')return 'your wingman';return 'bandit '+t.id+' ('+(AC_DEFS[t.type]?AC_DEFS[t.type].name:'?')+')'}
 function recLaunch(m,who,target){m.rid=++mslSeq;
   REC.msl.set(m.rid,{id:m.rid,t:REC.t,who,name:m.name,target:tgtLabel(target),res:null,why:''});
