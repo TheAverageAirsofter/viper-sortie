@@ -1,5 +1,7 @@
 # Viper Sortie
 
+Developed by **ValidAirsoft Productions**.
+
 Mobile-first 3D F-16 combat flight sim: energy-based flight model, radar and missiles, AI wings, carrier ops, campaign, replays and optional multiplayer. Static site, no build step.
 
 ## Run

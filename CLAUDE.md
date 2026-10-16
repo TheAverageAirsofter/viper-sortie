@@ -1,6 +1,6 @@
 # Viper Sortie: notes for Claude
 
-Mobile-first 3D F-16 combat flight sim. Static site, no framework. See README.md for the file layout.
+Mobile-first 3D F-16 combat flight sim. Static site, no framework. See README.md for the file layout. Developer / publisher name: **ValidAirsoft Productions** (title screen credit, README, package author).
 
 ## Modules
 In Career a stock aircraft flies with penalties (`STOCK` in progress.js: -6 % thrust, -10 % roll, half countermeasures, -10 % missile range and agility, no drop tanks, half the missile load). The hangar **Mods** tab (`modsRender` in progressui.js) lists `MODS`: research with the RP earned in that aircraft (state `'r'` in `prog.mods[id]`), then buy with Silver Lions (`true`). Tier I modules lift the penalties and unlock pylons (`tnk1`, `ord1` gate `ldCap` in ops.js); tier II goes beyond stock. Free play ignores modules. Model size corrections live in `M2K` (roster.js).
