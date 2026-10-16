@@ -23,12 +23,25 @@ const path = require('path'), assert = require('assert');
   assert.match(await cls('MIG29'), /res/); let g = await p.evaluate(() => ({ rp: __vs.prog.rp.MIG21, frp: __vs.prog.frp })); assert.equal(g.rp, 2000); assert.equal(g.frp, 3000);
   // buy it (25,000 SL)
   await p.click('#hgTree [data-act=buy]'); await p.waitForTimeout(300); assert.match(await cls('MIG29'), /own/); assert.equal(await p.evaluate(() => __vs.prog.sl), 375000);
-  // module on the F-4E (the starting jet): Engine I raises thrust in the spec sheet
+  // modules on the F-4E: a stock career jet flies with penalties; research with RP, buy with SL
   assert.equal(await p.evaluate(() => __vs.AC.id), 'F4E', 'career starts in an owned jet');
-  await p.click('#hgTree .tn[data-id=F4E]'); await p.click('#hgTree [data-act=mod][data-m=eng1]'); await p.waitForTimeout(300);
-  assert(await p.evaluate(() => __vs.prog.mods.F4E.eng1), 'module installed');
-  assert.equal(await p.evaluate(() => Math.round(__vs.AC.T_AB / 1000)), 165, 'engine module raises thrust (159 kN x 1.04)');
+  const thr0 = await p.evaluate(() => Math.round(__vs.AC.T_AB / 1000)); assert(thr0 < 159, 'stock thrust is reduced: ' + thr0);
+  const cap0 = await p.evaluate(() => ({ tanks: __vs.ldCap('F4E').tanks, hp: __vs.ldCap('F4E').hp }));
+  assert.equal(cap0.tanks, 0, 'stock jet has no drop tanks');
+  await p.evaluate(() => { __vs.prog.rp.F4E = 5000; });
+  await p.click('.hgTabs button[data-tab=mods]'); assert.match(await p.textContent('#hgMods'), /stock condition/);
+  await p.click('#hgMods [data-m=eng1] [data-act=mres]'); await p.waitForTimeout(150);
+  assert.equal(await p.evaluate(() => __vs.prog.mods.F4E.eng1), 'r', 'researched, not yet installed');
+  assert.equal(await p.evaluate(() => Math.round(__vs.AC.T_AB / 1000)), thr0, 'research alone changes nothing');
+  await p.click('#hgMods [data-m=eng1] [data-act=mbuy]'); await p.waitForTimeout(300);
+  assert.equal(await p.evaluate(() => __vs.prog.mods.F4E.eng1), true, 'module installed');
+  assert.equal(await p.evaluate(() => Math.round(__vs.AC.T_AB / 1000)), 159, 'engine module removes the stock penalty');
+  assert(await p.isDisabled('#hgMods [data-m=eng2] button') || (await p.textContent('#hgMods [data-m=eng2]')).length > 0, 'tier II shows');
+  await p.evaluate(() => { __vs.prog.sl += 200000; });
+  for (const m of ['tnk1', 'ord1']) { await p.click('.hgTabs button[data-tab=mods]'); await p.click('#hgMods [data-m=' + m + '] [data-act=mres]'); await p.click('#hgMods [data-m=' + m + '] [data-act=mbuy]'); }
+  const cap1 = await p.evaluate(() => ({ tanks: __vs.ldCap('F4E').tanks, hp: __vs.ldCap('F4E').hp })); assert(cap1.tanks > 0 && cap1.hp > cap0.hp, 'pylon modules unlock stores ' + JSON.stringify([cap0, cap1]));
   // crew skill
+  await p.click('.hgTabs button[data-tab=tree]');
   await p.click('#hgTree [data-act=crew][data-k=g]'); assert.equal(await p.evaluate(() => __vs.prog.crew.g), 1);
   // sortie rewards: RP to the aircraft flown, SL earned, repair when lost
   const r = await p.evaluate(() => { const before = __vs.prog.sl, o = __vs.progAward(2000, true, 3, true, false), lost = __vs.progAward(500, false, 0, false, false); return { before, o, lost, after: __vs.prog.sl }; });

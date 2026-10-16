@@ -507,3 +507,117 @@ Object.assign(PAINT,{
   J11B:{p:3,c:['#8d97a3','#6e7c8c','#a0aab4'],nat:'prc',num:'13200',nose:'13200'},
   J15:{p:3,c:['#8a95a1','#6c7a8a','#9ea8b2'],nat:'prc',num:'552',nose:'552'},
   J16:{p:1,c:['#8f98a3','#74808c','#a1aab3'],nat:'prc',num:'67010',nose:'67010'}});
+
+
+/* ===== more aircraft: F-5E, F-14B, MiG-23ML, MiG-25PD, J-8F, Mirage F1C, Mirage 2000-5F (BRs and loadouts follow War Thunder where known, otherwise estimates; hulls are shared where the real shapes are close) ===== */
+SRM.R550=Object.assign({},SRM.AIM9L,{acc:155,gmax:30,maxR:8000,gimbal:.8});
+SRM.MICAIR=Object.assign({},SRM.PY3,{acc:185,gmax:50,maxR:15000,gimbal:1.2,cone:1.2});
+MRM.R530F={burn:4,acc:150,cd:5.5e-5,gmax:20,life:40,fuze:9,gimbal:.9,decoy:0,minR:1500,maxR:22000,cone:.9,lockT:1.8,sarh:true,launchG:4,termR:28000,dlR:0};
+MRM.R23R={burn:4,acc:150,cd:5.5e-5,gmax:18,life:45,fuze:9,gimbal:.8,decoy:0,minR:1500,maxR:24000,cone:.8,lockT:1.8,sarh:true,launchG:4,termR:30000,dlR:0};
+MRM.R40R={burn:5,acc:200,cd:5e-5,gmax:15,life:60,fuze:10,gimbal:.8,decoy:0,minR:2000,maxR:38000,cone:.8,lockT:2,sarh:true,launchG:3,termR:48000,dlR:0};
+MRM.PL11={burn:4,acc:150,cd:5.5e-5,gmax:20,life:45,fuze:9,gimbal:.9,decoy:0,minR:1500,maxR:24000,cone:.9,lockT:1.8,sarh:true,launchG:4,termR:30000,dlR:0};
+MRM.MICAEM=Object.assign({},AC_DEFS.F16.mr,{maxR:45000,gmax:45,dlR:60000,termR:15000});
+MRM.AIM54=Object.assign({},AC_DEFS.F16.mr,{maxR:70000,gmax:20,acc:190,dlR:90000,termR:20000});
+// F-5E Tiger II: Northrop, 2× J85-GE-21 (22.2 kN AB each), 17.3 m² wing, +7.3 g, 2× M39 20 mm (280 rds each), 2 wing-tip + 2 pylon AIM-9, ranging radar only
+dv('F104G','F5E','F-5E Tiger II','Tiger',{corner:380,
+  S:17.3,MASS:6800,CLMAX:1.25,KIND:.15,T_AB:44500,T_MIL:30000,ram:.4,cdK:1.0,supK:.1,gmax:7.3,roll:6.0,vne:700,
+  gunRate:50,gunRounds:560,muzzle:1030,gunDmg:1,gunSnd:1800,ammo:'PGU-28',
+  fuelCap:2050,sfcDry:.95,sfcAB:2.1,fuelUnit:'LB',engines:2,refuel:null,irstR:0,irstMax:0,
+  srName:'9P',srFull:'AIM-9P',mrName:'-',mrFull:'none',srN:4,mrN:0,sr:SRM.AIM9P,mr:MRM.AIM7,
+  radar:{modes:['RWS'],name:'AN/APQ-159',range:15000},
+  cm:cmo(0,0,0,false,null,'','none',stn([['TIP L','9P'],['TIP R','9P'],['PYL L','9P'],['PYL R','9P']],[])),
+  spec:'<span><b>+7.3 g</b></span><span><b>Mach 1.6</b></span><span>2× J85 <b>44.5 kN</b></span><span>2× M39 · <b>560 rds</b></span><span>4× AIM-9P · ranging radar</span><span>No countermeasures</span>',
+  snd:{f:36,roar:240,wh:.004,twin:1,howl:[220,.012]},seek:{flareP:.02,chaffP:.01},rwrSym:'F5',rwrName:'none',srDesc:'AIM-9P Sidewinder (rear aspect, short range)',mrDesc:'No radar missiles',cmDesc:'none'});
+// F-14B Tomcat: variable-sweep, 2× F110-GE-400 (126 kN AB each), AN/AWG-9 (up to 6 AIM-54), 2 AIM-9, M61A1 (675 rds)
+dv('F15C','F14B','F-14B Tomcat','Tomcat',{corner:420,
+  S:52.5,MASS:23500,CLMAX:1.5,KIND:.12,T_AB:253000,T_MIL:162000,ram:.45,cdK:1.4,supK:.15,gmax:6.5,roll:3.3,vne:800,
+  gunRate:100,gunRounds:675,muzzle:1030,gunDmg:1,gunSnd:1800,ammo:'PGU-28',
+  fuelCap:7300,sfcDry:.85,sfcAB:1.9,fuelUnit:'KG',engines:2,refuel:'probe',irstR:0,irstMax:0,
+  srName:'9L',srFull:'AIM-9L',mrName:'54C',mrFull:'AIM-54C',srN:2,mrN:6,sr:SRM.AIM9L,mr:MRM.AIM54,
+  radar:{modes:['RWS','TWS'],name:'AN/AWG-9',range:180000},
+  cm:cmo(60,30,0,false,null,'','ALE-39',stn([['1A','9L'],['1B','9L']],[['3','54C'],['4','54C'],['5','54C'],['6','54C'],['7','54C'],['8','54C']])),
+  spec:'<span><b>+6.5 g</b> · variable sweep</span><span><b>Mach 2.3</b></span><span>2× F110 <b>253 kN</b></span><span>AWG-9 <b>180 km</b></span><span>6× AIM-54C · 2× AIM-9L</span><span>M61A1 · <b>675 rds</b></span>',
+  snd:{f:25,roar:190,wh:.006,twin:1,howl:[300,.02]},seek:{flareP:.04,chaffP:.03},rwrSym:'14',rwrName:'AN/ALR-67',srDesc:'AIM-9L Sidewinder, all-aspect',mrDesc:'AIM-54C Phoenix (Fox 3): active radar, launch and leave',cmDesc:'90 cartridges (est.)'});
+// MiG-23ML: swing-wing interceptor, R-35-300 (127 kN AB), 23-mm GSh-23L, R-24/R-23R and R-60
+dv('MIG21','MIG23ML','MiG-23ML','Flogger',{corner:450,
+  S:34.2,MASS:14500,CLMAX:1.4,KIND:.13,T_AB:127000,T_MIL:83000,ram:.4,cdK:1.2,supK:.12,gmax:8.5,roll:3.8,vne:850,
+  gunRate:50,gunRounds:200,muzzle:715,gunDmg:1,gunSnd:1200,ammo:'23MM',
+  fuelCap:4900,sfcDry:.95,sfcAB:2.1,fuelUnit:'KG',engines:1,refuel:null,
+  srName:'R60',srFull:'R-60M',mrName:'R23R',mrFull:'R-23R',srN:4,mrN:2,sr:SRM.R60,mr:MRM.R23R,
+  radar:{modes:['RWS'],name:'Sapfir-23ML',range:55000},
+  cm:cmo(0,0,0,false,null,'','none',stn([['1','R60'],['2','R60'],['3','R60'],['4','R60']],[['5','R23R'],['6','R23R']])),
+  spec:'<span><b>+8.5 g</b> · variable sweep</span><span><b>Mach 2.35</b></span><span>R-35 <b>127 kN</b></span><span>GSh-23L · <b>200 rds</b></span><span>R-23R · R-60M</span><span>No countermeasures</span>',
+  snd:{f:30,roar:215,wh:.004,twin:0,howl:[150,.012]},seek:{flareP:.04,chaffP:.02},rwrSym:'23',rwrName:'SPO-15',srDesc:'R-60M heat seeker, short range',mrDesc:'R-23R semi-active radar missile: hold the lock to impact',cmDesc:'none'});
+// MiG-25PD: Mach 2.8 interceptor, 2× R-15BD-300 (110 kN AB each), Sapfir-25 radar, 4× R-40RD + 2× R-60, no gun
+dv('F15C','MIG25PD','MiG-25PD','Foxbat',{corner:520,
+  S:61.4,MASS:34000,CLMAX:1.1,KIND:.12,T_AB:220000,T_MIL:150000,ram:.5,cdK:1.2,supK:.1,gmax:5,roll:2.2,vne:1000,
+  gunRate:0,gunRounds:0,muzzle:700,gunDmg:1,gunSnd:1200,ammo:'23MM',
+  fuelCap:14500,sfcDry:1.1,sfcAB:2.3,fuelUnit:'KG',engines:2,refuel:null,irstR:0,irstMax:0,
+  srName:'R60',srFull:'R-60M',mrName:'R40R',mrFull:'R-40RD',srN:2,mrN:4,sr:SRM.R60,mr:MRM.R40R,
+  radar:{modes:['RWS'],name:'Sapfir-25',range:85000},
+  cm:cmo(0,0,0,false,null,'','none',stn([['1','R60'],['2','R60']],[['3','R40'],['4','R40'],['5','R40'],['6','R40']])),
+  spec:'<span><b>+5 g</b> (limited)</span><span><b>Mach 2.8</b></span><span>2× R-15 <b>220 kN</b></span><span>Sapfir-25 radar</span><span>R-40RD · R-60M</span><span>No gun, no countermeasures</span>',
+  snd:{f:24,roar:185,wh:.006,twin:1,howl:[300,.02]},seek:{flareP:.03,chaffP:.02},rwrSym:'25',rwrName:'SPO-10',srDesc:'R-60M heat seeker, short range',mrDesc:'R-40RD semi-active radar missile: hold the lock to impact',cmDesc:'none'});
+// J-8F: Shenyang twin-engine interceptor, 2× WP-13B (68.6 kN AB each), 23-mm Type 23-III, PL-8 + PL-11
+dv('MIG21','J8F','J-8F','Finback',{corner:450,
+  S:42.2,MASS:14800,CLMAX:1.3,KIND:.13,T_AB:137000,T_MIL:90000,ram:.4,cdK:1.15,supK:.12,gmax:7.5,roll:3.8,vne:850,
+  gunRate:50,gunRounds:200,muzzle:715,gunDmg:1,gunSnd:1200,ammo:'23MM',
+  fuelCap:4600,sfcDry:.95,sfcAB:2.1,fuelUnit:'KG',engines:2,refuel:null,
+  srName:'PL8',srFull:'PL-8',mrName:'PL11',mrFull:'PL-11',srN:4,mrN:2,sr:SRM.PY3,mr:MRM.PL11,
+  radar:{modes:['RWS'],name:'Type 1492',range:70000},
+  cm:cmo(30,30,0,false,null,'','chaff/flare',stn([['1','PL8'],['2','PL8'],['3','PL8'],['4','PL8']],[['5','PL11'],['6','PL11']])),
+  spec:'<span><b>+7.5 g</b></span><span><b>Mach 2.2</b></span><span>2× WP-13B <b>137 kN</b></span><span>Type 23-III · <b>200 rds</b></span><span>PL-11 · PL-8</span><span>60 countermeasures (est.)</span>',
+  snd:{f:30,roar:215,wh:.004,twin:1,howl:[180,.014]},seek:{flareP:.05,chaffP:.03},rwrSym:'J8',rwrName:'RWR (est.)',srDesc:'PL-8 all-aspect heat seeker',mrDesc:'PL-11 semi-active radar missile: hold the lock to impact',cmDesc:'60 cartridges (est.)'});
+// Mirage F1C: Dassault, Atar 9K-50 (70.6 kN AB), 2× DEFA 553 30 mm (135 rds each), R.550 Magic at the tips, Matra R.530F, Cyrano IV radar
+dv('KFIR','MIRAGEF1','Mirage F1C','Cigogne',{corner:430,
+  S:25,MASS:8500,CLMAX:1.45,KIND:.14,T_AB:70600,T_MIL:49000,ram:.4,cdK:1.1,supK:.13,gmax:7.5,roll:4.5,vne:850,
+  gunRate:43,gunRounds:270,muzzle:800,gunDmg:2,gunSnd:900,ammo:'30MM',
+  fuelCap:2900,sfcDry:.85,sfcAB:1.95,fuelUnit:'KG',engines:1,refuel:null,irstR:0,irstMax:0,
+  srName:'R550',srFull:'R.550 Magic',mrName:'530F',mrFull:'R.530F',srN:2,mrN:2,sr:SRM.R550,mr:MRM.R530F,
+  radar:{modes:['RWS'],name:'Cyrano IV',range:35000},
+  cm:cmo(0,0,0,false,null,'','none',stn([['TIP L','R550'],['TIP R','R550']],[['PYL L','530F'],['PYL R','530F']])),
+  spec:'<span><b>+7.5 g</b></span><span><b>Mach 2.2</b></span><span>Atar <b>70.6 kN</b></span><span>2× DEFA · <b>270 rds</b></span><span>R.550 Magic · R.530F</span><span>No countermeasures</span>',
+  snd:{f:36,roar:235,wh:.003,twin:0,howl:[190,.011]},seek:{flareP:.04,chaffP:.02},rwrSym:'F1',rwrName:'none',srDesc:'R.550 Magic heat seeker',mrDesc:'R.530F semi-active radar missile: hold the lock to impact',cmDesc:'none'});
+// Mirage 2000-5F: delta fly-by-wire fighter, M53-P2 (95.1 kN AB), RDY radar, MICA EM + Magic II, 2× DEFA 554 (125 rds each)
+dv('KFIR','M2000','Mirage 2000-5F','Mirage',{corner:440,
+  S:41,MASS:10200,CLMAX:1.7,KIND:.12,T_AB:95100,T_MIL:64300,ram:.4,cdK:1.0,supK:.1,gmax:9,roll:5.0,vne:880,
+  gunRate:43,gunRounds:250,muzzle:800,gunDmg:2,gunSnd:900,ammo:'30MM',
+  fuelCap:3200,sfcDry:.85,sfcAB:1.9,fuelUnit:'KG',engines:1,refuel:'probe',irstR:0,irstMax:0,
+  srName:'R550',srFull:'Magic II',mrName:'MICA',mrFull:'MICA EM',srN:2,mrN:4,sr:SRM.R550,mr:MRM.MICAEM,
+  radar:{modes:['RWS','TWS'],name:'RDY-2',range:90000},
+  cm:cmo(112,112,0,false,'ECM','Spirale','Spirale',stn([['TIP L','Magic'],['TIP R','Magic']],[['3A','MICA'],['3B','MICA'],['7A','MICA'],['7B','MICA']])),
+  spec:'<span><b>+9 g</b> · delta, fly-by-wire</span><span><b>Mach 2.2</b></span><span>M53-P2 <b>95.1 kN</b></span><span>RDY-2 <b>90 km</b></span><span>MICA EM · Magic II</span><span>Spirale countermeasures</span>',
+  snd:{f:34,roar:230,wh:.004,twin:0,howl:[200,.012]},seek:{flareP:.1,chaffP:.08},rwrSym:'M2',rwrName:'Serval',srDesc:'Magic II heat seeker, high off-boresight',mrDesc:'MICA EM active radar missile (Fox 3): launch and leave',cmDesc:'224 cartridges (est.)'});
+for(const id of ['F5E','F14B','MIG23ML','MIG25PD','J8F','MIRAGEF1','M2000']){delete AC_DEFS[id].model}
+AC_DEFS.MIRAGEF1.cut=AC_DEFS.M2000.cut=AC_DEFS.KFIR.cut; AC_DEFS.F5E.cut=AC_DEFS.F104G.cut;
+
+// models: the F-5E has its own loft; the rest reuse the closest real hull and are resized to the real length and span below
+M2.F5E={L:14.45,nz:3.4,radome:5.4,
+  fus:[[-6.6,.55,.5,.45,0,2.3],[-5,.65,.55,.5,0,2.5],[-2.5,.62,.52,.5,.02,2.7],[0,.58,.5,.46,.05,2.8],[2,.5,.44,.4,.05,2.6],[4,.38,.34,.3,.02,2.4],[5.6,.26,.22,.2,0,2.2],[6.6,.12,.1,.1,0,2],[7.2,0,0,0,0,2]],
+  parts:[],
+  wings:[{st:[{x:.6,zle:3.4,zte:-2.8,y:-.15,t:.04},{x:1.3,zle:1.9,zte:-2.8,y:-.15,t:.035},{x:4.0,zle:-.8,zte:-2.4,y:-.15,t:.03}]},{st:[{x:.5,zle:-5.2,zte:-6.5,y:-.05,t:.03},{x:2.0,zle:-5.9,zte:-6.9,y:-.05,t:.025}]}],
+  fins:[{x:0,y:.5,st:[{h:0,zle:-2.4,zte:-6.4,t:.05},{h:2.0,zle:-4.6,zte:-6.9,t:.04}]}],
+  canopy:[3.0,.5,.36,.34,1.3],frame:-1,noz:[[.28,0,-6.8,.3,.9],[-.28,0,-6.8,.3,.9]],
+  r9:mir([[4.06,-.15,-.4,null],[2.2,-.4,-.9,-.05]]),r120:[]};
+m2Alias('F14B','F15C');
+m2Alias('MIG25PD','F15C',{r9:mir([[4.05,-.65,-2.4,.05]]),r120:mir([[3.2,-.7,-2.2,.07],[1.55,-.85,1.8,-.55]])});
+m2Alias('MIG23ML','MIG21',{wings:[{st:[{x:.9,zle:1.6,zte:-4.2,y:-.25,t:.04},{x:3.9,zle:-1.8,zte:-3.4,y:-.25,t:.03}]},M2.MIG21.wings[1]]});
+m2Alias('J8F','MIG21');
+m2Alias('MIRAGEF1','KFIR',{wings:[{st:[{x:.6,zle:1.6,zte:-3.2,y:.3,t:.04},{x:4.2,zle:-1.2,zte:-2.8,y:.3,t:.03}]},{st:[{x:.5,zle:-5.6,zte:-7.0,y:-.1,t:.03},{x:2.0,zle:-6.3,zte:-7.3,y:-.1,t:.025}]}],r9:mir([[4.2,.3,-1.9,null]]),r120:mir([[1.8,-.45,-.6,-.05]])});
+m2Alias('M2000','KFIR',{wings:[{st:[{x:.6,zle:1.6,zte:-5.4,y:-.1,t:.045},{x:4.56,zle:-2.6,zte:-4.8,y:-.1,t:.03}]}],r9:mir([[4.5,-.1,-3.4,null]]),r120:mir([[1.8,-.45,-.6,-.05],[3.2,-.4,-1.8,-.05]])});
+for(const id of ['F5E','F14B','MIG25PD','MIG23ML','J8F','MIRAGEF1','M2000'])m2Fit(id);
+Object.assign(M2K,{F14B:[.9,1,.985],MIG25PD:[1.08,1,1.02],MIG23ML:[1.04,1,1.13],J8F:[1.31,1,1.46],MIRAGEF1:[1,1,.975],M2000:[.97,1,.92]});
+ROSTER_IDS.push('F5E','F14B','MIG23ML','MIG25PD','J8F','MIRAGEF1','M2000');
+Object.assign(ROSTER_LIKE,{F5E:'F104G',F14B:'F15C',MIG23ML:'MIG21',MIG25PD:'SU27',J8F:'MIG21',MIRAGEF1:'KFIR',M2000:'KFIR'});
+Object.assign(PITS,{F5E:'TEEN',F14B:'TEEN',MIG23ML:'RUS',MIG25PD:'RUS',J8F:'RUS',MIRAGEF1:'TEEN',M2000:'3MFD'});
+Object.assign(PAINT,{
+  F5E:{p:2,c:['#b9ad8a','#8f9a82','#7b8a99'],b:'#bcc2c8',nat:'usaf',num:'AF 74-1559'},
+  F14B:{p:1,c:['#8a929a','#707a84','#9aa2a9'],nat:'usn',num:'NE 101',nose:'101'},
+  MIG23ML:{p:2,c:['#808a6a','#9a9c80','#7a8a99'],b:'#b0b5ba',nat:'rus',num:'23',nose:'23'},
+  MIG25PD:{p:0,c:['#9ea5ad','#8e969e','#a8afb6'],nat:'rus',num:'25',nose:'25'},
+  J8F:{p:2,c:['#7d8a78','#98a08c','#7f95a8'],b:'#b4b9be',nat:'prc',num:'81'},
+  MIRAGEF1:{p:2,c:['#6f7a55','#8d9170','#7e8d9a'],b:'#b9bdc2',nat:'fra',num:'12-YA'},
+  M2000:{p:1,c:['#7e8a96','#6a7681','#8a95a0'],nat:'fra',num:'2-EA',lowvis:1}});
+
+/* size corrections measured against public length and span (tools/real-dims.json); [across, up, along] */
+Object.assign(M2K,{SU57:[1.156,1.03,.93],TORNADO3:[1,1,.88],J7G:[1.165,1,1],FA18C:[.94,.97,.928],J10C:[1,1,1.073],MIG21:[1,1,1.065],F22A:[1,1,.955],F16:[1.03,1,.975],F16B70:[1.03,1,.975],F16BARAK:[1.03,1,.975],F16I:[1.03,1,.975],FA18E:[1.04,1,1],MIG35:[1.056,1,.978],SU27:[1.035,1,.99],SU35:[1.08,1,.99],SU30SM:[1.035,1,.99],J11B:[1.035,1,.99],J16:[1.035,1,.99],J15:[1.035,1,.957],SU33:[1.035,1,.957],PHANTOM2:[1,1,.917]});

@@ -649,3 +649,13 @@ button:disabled{opacity:.4;cursor:not-allowed}
   #ov .it{padding:3px 0;font-size:12px}#ov .it b{font-size:14px}#ov .it.tot b{font-size:16px}#ov .itCol h4{padding-bottom:3px}
   #ov #ovLede{-webkit-line-clamp:2}
 }
+
+/* hangar Mods tab */
+.mods{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+.mod{display:flex;flex-direction:column;gap:3px;padding:9px 10px;border:1px solid rgba(233,238,234,.16);background:rgba(8,12,10,.5)}
+.mod small{font:600 9px var(--f-body);letter-spacing:.22em;text-transform:uppercase;color:var(--hud-dim)}
+.mod b{font:600 14px var(--f-body);color:var(--paper)}
+.mod p{margin:0 0 4px;font:12px/1.35 var(--f-body);color:var(--hud-dim);flex:1}
+.mod.own{border-color:rgba(125,255,154,.5)}.mod.res{border-color:rgba(255,200,90,.55)}.mod.lock{opacity:.55}
+.mod .ok{color:var(--hud);font-size:11px}
+.mod button{font-size:11px;padding:6px 8px}

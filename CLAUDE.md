@@ -2,6 +2,9 @@
 
 Mobile-first 3D F-16 combat flight sim. Static site, no framework. See README.md for the file layout.
 
+## Modules
+In Career a stock aircraft flies with penalties (`STOCK` in progress.js: -6 % thrust, -10 % roll, half countermeasures, -10 % missile range and agility, no drop tanks, half the missile load). The hangar **Mods** tab (`modsRender` in progressui.js) lists `MODS`: research with the RP earned in that aircraft (state `'r'` in `prog.mods[id]`), then buy with Silver Lions (`true`). Tier I modules lift the penalties and unlock pylons (`tnk1`, `ord1` gate `ldCap` in ops.js); tier II goes beyond stock. Free play ignores modules. Model size corrections live in `M2K` (roster.js).
+
 ## Menu notes
 `src/menu.js` builds the AAA-style menu: title screen, a left-hand list (Campaign, Quick mission, Online, Hangar, Training, Settings), and panes for each. The original cycle buttons (bTime, bWx, bMission, bPal ...) live hidden in `#legacy`; the "LABEL ... < Value >" rows, sliders and action rows drive them with `drive(btn, getter, want)` and re-read the real game variables in `uiSync()`. Tests that need a setting click the row (`#qRows .mr[data-name=Time] .rm`, `#sRows .mr[...]`) or `document.getElementById(id).click()` for the legacy button. `tools/launch.js` gives test pages the title and the loading delay switched off and a `p.sortie()` helper (Quick mission, then Launch); set `TITLE=1` / `LOAD=1` to keep them. The menu scene is the hangar behind the overlay (`HG.bg`); `camGoal(pane)` eases the camera per pane. Design tokens are CSS variables at the top of `css/style.css` and on `#ov`.
 Fonts (Barlow Condensed and Barlow, SIL OFL) are in `fonts/`; the full single-file build embeds them, the cdn build falls back to the Google Fonts link.
@@ -35,6 +38,8 @@ node tools/hangar-test.js     # hangar: loadout, specs, aircraft, paint
 node tools/progress-test.js   # tech tree, research, buy, modules, crew, rewards
 node tools/menu-test.js       # every menu screen fits 844x390, rows, presets, top bar, itemised debrief, research grid, crew, daily tasks, phone nav, briefing
 node tools/roster-test.js     # every aircraft: data, stations, tables, a short sortie, and as a bandit
+node tools/weapons-test.js    # missile sanity for every type, live shots (rear-aspect seekers, SARH lock, AMRAAM, gun); slow (~8 min)
+node tools/dims-test.js       # model length and span against tools/real-dims.json (add a row for every new aircraft)
 node tools/visuals-test.js    # night lights, lightning, explosion, heat shimmer, every aircraft model
 ```
 Headless Chromium is at /opt/pw-browsers/chromium in the cloud sandbox (tools/launch.js finds it). Tests that click through gameplay set `vsTips` in localStorage to skip the controls guide.

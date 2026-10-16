@@ -254,7 +254,9 @@ function withNav(root,type){const D=AC_DEFS[type];if(D&&D.fx&&D.fx.nav){const [s
 function buildJet(c,type){type=type||'F16';const r=withNav(buildJetBase(c,type),type);
   r.traverse(o=>{const m=o.material;if(m&&m.isMeshStandardMaterial&&!m.__ibl){m.__ibl=true;m.envMapIntensity=.75;if(m.roughness>.55){m.roughness=.48;m.metalness=Math.max(m.metalness,.22)}}});
   return dressFlames(r)}
-function buildJetBase(c,type){const D=AC_DEFS[type];if(typeof M2!=='undefined'&&M2[type])return buildLoftJet(c,M2[type],type);if(D&&D.model&&MODELS[D.model])return buildParam(c,MODELS[D.model]);if(type==='SU27'||type==='SU35'||type==='SU33')return buildSu(c,type);if(type==='MIG29K')return buildMig29(c,'35');return type==='GRIPEN'?buildGripen(c):type==='GRIPENE'?buildGripen(c,true):type==='F16B70'?buildF16(c,true):type==='MIG29'?buildMig29(c,'A'):type==='MIG29UPG'?buildMig29(c,'UPG'):type==='MIG35'?buildMig29(c,'35'):buildF16(c)}
+// per-aircraft size correction [across, up, along] so the lofted shapes match the real length and span; filled in the roster slice
+const M2K={};
+function buildJetBase(c,type){const D=AC_DEFS[type];if(typeof M2!=='undefined'&&M2[type]){const g=buildLoftJet(c,M2[type],type),k=M2K[type];if(k)g.scale.set(k[0],k[1],k[2]);return g}if(D&&D.model&&MODELS[D.model])return buildParam(c,MODELS[D.model]);if(type==='SU27'||type==='SU35'||type==='SU33')return buildSu(c,type);if(type==='MIG29K')return buildMig29(c,'35');return type==='GRIPEN'?buildGripen(c):type==='GRIPENE'?buildGripen(c,true):type==='F16B70'?buildF16(c,true):type==='MIG29'?buildMig29(c,'A'):type==='MIG29UPG'?buildMig29(c,'UPG'):type==='MIG35'?buildMig29(c,'35'):buildF16(c)}
 function buildF16(c,b70){
   const g=new THREE.Group(), root=new THREE.Group(); root.add(g); g.scale.setScalar(.75);
   const body=new THREE.MeshStandardMaterial({color:c.body,roughness:.62,metalness:.1,flatShading:true,side:THREE.DoubleSide});

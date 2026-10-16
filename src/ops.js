@@ -122,13 +122,15 @@ const JET_HP={F16:{extra:1,tanks:3,tankKg:1130,ag:['HARM','JDAM']},F16B70:{extra
 rosterFill(JET_HP,{F4E:{extra:2,tanks:3,tankKg:1800,ag:['PAVE4']},F35A:{extra:2,tanks:0,tankKg:0,ag:['JDAM']},F22A:{extra:0,tanks:0,tankKg:0,ag:[]},F104G:{extra:1,tanks:2,tankKg:700,ag:[]},
   MIG21:{extra:1,tanks:2,tankKg:400,ag:['FAB500']},SU57:{extra:2,tanks:0,tankKg:0,ag:['KAB500S']},J35F:{extra:0,tanks:1,tankKg:600,ag:[]},JA37:{extra:1,tanks:1,tankKg:1000,ag:[]},
   LIGHTNING:{extra:0,tanks:1,tankKg:1000,ag:[]},TORNADO3:{extra:1,tanks:2,tankKg:1500,ag:[]},KFIR:{extra:2,tanks:3,tankKg:900,ag:['PAVE4']},F15E:{extra:3,tanks:3,tankKg:1820,ag:['JDAM','SDB']},
-  F15I:{extra:3,tanks:3,tankKg:1820,ag:['JDAM','SDB']},F16I:{extra:1,tanks:3,tankKg:1130,ag:['JDAM']},J7G:{extra:1,tanks:2,tankKg:400,ag:['LS6']},J11B:{extra:1,tanks:0,tankKg:0,ag:['YJ91','LS6']},J15:{extra:1,tanks:0,tankKg:0,ag:['YJ91','LS6']},J16:{extra:2,tanks:2,tankKg:1600,ag:['YJ91','LS6']},SU30SM:{extra:2,tanks:2,tankKg:1600,ag:['KH31P','KAB500S','FAB500']}});
+  F15I:{extra:3,tanks:3,tankKg:1820,ag:['JDAM','SDB']},F16I:{extra:1,tanks:3,tankKg:1130,ag:['JDAM']},F5E:{extra:1,tanks:3,tankKg:900,ag:[]},F14B:{extra:0,tanks:2,tankKg:1000,ag:[]},MIG23ML:{extra:1,tanks:2,tankKg:800,ag:['FAB500']},MIG25PD:{extra:0,tanks:0,tankKg:0,ag:[]},J8F:{extra:1,tanks:2,tankKg:900,ag:['LS6']},MIRAGEF1:{extra:1,tanks:2,tankKg:1100,ag:[]},M2000:{extra:2,tanks:3,tankKg:1700,ag:['LS6']},J7G:{extra:1,tanks:2,tankKg:400,ag:['LS6']},J11B:{extra:1,tanks:0,tankKg:0,ag:['YJ91','LS6']},J15:{extra:1,tanks:0,tankKg:0,ag:['YJ91','LS6']},J16:{extra:2,tanks:2,tankKg:1600,ag:['YJ91','LS6']},SU30SM:{extra:2,tanks:2,tankKg:1600,ag:['KH31P','KAB500S','FAB500']}});
 const railsOf=(b,re)=>b.cm.stations.filter(st=>re.test(st[2])).length;
-function ldDefault(id){const b=effAC0(id);return{sr:b.srN,mr:b.mrN,ag:{},tk:0}}
+function ldDefault(id){const b=effAC0(id);return{sr:b.srN,mr:ldStockMr(id,b),ag:{},tk:0}}
+// a stock career jet carries only the basic missile load until Weapon pylons is installed
+function ldStockMr(id,b){return careerOn&&!hasMod(id,'ord1')?Math.min(b.mrN,Math.max(2,Math.ceil(b.mrN/2))):b.mrN}
 function ldStrike(id){const b=effAC0(id),SL=STRIKE_LOAD[id];if(!SL)return ldDefault(id);const ag={};SL.ag.forEach(([k,n])=>ag[k]=n);return{sr:b.srN,mr:Math.min(b.mrN,SL.keep),ag,tk:0}}
 function ldGet(id){try{const v=JSON.parse(localStorage.getItem('vsLd_'+id)||'null');if(v&&typeof v.sr==='number')return v}catch(e){}return strikeRole&&STRIKE_LOAD[id]?ldStrike(id):ldDefault(id)}
 function ldSet(id,v){try{localStorage.setItem('vsLd_'+id,JSON.stringify(v))}catch(e){}}
-function ldCap(id){const b=effAC0(id),H=JET_HP[id]||{extra:0,tanks:0,tankKg:0,ag:[]};return{sr:railsOf(b,/^r9_/),hp:railsOf(b,/^r120_/),extra:H.extra,tanks:H.tanks,tankKg:H.tankKg,ag:H.ag}}
+function ldCap(id){const b=effAC0(id),H=JET_HP[id]||{extra:0,tanks:0,tankKg:0,ag:[]},o=!careerOn||hasMod(id,'ord1'),t=!careerOn||hasMod(id,'tnk1');return{sr:railsOf(b,/^r9_/),hp:o?railsOf(b,/^r120_/):ldStockMr(id,b),extra:o?H.extra:0,tanks:t?H.tanks:0,tankKg:H.tankKg,ag:o?H.ag:[]}}
 const ldUsed=(v)=>v.mr+Object.entries(v.ag).reduce((a,[k,n])=>a+Math.ceil(n/(AGW[k].perSt||1)),0)+v.tk;
 function ldValid(id,v){const c=ldCap(id);return v.sr>=0&&v.sr<=c.sr&&v.mr>=0&&v.mr<=c.hp&&v.tk>=0&&v.tk<=c.tanks&&Object.keys(v.ag).every(k=>c.ag.includes(k)&&v.ag[k]>=0)&&ldUsed(v)<=c.hp+c.extra}
 const agStoreMat=new THREE.MeshStandardMaterial({color:0x8a8f7a,roughness:.6,flatShading:true});
