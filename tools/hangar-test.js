@@ -41,7 +41,12 @@ const path = require('path'), assert = require('assert');
   await p.click('#hgChips button[data-v=cockpit]'); await p.waitForTimeout(500); assert((await p.evaluate(() => __vs.HG.zoom)) < .5, 'cockpit close-up'); await p.screenshot({ path: '/tmp/w/hg-cockpit.png' });
   await p.mouse.move(250, 260); await p.mouse.wheel(0, 800); assert((await p.evaluate(() => __vs.HG.zoom)) > .45, 'wheel zooms out');
   await p.click('#hgChips button[data-v=auto]'); assert(await p.evaluate(() => __vs.HG.auto), 'spin resumes');
-  await p.click('#hgClose'); assert(await p.isVisible('#ov')); assert(!(await p.isVisible('#hangar')));
+  // pan: right-drag and WASD move the view point; the jet is parked in the hall
+  const t0 = await p.evaluate(() => __vs.HG.tgt.toArray()); await p.mouse.move(250, 260); await p.mouse.down({ button: 'right' }); await p.mouse.move(150, 200, { steps: 5 }); await p.mouse.up({ button: 'right' });
+  const t1 = await p.evaluate(() => __vs.HG.tgt.toArray()); assert(t0.some((v, i) => Math.abs(v - t1[i]) > .3), 'right-drag pans ' + t0 + ' -> ' + t1);
+  await p.keyboard.press('w'); await p.keyboard.press('d'); await p.keyboard.press('e'); const t2 = await p.evaluate(() => __vs.HG.tgt.toArray()); assert(t1.some((v, i) => Math.abs(v - t2[i]) > .05), 'WASD walks the view');
+  assert(await p.evaluate(() => __vs.hgParked()), 'jet is parked in the hangar scene');
+  await p.click('#hgClose'); assert(await p.isVisible('#ov')); assert(!(await p.isVisible('#hangar'))); assert(!(await p.evaluate(() => __vs.hgParked())), 'jet leaves the hangar');
   await p.click('#bRole'); assert(await p.isVisible('#hangar')); assert(await p.isVisible('#ldRows'));
   await p.keyboard.press('Escape'); assert(!(await p.isVisible('#hangar')), 'Esc closes the hangar');
   // launch straight from the hangar

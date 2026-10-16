@@ -739,7 +739,7 @@ function animJet(obj,j,dt,isPlayer){
   for(const n of A.noz){const ns=ab?1.13:thr<.25?1.02:.93,c=n.children[0];if(c){const v=c.scale.x+(ns-c.scale.x)*k*.5;c.scale.set(v,v,1)}
     if(tv){const tt=clamp(p*.28+n.userData.s*r*.08,-.26,.26);n.rotation.x+=(tt-n.rotation.x)*k}}
   if(A.py)for(const q of A.py)if(q.__rail)q.visible=q.__rail.visible;
-  if(A.can){const open=isPlayer&&P.onGround&&Math.hypot(P.vel.x,P.vel.z)<1.5&&throttle<.08&&state!=='menu'?1:0;A.op=(A.op||0)+clamp(open-(A.op||0),-dt*.7,dt*.7);A.can.rotation.x=-A.op*.72}
+  if(A.can){const open=isPlayer&&P.onGround&&Math.hypot(P.vel.x,P.vel.z)<1.5&&throttle<.08&&(state!=='menu'||HG.on)?1:0;A.op=(A.op||0)+clamp(open-(A.op||0),-dt*.7,dt*.7);A.can.rotation.x=-A.op*.72}
 }
 
 
