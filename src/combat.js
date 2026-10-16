@@ -229,16 +229,16 @@ function launch(type,target){
   m.vel.copy(P.vel).addScaledVector(P.up,-4); m.prev.copy(m.m.position);
   m.notchT=0; m.notchRolled=false; m.blindT=0; m.lostT=0; m.term=false; m.kp=null; m.gmode=''; m.reason=target?'':'NO LOCK (BORESIGHT)'; m.team='blue'; m.owner=P; m.name=isNine?AC.srFull:AC.mrFull;
   recLaunch(m,'You',target);
-  sndMsl(); buzz(35); message(isNine?'FOX 2':'FOX 3',1);
+  sndMsl(); buzz(35); message(isNine?'FOX 2':SPEC['120'].sarh?'FOX 1':'FOX 3',1);
 }
 function updateWeapons(dt){
   updateRadar(dt);
   const s9=SPEC['9X'],s12=SPEC['120'], rt=radarTarget();
   // 9X seeker: slaved to the radar target if it can see it, otherwise searches near the nose for the hottest source
   let seek=null;
-  if(rt){_a.subVectors(rt.pos,P.pos);if(P.fwd.angleTo(_a)<s9.cone&&_a.length()<=s9.maxR*1.2)seek=rt}
+  if(rt){_a.subVectors(rt.pos,P.pos);if(P.fwd.angleTo(_a)<s9.cone&&_a.length()<=s9.maxR*1.2&&(!s9.rear||rearOK(P.pos,rt)))seek=rt}
   if(seek&&irBlocked(P.pos,seek.pos))seek=null;
-  if(!seek){let ba=.35;for(const e of enemies){if(!e.alive||irBlocked(P.pos,e.pos))continue;_a.subVectors(e.pos,P.pos);const a=P.fwd.angleTo(_a);if(a<ba&&_a.length()<=s9.maxR*1.2){ba=a;seek=e}}}
+  if(!seek){let ba=.35;for(const e of enemies){if(!e.alive||irBlocked(P.pos,e.pos)||(s9.rear&&!rearOK(P.pos,e)))continue;_a.subVectors(e.pos,P.pos);const a=P.fwd.angleTo(_a);if(a<ba&&_a.length()<=s9.maxR*1.2){ba=a;seek=e}}}
   if(seek&&seek===seekT)lockT+=dt; else {seekT=seek;lockT=0}
   lockTarget=rt||seekT;
   if(lockTarget){_a.subVectors(lockTarget.pos,P.pos);lockDist=_a.length();lockAng=P.fwd.angleTo(_a)} else {lockDist=0;lockAng=0}

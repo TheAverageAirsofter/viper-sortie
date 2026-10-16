@@ -1141,24 +1141,24 @@ const cmo=(flares,chaff,decoys,maws,jam,jamName,cmds,stations)=>({fixed:true,fla
 const stn=(sr,mr)=>[...sr.map((l,i)=>[l[0],l[1],'r9_'+i]),...mr.map((l,i)=>[l[0],l[1],'r120_'+i])];
 // short-range heat seekers (game values; ranges and gimbal limits est.)
 const SRM={
-  AIM9B:{burn:2.2,acc:90,cd:8e-5,gmax:16,life:18,fuze:7,gimbal:.5,decoy:.35,minR:600,maxR:3500,cone:.3,lockT:1.5},     // rear-aspect, flare-prone
-  AIM9P:{burn:3.5,acc:115,cd:7.5e-5,gmax:25,life:22,fuze:7,gimbal:.7,decoy:.2,minR:500,maxR:6000,cone:.4,lockT:1.2},
-  AIM9L:{burn:4,acc:130,cd:7e-5,gmax:32,life:25,fuze:8,gimbal:.9,decoy:.14,minR:400,maxR:8500,cone:.55,lockT:1},        // all-aspect
-  R60:{burn:3,acc:120,cd:7e-5,gmax:35,life:18,fuze:6,gimbal:.7,decoy:.2,minR:300,maxR:6000,cone:.5,lockT:1},
-  AAM3:{burn:4,acc:135,cd:7e-5,gmax:35,life:25,fuze:8,gimbal:1.0,decoy:.12,minR:400,maxR:9000,cone:.65,lockT:.9},
+  AIM9B:{burn:2.5,acc:110,cd:8e-5,gmax:16,life:18,fuze:7,gimbal:.5,decoy:.35,minR:600,maxR:3500,cone:.3,lockT:1.5,rear:true},     // rear-aspect, flare-prone
+  AIM9P:{burn:3.5,acc:135,cd:7.5e-5,gmax:25,life:22,fuze:7,gimbal:.7,decoy:.2,minR:500,maxR:6000,cone:.4,lockT:1.2,rear:true},
+  AIM9L:{burn:4,acc:150,cd:7e-5,gmax:32,life:25,fuze:8,gimbal:.9,decoy:.14,minR:400,maxR:8500,cone:.55,lockT:1},        // all-aspect
+  R60:{burn:3.5,acc:150,cd:7e-5,gmax:35,life:18,fuze:6,gimbal:.7,decoy:.2,minR:300,maxR:6000,cone:.5,lockT:1},
+  AAM3:{burn:4,acc:150,cd:7e-5,gmax:35,life:25,fuze:8,gimbal:1.0,decoy:.12,minR:400,maxR:9000,cone:.65,lockT:.9},
   AAM5:{burn:5,acc:165,cd:7e-5,gmax:50,life:25,fuze:9,gimbal:1.4,decoy:.07,minR:300,maxR:13000,cone:1.3,lockT:.7},
-  PY3:{burn:4.5,acc:140,cd:7e-5,gmax:35,life:25,fuze:8,gimbal:1.0,decoy:.1,minR:400,maxR:10000,cone:.9,lockT:.8},
+  PY3:{burn:4.5,acc:165,cd:7e-5,gmax:35,life:25,fuze:8,gimbal:1.0,decoy:.1,minR:400,maxR:10000,cone:.9,lockT:.8},
   PY5:{burn:5,acc:190,cd:7e-5,gmax:60,life:25,fuze:9,gimbal:Math.PI/2,decoy:.05,minR:300,maxR:17000,cone:Math.PI/2,lockT:.7},
   ASRAAM:{burn:5.5,acc:195,cd:6.5e-5,gmax:60,life:28,fuze:9,gimbal:Math.PI/2,decoy:.05,minR:300,maxR:18000,cone:Math.PI/2,lockT:.7},
-  REDTOP:{burn:3.5,acc:110,cd:7e-5,gmax:22,life:20,fuze:7,gimbal:.7,decoy:.16,minR:500,maxR:9000,cone:.4,lockT:1.2},
-  FALCON:{burn:2.5,acc:90,cd:8e-5,gmax:18,life:15,fuze:6,gimbal:.5,decoy:.3,minR:500,maxR:6000,cone:.35,lockT:1.5}};
+  REDTOP:{burn:3.5,acc:125,cd:7e-5,gmax:22,life:20,fuze:7,gimbal:.7,decoy:.16,minR:500,maxR:9000,cone:.4,lockT:1.2,rear:true},
+  FALCON:{burn:2.5,acc:105,cd:8e-5,gmax:18,life:15,fuze:6,gimbal:.5,decoy:.3,minR:500,maxR:6000,cone:.35,lockT:1.5,rear:true}};
 // radar missiles: semi-active Sparrow family (the launcher keeps illuminating), AMRAAM A/B, AAM-4, Derby
 const MRM={
-  AIM7E:{burn:3.5,acc:120,cd:5.5e-5,gmax:22,life:50,fuze:9,gimbal:.9,decoy:0,minR:1500,maxR:24000,cone:.9,lockT:1.8,sarh:true,launchG:4,termR:30000,dlR:0},
-  AIM7:{burn:4,acc:130,cd:5e-5,gmax:25,life:55,fuze:10,gimbal:1.0,decoy:0,minR:1500,maxR:35000,cone:1.05,lockT:1.5,sarh:true,launchG:5,termR:45000,dlR:0},
-  SKYFLASH:{burn:4.5,acc:135,cd:5e-5,gmax:28,life:60,fuze:10,gimbal:1.0,decoy:0,minR:1500,maxR:42000,cone:1.05,lockT:1.5,sarh:true,launchG:5,termR:50000,dlR:0},
-  R3R:{burn:3,acc:85,cd:7e-5,gmax:12,life:25,fuze:7,gimbal:.6,decoy:.05,minR:700,maxR:8000,cone:.45,lockT:1.6,sarh:true,launchG:3,termR:10000,dlR:0},
-  RB27:{burn:3,acc:100,cd:6e-5,gmax:15,life:30,fuze:8,gimbal:.7,decoy:0,minR:1000,maxR:14000,cone:.7,lockT:1.5,sarh:true,launchG:4,termR:20000,dlR:0}};
+  AIM7E:{burn:4.5,acc:150,cd:5.5e-5,gmax:22,life:50,fuze:9,gimbal:.9,decoy:0,minR:1500,maxR:24000,cone:.9,lockT:1.8,sarh:true,launchG:4,termR:30000,dlR:0},
+  AIM7:{burn:5,acc:175,cd:5e-5,gmax:25,life:55,fuze:10,gimbal:1.0,decoy:0,minR:1500,maxR:35000,cone:1.05,lockT:1.5,sarh:true,launchG:5,termR:45000,dlR:0},
+  SKYFLASH:{burn:5,acc:180,cd:5e-5,gmax:28,life:60,fuze:10,gimbal:1.0,decoy:0,minR:1500,maxR:42000,cone:1.05,lockT:1.5,sarh:true,launchG:5,termR:50000,dlR:0},
+  R3R:{burn:3.5,acc:120,cd:7e-5,gmax:12,life:25,fuze:7,gimbal:.6,decoy:.05,minR:700,maxR:8000,cone:.45,lockT:1.6,sarh:true,launchG:3,termR:10000,dlR:0},
+  RB27:{burn:3.5,acc:130,cd:6e-5,gmax:15,life:30,fuze:8,gimbal:.7,decoy:0,minR:1000,maxR:14000,cone:.7,lockT:1.5,sarh:true,launchG:4,termR:20000,dlR:0}};
 MRM.AIM120B=Object.assign({},AC_DEFS.F16.mr,{maxR:32000,dlR:40000,termR:14000});
 MRM.AAM4=Object.assign({},AC_DEFS.F16.mr,{maxR:55000,gmax:40,acc:155,dlR:70000,termR:20000});
 MRM.DERBY=Object.assign({},AC_DEFS.F16.mr,{maxR:50000,gmax:35,dlR:40000,termR:15000});
@@ -2172,8 +2172,11 @@ function irBlocked(a,b){
   if(weather==='SCATTERED')for(const cl of clouds){if(!cl.visible)continue;if(Math.abs(cl.position.y-(a.y+b.y)/2)>2500)continue;if(distSeg(cl.position,a,b)<360)return true}
   return false;
 }
+// early heat seekers (AIM-9B/P, Falcon, Red Top) only see a hot tailpipe: they need the target moving away from the shooter
+const rearOK=(from,tg,k)=>{if(!tg||!tg.fwd)return true;_s1.subVectors(from,tg.pos).normalize();return tg.fwd.dot(_s1)<(k==null?-.45:k)};
 function irEnv(m,tg,dt){   // returns a miss reason or ''
   m.envT=(m.envT||0)-dt; if(m.envT>0)return ''; m.envT=.25;
+  {const sp=m.spec||SPEC[m.type];if(sp&&sp.rear&&!rearOK(m.m.position,tg,.2))return 'REAR-ASPECT SEEKER: TARGET TURNED HEAD-ON'}
   if(irBlocked(m.m.position,tg.pos))return 'LOST THE TARGET IN CLOUD';
   if(weather==='RAIN'&&m.m.position.distanceTo(tg.pos)>3500&&Math.random()<.12)return 'LOST THE TARGET IN RAIN';
   if(timeOfDay!=='NIGHT'&&weather!=='OVERCAST'){_s1.subVectors(tg.pos,m.m.position).normalize(); if(_s1.angleTo(SUN_DIR)<.14&&Math.random()<.35)return 'SEEKER LOCKED ONTO THE SUN'}
@@ -3880,7 +3883,7 @@ function updateAI(e,dt){
   if(e.mslCd<=0&&!own&&missilesAt(tg)<2&&e.mode!=='NOTCH'&&e.mode!=='DRAG'&&e.mode!=='BREAK'){
     const sI=e.espec.IR,sR=e.espec.RDR;
     const D=sk(e), irMax=D.rne?Math.min(e.zI?e.zI.rne*1.15:0,e.zI?e.zI.rmax*D.iK:0):(e.zI?e.zI.rmax*D.iK:0);
-    if(e.zI&&dT>sI.minR&&dT<Math.min(irMax,sI.maxR)&&off<sI.cone*.8){e.ir--;e.mslCd=rand(5,9)*D.cd;launchAI(e,'IR')}
+    if(e.zI&&dT>sI.minR&&dT<Math.min(irMax,sI.maxR)&&off<sI.cone*.8&&(!sI.rear||rearOK(e.pos,tg))){e.ir--;e.mslCd=rand(5,9)*D.cd;launchAI(e,'IR')}
     else if(e.zR&&e.lockT>2&&dT>sR.minR&&dT<e.zR.rmax*D.rK*(jam?.6:1)&&off<.4&&!(sR.launchG&&e.n>sR.launchG)){e.rdr--;e.mslCd=rand(8,13)*D.cd;launchAI(e,'RDR')}
   }
 }
@@ -4116,16 +4119,16 @@ function launch(type,target){
   m.vel.copy(P.vel).addScaledVector(P.up,-4); m.prev.copy(m.m.position);
   m.notchT=0; m.notchRolled=false; m.blindT=0; m.lostT=0; m.term=false; m.kp=null; m.gmode=''; m.reason=target?'':'NO LOCK (BORESIGHT)'; m.team='blue'; m.owner=P; m.name=isNine?AC.srFull:AC.mrFull;
   recLaunch(m,'You',target);
-  sndMsl(); buzz(35); message(isNine?'FOX 2':'FOX 3',1);
+  sndMsl(); buzz(35); message(isNine?'FOX 2':SPEC['120'].sarh?'FOX 1':'FOX 3',1);
 }
 function updateWeapons(dt){
   updateRadar(dt);
   const s9=SPEC['9X'],s12=SPEC['120'], rt=radarTarget();
   // 9X seeker: slaved to the radar target if it can see it, otherwise searches near the nose for the hottest source
   let seek=null;
-  if(rt){_a.subVectors(rt.pos,P.pos);if(P.fwd.angleTo(_a)<s9.cone&&_a.length()<=s9.maxR*1.2)seek=rt}
+  if(rt){_a.subVectors(rt.pos,P.pos);if(P.fwd.angleTo(_a)<s9.cone&&_a.length()<=s9.maxR*1.2&&(!s9.rear||rearOK(P.pos,rt)))seek=rt}
   if(seek&&irBlocked(P.pos,seek.pos))seek=null;
-  if(!seek){let ba=.35;for(const e of enemies){if(!e.alive||irBlocked(P.pos,e.pos))continue;_a.subVectors(e.pos,P.pos);const a=P.fwd.angleTo(_a);if(a<ba&&_a.length()<=s9.maxR*1.2){ba=a;seek=e}}}
+  if(!seek){let ba=.35;for(const e of enemies){if(!e.alive||irBlocked(P.pos,e.pos)||(s9.rear&&!rearOK(P.pos,e)))continue;_a.subVectors(e.pos,P.pos);const a=P.fwd.angleTo(_a);if(a<ba&&_a.length()<=s9.maxR*1.2){ba=a;seek=e}}}
   if(seek&&seek===seekT)lockT+=dt; else {seekT=seek;lockT=0}
   lockTarget=rt||seekT;
   if(lockTarget){_a.subVectors(lockTarget.pos,P.pos);lockDist=_a.length();lockAng=P.fwd.angleTo(_a)} else {lockDist=0;lockAng=0}
@@ -5404,7 +5407,13 @@ const _careerAward=careerAward;
 careerAward=function(){lbAdd();return _careerAward.apply(this,arguments)};
 
 /* ---------- test hook (only with ?test in the URL) ---------- */
-if(/[?&]test\b/.test(location.search))window.__vs={setThr,HEAT,explode,puff,camera,LT,townLights,flashLt,P,fly,dlz,flyout,AC_DEFS,V3,atm,clamp,lbAdd,showOverlay:k=>showOverlay(k),setScore:(n,k)=>{score=n;kills=k},get state(){return state},setAC:id=>{AC=AC_DEFS[id];applyAC()},ROSTER_IDS,restart:()=>startGame(),spawnAll:()=>{let n=0;for(const id of FIGHTERS){spawnFighter('red',id,P.pos.clone().add(new V3(rand(-4000,4000),rand(-300,300),rand(8000,14000))),P.pos);n++}return n},tableRows:id=>({gear:!!GEAR_SPEC[id],snd:!!ENG_SND[id],hp:!!JET_HP[id],rcs:RCS[id]!=null,paint:!!PAINT[id]||!!(AC_DEFS[id].model),band:!!BANDITS[id],fighter:FIGHTERS.indexOf(id)>=0}),get preset(){return preset},PRESETS,get daily(){return daily},dailyAdd,endTest:o=>{deathCause=o.cause||'win';score=o.score||0;kills=o.kills||0;missionT=o.t||90;P.alive=o.alive!==false;P.rescued=!!o.rescued;state='over';careerAward();showOverlay('over')},get AC(){return AC}};
+if(/[?&]test\b/.test(location.search))window.__vs={setThr,HEAT,explode,puff,camera,LT,townLights,flashLt,P,fly,dlz,flyout,AC_DEFS,V3,atm,clamp,lbAdd,showOverlay:k=>showOverlay(k),setScore:(n,k)=>{score=n;kills=k},get state(){return state},missiles:()=>missiles.filter(m=>m.on),setAC:id=>{AC=AC_DEFS[id];applyAC()},wt:{   // weapon-test hooks: a clean sky, one drone, scripted launches
+  begin:id=>{AC=AC_DEFS[id];applyAC();startGame();return AC.id},
+  clear:()=>{waveClearT=1e9;for(const e of enemies){e.alive=false;scene.remove(e.obj)}enemies.length=0;P.pos.set(0,6000,0);P.vel.set(0,0,250);throttle=.7;return state},
+  target:(type,dz,away,speed)=>{const e=spawnFighter('red',type,new V3(0,6000,dz),new V3(0,6000,dz+(away?9999:-9999)),{ir:0,rdr:0,speed:speed||220});e.drone=true;return e.id},
+  lock:()=>{if(enemies[0])lockOn(enemies[0])},fire:w=>{if(w==='9X')fire9=true;else fire120=true},gun:on=>{gunHeld=on},
+  missiles:()=>missiles.filter(m=>m.on),
+  st:()=>{const e=enemies[0];return{can9,can120,aim9:P.aim9,aim120:P.aim120,rounds:P.rounds,alive:!!(e&&e.alive),hp:e?e.hp:0,msl:missiles.filter(m=>m.on).length,stt:!!R.stt,sttAcq:R.acqT,d:e?e.pos.distanceTo(P.pos):0,msg:$('msg')?$('msg').textContent:''}}},M2dims:()=>{const o={};for(const id in M2){const S=M2[id],zs=S.fus.map(f=>f[0]).concat(S.noz.map(n=>n[2]-n[4]/2)),L=Math.max(...zs)-Math.min(...zs),sp=2*Math.max(...S.wings.flatMap(w=>w.st.map(q=>q.x)));o[id]=[+L.toFixed(2),+sp.toFixed(2)]}return o},ROSTER_IDS,restart:()=>startGame(),spawnAll:()=>{let n=0;for(const id of FIGHTERS){spawnFighter('red',id,P.pos.clone().add(new V3(rand(-4000,4000),rand(-300,300),rand(8000,14000))),P.pos);n++}return n},tableRows:id=>({gear:!!GEAR_SPEC[id],snd:!!ENG_SND[id],hp:!!JET_HP[id],rcs:RCS[id]!=null,paint:!!PAINT[id]||!!(AC_DEFS[id].model),band:!!BANDITS[id],fighter:FIGHTERS.indexOf(id)>=0}),get preset(){return preset},PRESETS,get daily(){return daily},dailyAdd,endTest:o=>{deathCause=o.cause||'win';score=o.score||0;kills=o.kills||0;missionT=o.t||90;P.alive=o.alive!==false;P.rescued=!!o.rescued;state='over';careerAward();showOverlay('over')},get AC(){return AC}};
 
 /* ---------- hangar: pick the aircraft, edit the loadout, change paint, read every spec; the jet turns on a turntable behind the panel ---------- */
 const hgEl=$('hangar');

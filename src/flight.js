@@ -114,8 +114,11 @@ function irBlocked(a,b){
   if(weather==='SCATTERED')for(const cl of clouds){if(!cl.visible)continue;if(Math.abs(cl.position.y-(a.y+b.y)/2)>2500)continue;if(distSeg(cl.position,a,b)<360)return true}
   return false;
 }
+// early heat seekers (AIM-9B/P, Falcon, Red Top) only see a hot tailpipe: they need the target moving away from the shooter
+const rearOK=(from,tg,k)=>{if(!tg||!tg.fwd)return true;_s1.subVectors(from,tg.pos).normalize();return tg.fwd.dot(_s1)<(k==null?-.45:k)};
 function irEnv(m,tg,dt){   // returns a miss reason or ''
   m.envT=(m.envT||0)-dt; if(m.envT>0)return ''; m.envT=.25;
+  {const sp=m.spec||SPEC[m.type];if(sp&&sp.rear&&!rearOK(m.m.position,tg,.2))return 'REAR-ASPECT SEEKER: TARGET TURNED HEAD-ON'}
   if(irBlocked(m.m.position,tg.pos))return 'LOST THE TARGET IN CLOUD';
   if(weather==='RAIN'&&m.m.position.distanceTo(tg.pos)>3500&&Math.random()<.12)return 'LOST THE TARGET IN RAIN';
   if(timeOfDay!=='NIGHT'&&weather!=='OVERCAST'){_s1.subVectors(tg.pos,m.m.position).normalize(); if(_s1.angleTo(SUN_DIR)<.14&&Math.random()<.35)return 'SEEKER LOCKED ONTO THE SUN'}

@@ -149,7 +149,7 @@ function updateAI(e,dt){
   if(e.mslCd<=0&&!own&&missilesAt(tg)<2&&e.mode!=='NOTCH'&&e.mode!=='DRAG'&&e.mode!=='BREAK'){
     const sI=e.espec.IR,sR=e.espec.RDR;
     const D=sk(e), irMax=D.rne?Math.min(e.zI?e.zI.rne*1.15:0,e.zI?e.zI.rmax*D.iK:0):(e.zI?e.zI.rmax*D.iK:0);
-    if(e.zI&&dT>sI.minR&&dT<Math.min(irMax,sI.maxR)&&off<sI.cone*.8){e.ir--;e.mslCd=rand(5,9)*D.cd;launchAI(e,'IR')}
+    if(e.zI&&dT>sI.minR&&dT<Math.min(irMax,sI.maxR)&&off<sI.cone*.8&&(!sI.rear||rearOK(e.pos,tg))){e.ir--;e.mslCd=rand(5,9)*D.cd;launchAI(e,'IR')}
     else if(e.zR&&e.lockT>2&&dT>sR.minR&&dT<e.zR.rmax*D.rK*(jam?.6:1)&&off<.4&&!(sR.launchG&&e.n>sR.launchG)){e.rdr--;e.mslCd=rand(8,13)*D.cd;launchAI(e,'RDR')}
   }
 }

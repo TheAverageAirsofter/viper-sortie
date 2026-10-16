@@ -5,24 +5,24 @@ const cmo=(flares,chaff,decoys,maws,jam,jamName,cmds,stations)=>({fixed:true,fla
 const stn=(sr,mr)=>[...sr.map((l,i)=>[l[0],l[1],'r9_'+i]),...mr.map((l,i)=>[l[0],l[1],'r120_'+i])];
 // short-range heat seekers (game values; ranges and gimbal limits est.)
 const SRM={
-  AIM9B:{burn:2.2,acc:90,cd:8e-5,gmax:16,life:18,fuze:7,gimbal:.5,decoy:.35,minR:600,maxR:3500,cone:.3,lockT:1.5},     // rear-aspect, flare-prone
-  AIM9P:{burn:3.5,acc:115,cd:7.5e-5,gmax:25,life:22,fuze:7,gimbal:.7,decoy:.2,minR:500,maxR:6000,cone:.4,lockT:1.2},
-  AIM9L:{burn:4,acc:130,cd:7e-5,gmax:32,life:25,fuze:8,gimbal:.9,decoy:.14,minR:400,maxR:8500,cone:.55,lockT:1},        // all-aspect
-  R60:{burn:3,acc:120,cd:7e-5,gmax:35,life:18,fuze:6,gimbal:.7,decoy:.2,minR:300,maxR:6000,cone:.5,lockT:1},
-  AAM3:{burn:4,acc:135,cd:7e-5,gmax:35,life:25,fuze:8,gimbal:1.0,decoy:.12,minR:400,maxR:9000,cone:.65,lockT:.9},
+  AIM9B:{burn:2.5,acc:110,cd:8e-5,gmax:16,life:18,fuze:7,gimbal:.5,decoy:.35,minR:600,maxR:3500,cone:.3,lockT:1.5,rear:true},     // rear-aspect, flare-prone
+  AIM9P:{burn:3.5,acc:135,cd:7.5e-5,gmax:25,life:22,fuze:7,gimbal:.7,decoy:.2,minR:500,maxR:6000,cone:.4,lockT:1.2,rear:true},
+  AIM9L:{burn:4,acc:150,cd:7e-5,gmax:32,life:25,fuze:8,gimbal:.9,decoy:.14,minR:400,maxR:8500,cone:.55,lockT:1},        // all-aspect
+  R60:{burn:3.5,acc:150,cd:7e-5,gmax:35,life:18,fuze:6,gimbal:.7,decoy:.2,minR:300,maxR:6000,cone:.5,lockT:1},
+  AAM3:{burn:4,acc:150,cd:7e-5,gmax:35,life:25,fuze:8,gimbal:1.0,decoy:.12,minR:400,maxR:9000,cone:.65,lockT:.9},
   AAM5:{burn:5,acc:165,cd:7e-5,gmax:50,life:25,fuze:9,gimbal:1.4,decoy:.07,minR:300,maxR:13000,cone:1.3,lockT:.7},
-  PY3:{burn:4.5,acc:140,cd:7e-5,gmax:35,life:25,fuze:8,gimbal:1.0,decoy:.1,minR:400,maxR:10000,cone:.9,lockT:.8},
+  PY3:{burn:4.5,acc:165,cd:7e-5,gmax:35,life:25,fuze:8,gimbal:1.0,decoy:.1,minR:400,maxR:10000,cone:.9,lockT:.8},
   PY5:{burn:5,acc:190,cd:7e-5,gmax:60,life:25,fuze:9,gimbal:Math.PI/2,decoy:.05,minR:300,maxR:17000,cone:Math.PI/2,lockT:.7},
   ASRAAM:{burn:5.5,acc:195,cd:6.5e-5,gmax:60,life:28,fuze:9,gimbal:Math.PI/2,decoy:.05,minR:300,maxR:18000,cone:Math.PI/2,lockT:.7},
-  REDTOP:{burn:3.5,acc:110,cd:7e-5,gmax:22,life:20,fuze:7,gimbal:.7,decoy:.16,minR:500,maxR:9000,cone:.4,lockT:1.2},
-  FALCON:{burn:2.5,acc:90,cd:8e-5,gmax:18,life:15,fuze:6,gimbal:.5,decoy:.3,minR:500,maxR:6000,cone:.35,lockT:1.5}};
+  REDTOP:{burn:3.5,acc:125,cd:7e-5,gmax:22,life:20,fuze:7,gimbal:.7,decoy:.16,minR:500,maxR:9000,cone:.4,lockT:1.2,rear:true},
+  FALCON:{burn:2.5,acc:105,cd:8e-5,gmax:18,life:15,fuze:6,gimbal:.5,decoy:.3,minR:500,maxR:6000,cone:.35,lockT:1.5,rear:true}};
 // radar missiles: semi-active Sparrow family (the launcher keeps illuminating), AMRAAM A/B, AAM-4, Derby
 const MRM={
-  AIM7E:{burn:3.5,acc:120,cd:5.5e-5,gmax:22,life:50,fuze:9,gimbal:.9,decoy:0,minR:1500,maxR:24000,cone:.9,lockT:1.8,sarh:true,launchG:4,termR:30000,dlR:0},
-  AIM7:{burn:4,acc:130,cd:5e-5,gmax:25,life:55,fuze:10,gimbal:1.0,decoy:0,minR:1500,maxR:35000,cone:1.05,lockT:1.5,sarh:true,launchG:5,termR:45000,dlR:0},
-  SKYFLASH:{burn:4.5,acc:135,cd:5e-5,gmax:28,life:60,fuze:10,gimbal:1.0,decoy:0,minR:1500,maxR:42000,cone:1.05,lockT:1.5,sarh:true,launchG:5,termR:50000,dlR:0},
-  R3R:{burn:3,acc:85,cd:7e-5,gmax:12,life:25,fuze:7,gimbal:.6,decoy:.05,minR:700,maxR:8000,cone:.45,lockT:1.6,sarh:true,launchG:3,termR:10000,dlR:0},
-  RB27:{burn:3,acc:100,cd:6e-5,gmax:15,life:30,fuze:8,gimbal:.7,decoy:0,minR:1000,maxR:14000,cone:.7,lockT:1.5,sarh:true,launchG:4,termR:20000,dlR:0}};
+  AIM7E:{burn:4.5,acc:150,cd:5.5e-5,gmax:22,life:50,fuze:9,gimbal:.9,decoy:0,minR:1500,maxR:24000,cone:.9,lockT:1.8,sarh:true,launchG:4,termR:30000,dlR:0},
+  AIM7:{burn:5,acc:175,cd:5e-5,gmax:25,life:55,fuze:10,gimbal:1.0,decoy:0,minR:1500,maxR:35000,cone:1.05,lockT:1.5,sarh:true,launchG:5,termR:45000,dlR:0},
+  SKYFLASH:{burn:5,acc:180,cd:5e-5,gmax:28,life:60,fuze:10,gimbal:1.0,decoy:0,minR:1500,maxR:42000,cone:1.05,lockT:1.5,sarh:true,launchG:5,termR:50000,dlR:0},
+  R3R:{burn:3.5,acc:120,cd:7e-5,gmax:12,life:25,fuze:7,gimbal:.6,decoy:.05,minR:700,maxR:8000,cone:.45,lockT:1.6,sarh:true,launchG:3,termR:10000,dlR:0},
+  RB27:{burn:3.5,acc:130,cd:6e-5,gmax:15,life:30,fuze:8,gimbal:.7,decoy:0,minR:1000,maxR:14000,cone:.7,lockT:1.5,sarh:true,launchG:4,termR:20000,dlR:0}};
 MRM.AIM120B=Object.assign({},AC_DEFS.F16.mr,{maxR:32000,dlR:40000,termR:14000});
 MRM.AAM4=Object.assign({},AC_DEFS.F16.mr,{maxR:55000,gmax:40,acc:155,dlR:70000,termR:20000});
 MRM.DERBY=Object.assign({},AC_DEFS.F16.mr,{maxR:50000,gmax:35,dlR:40000,termR:15000});
