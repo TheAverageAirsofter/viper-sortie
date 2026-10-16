@@ -53,5 +53,12 @@ const path = require('path'), assert = require('assert');
   await p.click('#bHangar'); await p.click('#hgLaunch'); await p.waitForTimeout(2500);
   assert(!(await p.isVisible('#hangar'))); assert.equal(await p.evaluate(() => __vs.state), 'play');
   await p.click('#bPause'); await p.waitForTimeout(500); assert(!(await p.isVisible('#bHangar')), 'no hangar in the pause menu');
+  // after a sortie (debrief screen) the hangar must still show the jet parked in the hall
+  await p.click('#bQuit'); await p.waitForTimeout(500);
+  await p.click('#bStart'); await p.waitForTimeout(2000);
+  await p.evaluate(() => { const { P } = __vs; P.pos.y = 5; P.vel.set(0, -80, 200); }); await p.waitForFunction(() => __vs.state === 'over', null, { timeout: 25000 });
+  await p.click('#bHangar'); await p.waitForTimeout(800);
+  assert(await p.evaluate(() => __vs.hgParked()), 'hangar shows the jet after a sortie');
+  await p.click('#hgLaunch'); await p.waitForTimeout(1500); assert.equal(await p.evaluate(() => __vs.state), 'play'); assert(!(await p.evaluate(() => __vs.hgParked())), 'jet leaves the hangar on launch');
   assert.deepEqual(errs, []); console.log('hangar ok'); await b.close();
 })().catch(e => { console.error(e); process.exit(1); });

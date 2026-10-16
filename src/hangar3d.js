@@ -81,9 +81,10 @@ function hgSign(){const c=hgBanner.c.getContext('2d');c.fillStyle='#1b2a3a';c.fi
   c.font='700 40px "B612 Mono",monospace';c.fillStyle='#7dff9a';c.fillText(AC.name.toUpperCase(),512,196);hgBanner.t.needsUpdate=true}
 // step the jet into the hangar: parked, gear down, engine off, canopy open
 function hgEnter(){if(hgSaved)return;if(!hgScene)hgScene=hgBuild();
+  if(state==='over')applyAC();   // after a sortie the jet is battered: start from a fresh airframe
   hgSaved={pos:P.pos.clone(),q:playerJet.quaternion.clone(),vel:P.vel.clone(),gear:P.gear,gearT:P.gearT,og:P.onGround,thr:throttle,ci:P.ci};
   hgScene.environment=scene.environment;hgScene.add(playerJet);
-  P.pos.set(0,GEAR_H,HG_JZ);playerJet.quaternion.identity();P.vel.set(0,0,0);P.onGround=true;P.ci=[0,0,0,0];throttle=0;setGear(true);P.gearT=1;axes(P);
+  playerJet.visible=true;P.pos.set(0,GEAR_H,HG_JZ);playerJet.quaternion.identity();P.vel.set(0,0,0);P.onGround=true;P.ci=[0,0,0,0];throttle=0;setGear(true);P.gearT=1;axes(P);
   hgRefresh();HG.tgt.set(0,2.2,HG_JZ);HG.r=((typeof M2!=='undefined'&&M2[AC.id]&&M2[AC.id].L)||16)*1.35}
 // aircraft or loadout changed while parked: re-fit the shadow, ladder and sign, and keep the engine dark
 function hgRefresh(){if(!hgSaved)return;

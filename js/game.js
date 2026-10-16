@@ -4263,6 +4263,13 @@ function padTarget(){
   let b=null,bd=1e9;for(const e of enemies){const d=e.pos.distanceTo(P.pos);if(d<bd){bd=d;b=e}}return b;
 }
 function updateCamera(dt){
+  if(HG.on&&hgSaved){applyProj();   // hangar: orbit and pan around a target point, kept inside the hall
+    playerJet.visible=true; if(!HG.drag&&HG.auto)HG.ang+=dt*.25;
+    const r=HG.r*HG.zoom, ce=Math.cos(HG.el);
+    HG.tgt.set(clamp(HG.tgt.x,-26,26),clamp(HG.tgt.y,.4,12),clamp(HG.tgt.z,-29,29));
+    camera.position.set(HG.tgt.x+Math.sin(HG.ang)*r*ce,HG.tgt.y+Math.sin(HG.el)*r,HG.tgt.z+Math.cos(HG.ang)*r*ce);
+    camera.position.x=clamp(camera.position.x,-27,27);camera.position.y=clamp(camera.position.y,.35,16);camera.position.z=clamp(camera.position.z,-31,45);
+    camera.up.set(0,1,0); camUp.set(0,1,0); camera.lookAt(HG.tgt); if(hgSky)hgSky.position.copy(camera.position); camSnap=true; return}
   const alive=state==='play'||state==='menu'||state==='paused';
   applyProj();
   let v=VIEWS[view];
@@ -4270,13 +4277,7 @@ function updateCamera(dt){
   if(v==='PADLOCK'&&!pt)v='CHASE';
   playerJet.visible=(alive||(state!=='menu'&&P.alive))&&v!=='COCKPIT';
   if(!alive){camera.up.set(0,1,0);if(P.ejected&&chute&&state!=='replay')camera.position.lerp(_a.copy(chute.position).add(_b.set(16,5,16)),1-Math.exp(-dt*3));camera.lookAt(P.pos);return}
-  if(HG.on&&state==='menu'){   // hangar: orbit and pan around a target point, kept inside the hall
-    playerJet.visible=true; if(!HG.drag&&HG.auto)HG.ang+=dt*.25;
-    const r=HG.r*HG.zoom, ce=Math.cos(HG.el);
-    HG.tgt.set(clamp(HG.tgt.x,-26,26),clamp(HG.tgt.y,.4,12),clamp(HG.tgt.z,-29,29));
-    camera.position.set(HG.tgt.x+Math.sin(HG.ang)*r*ce,HG.tgt.y+Math.sin(HG.el)*r,HG.tgt.z+Math.cos(HG.ang)*r*ce);
-    camera.position.x=clamp(camera.position.x,-27,27);camera.position.y=clamp(camera.position.y,.35,16);camera.position.z=clamp(camera.position.z,-31,45);
-    camera.up.set(0,1,0); camUp.set(0,1,0); camera.lookAt(HG.tgt); if(hgSky)hgSky.position.copy(camera.position); camSnap=true; return}
+
   const q=playerJet.quaternion, k=camSnap?1:1-Math.exp(-dt*8); camSnap=false;
   if(look.id===null){const k2=Math.exp(-dt*3);look.yaw*=k2;look.pitch*=k2}
   if(v==='COCKPIT'){
@@ -4720,7 +4721,7 @@ function frame(now){
   updateShadow(); gust=1+.35*Math.sin(clock*.7)*Math.sin(clock*1.9+1); updateRain(dt||.016); updateLightning(dt||.016);
   for(const cl of clouds){if(!cl.visible)continue;const d=cl.position.distanceTo(camera.position),o=clamp((d-380)/900,0,1)*.95;if(cl.userData.op!==o){cl.userData.op=o;for(const m of cl.userData.mats)m.opacity=o}}
   sndEngine(); sndExtra(); sndFlyby(); updateGlints(); updateFlareLight(); shadowFollow();
-  renderer.clear(); renderer.render(HG.on&&state==='menu'&&hgScene?hgScene:scene,camera); if(VIEWS[view]!=='COCKPIT'&&!(KC.t>0)&&state!=='replay')heatPass();
+  renderer.clear(); renderer.render(HG.on&&hgSaved&&hgScene?hgScene:scene,camera); if(VIEWS[view]!=='COCKPIT'&&!(KC.t>0)&&state!=='replay')heatPass();
   if(VIEWS[view]==='COCKPIT'&&!(KC.t>0)&&(state==='play'||state==='menu'||state==='paused')){
     updateCockpit(dt||.016); renderer.clearDepth(); renderer.render(cockScene,cockCam);
   }
@@ -4842,7 +4843,7 @@ const hgEl=$('hangar');
 function hgTab(t){for(const b of hgEl.querySelectorAll('.hgTabs button'))b.classList.toggle('on',b.dataset.tab===t);
   $('hgLoad').hidden=t!=='load';$('hgSpec').hidden=t!=='spec';$('hgPaint').hidden=t!=='paint';$('hgTree').hidden=t!=='tree';if(t==='spec')hgSpecs();if(t==='tree')progRender();progWallet()}
 function hgOpen(t){if(state!=='menu'&&state!=='over')return;
-  if(!HG.on){HG.on=true;HG.zoom=1;HG.el=.2;HG.ang=.7;HG.auto=true;document.body.classList.add('hangar');hgEl.hidden=false;projKey='';if(state==='menu')hgEnter()}
+  if(!HG.on){HG.on=true;HG.zoom=1;HG.el=.2;HG.ang=.7;HG.auto=true;document.body.classList.add('hangar');hgEl.hidden=false;projKey='';hgEnter()}
   hgTab(t||'load');$('hgName').textContent=AC.name;renderLd()}
 function hgClose(){if(!HG.on)return;hgLeave();HG.on=false;HG.drag=null;document.body.classList.remove('hangar');hgEl.hidden=true;projKey='';camSnap=true}
 $('bHangar').addEventListener('click',()=>hgOpen('load'));
@@ -4877,6 +4878,8 @@ addEventListener('keydown',e=>{if(e.key==='Escape'&&HG.on){hgClose();e.stopPropa
 // the aircraft or loadout changed: keep the title and the spec sheet in step
 const _applyAC=applyAC;
 applyAC=function(){_applyAC.apply(this,arguments);if(HG.on){hgRefresh();$('hgName').textContent=AC.name;if(!$('hgSpec').hidden)hgSpecs()}};
+const _startGame=startGame;
+startGame=function(){hgClose();return _startGame.apply(this,arguments)};   // never start a sortie with the jet still parked in the hangar scene
 // no aircraft or loadout changes mid-sortie
 const _showOverlay2=showOverlay;
 showOverlay=function(kind){_showOverlay2(kind);const p=kind==='pause';$('bHangar').hidden=p;$('bRole').hidden=p;if(p)hgClose()};
@@ -5000,9 +5003,10 @@ function hgSign(){const c=hgBanner.c.getContext('2d');c.fillStyle='#1b2a3a';c.fi
   c.font='700 40px "B612 Mono",monospace';c.fillStyle='#7dff9a';c.fillText(AC.name.toUpperCase(),512,196);hgBanner.t.needsUpdate=true}
 // step the jet into the hangar: parked, gear down, engine off, canopy open
 function hgEnter(){if(hgSaved)return;if(!hgScene)hgScene=hgBuild();
+  if(state==='over')applyAC();   // after a sortie the jet is battered: start from a fresh airframe
   hgSaved={pos:P.pos.clone(),q:playerJet.quaternion.clone(),vel:P.vel.clone(),gear:P.gear,gearT:P.gearT,og:P.onGround,thr:throttle,ci:P.ci};
   hgScene.environment=scene.environment;hgScene.add(playerJet);
-  P.pos.set(0,GEAR_H,HG_JZ);playerJet.quaternion.identity();P.vel.set(0,0,0);P.onGround=true;P.ci=[0,0,0,0];throttle=0;setGear(true);P.gearT=1;axes(P);
+  playerJet.visible=true;P.pos.set(0,GEAR_H,HG_JZ);playerJet.quaternion.identity();P.vel.set(0,0,0);P.onGround=true;P.ci=[0,0,0,0];throttle=0;setGear(true);P.gearT=1;axes(P);
   hgRefresh();HG.tgt.set(0,2.2,HG_JZ);HG.r=((typeof M2!=='undefined'&&M2[AC.id]&&M2[AC.id].L)||16)*1.35}
 // aircraft or loadout changed while parked: re-fit the shadow, ladder and sign, and keep the engine dark
 function hgRefresh(){if(!hgSaved)return;

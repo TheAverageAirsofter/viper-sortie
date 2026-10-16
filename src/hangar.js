@@ -4,7 +4,7 @@ const hgEl=$('hangar');
 function hgTab(t){for(const b of hgEl.querySelectorAll('.hgTabs button'))b.classList.toggle('on',b.dataset.tab===t);
   $('hgLoad').hidden=t!=='load';$('hgSpec').hidden=t!=='spec';$('hgPaint').hidden=t!=='paint';$('hgTree').hidden=t!=='tree';if(t==='spec')hgSpecs();if(t==='tree')progRender();progWallet()}
 function hgOpen(t){if(state!=='menu'&&state!=='over')return;
-  if(!HG.on){HG.on=true;HG.zoom=1;HG.el=.2;HG.ang=.7;HG.auto=true;document.body.classList.add('hangar');hgEl.hidden=false;projKey='';if(state==='menu')hgEnter()}
+  if(!HG.on){HG.on=true;HG.zoom=1;HG.el=.2;HG.ang=.7;HG.auto=true;document.body.classList.add('hangar');hgEl.hidden=false;projKey='';hgEnter()}
   hgTab(t||'load');$('hgName').textContent=AC.name;renderLd()}
 function hgClose(){if(!HG.on)return;hgLeave();HG.on=false;HG.drag=null;document.body.classList.remove('hangar');hgEl.hidden=true;projKey='';camSnap=true}
 $('bHangar').addEventListener('click',()=>hgOpen('load'));
@@ -39,6 +39,8 @@ addEventListener('keydown',e=>{if(e.key==='Escape'&&HG.on){hgClose();e.stopPropa
 // the aircraft or loadout changed: keep the title and the spec sheet in step
 const _applyAC=applyAC;
 applyAC=function(){_applyAC.apply(this,arguments);if(HG.on){hgRefresh();$('hgName').textContent=AC.name;if(!$('hgSpec').hidden)hgSpecs()}};
+const _startGame=startGame;
+startGame=function(){hgClose();return _startGame.apply(this,arguments)};   // never start a sortie with the jet still parked in the hangar scene
 // no aircraft or loadout changes mid-sortie
 const _showOverlay2=showOverlay;
 showOverlay=function(kind){_showOverlay2(kind);const p=kind==='pause';$('bHangar').hidden=p;$('bRole').hidden=p;if(p)hgClose()};

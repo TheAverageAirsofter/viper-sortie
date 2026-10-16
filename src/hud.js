@@ -6,6 +6,13 @@ function padTarget(){
   let b=null,bd=1e9;for(const e of enemies){const d=e.pos.distanceTo(P.pos);if(d<bd){bd=d;b=e}}return b;
 }
 function updateCamera(dt){
+  if(HG.on&&hgSaved){applyProj();   // hangar: orbit and pan around a target point, kept inside the hall
+    playerJet.visible=true; if(!HG.drag&&HG.auto)HG.ang+=dt*.25;
+    const r=HG.r*HG.zoom, ce=Math.cos(HG.el);
+    HG.tgt.set(clamp(HG.tgt.x,-26,26),clamp(HG.tgt.y,.4,12),clamp(HG.tgt.z,-29,29));
+    camera.position.set(HG.tgt.x+Math.sin(HG.ang)*r*ce,HG.tgt.y+Math.sin(HG.el)*r,HG.tgt.z+Math.cos(HG.ang)*r*ce);
+    camera.position.x=clamp(camera.position.x,-27,27);camera.position.y=clamp(camera.position.y,.35,16);camera.position.z=clamp(camera.position.z,-31,45);
+    camera.up.set(0,1,0); camUp.set(0,1,0); camera.lookAt(HG.tgt); if(hgSky)hgSky.position.copy(camera.position); camSnap=true; return}
   const alive=state==='play'||state==='menu'||state==='paused';
   applyProj();
   let v=VIEWS[view];
@@ -13,13 +20,7 @@ function updateCamera(dt){
   if(v==='PADLOCK'&&!pt)v='CHASE';
   playerJet.visible=(alive||(state!=='menu'&&P.alive))&&v!=='COCKPIT';
   if(!alive){camera.up.set(0,1,0);if(P.ejected&&chute&&state!=='replay')camera.position.lerp(_a.copy(chute.position).add(_b.set(16,5,16)),1-Math.exp(-dt*3));camera.lookAt(P.pos);return}
-  if(HG.on&&state==='menu'){   // hangar: orbit and pan around a target point, kept inside the hall
-    playerJet.visible=true; if(!HG.drag&&HG.auto)HG.ang+=dt*.25;
-    const r=HG.r*HG.zoom, ce=Math.cos(HG.el);
-    HG.tgt.set(clamp(HG.tgt.x,-26,26),clamp(HG.tgt.y,.4,12),clamp(HG.tgt.z,-29,29));
-    camera.position.set(HG.tgt.x+Math.sin(HG.ang)*r*ce,HG.tgt.y+Math.sin(HG.el)*r,HG.tgt.z+Math.cos(HG.ang)*r*ce);
-    camera.position.x=clamp(camera.position.x,-27,27);camera.position.y=clamp(camera.position.y,.35,16);camera.position.z=clamp(camera.position.z,-31,45);
-    camera.up.set(0,1,0); camUp.set(0,1,0); camera.lookAt(HG.tgt); if(hgSky)hgSky.position.copy(camera.position); camSnap=true; return}
+
   const q=playerJet.quaternion, k=camSnap?1:1-Math.exp(-dt*8); camSnap=false;
   if(look.id===null){const k2=Math.exp(-dt*3);look.yaw*=k2;look.pitch*=k2}
   if(v==='COCKPIT'){
