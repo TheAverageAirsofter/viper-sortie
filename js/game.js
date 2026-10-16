@@ -1906,6 +1906,91 @@ Object.assign(PAINT,{
   HUNTER:{p:2,c:['#5f6a4f','#7a8068','#8a9298'],b:'#aab0b5',nat:'raf',num:'XG190'},
   MIRAGE3C:{p:2,c:['#8e969d','#a7adb3','#7d8995'],b:'#b9bdc2',nat:'fra',num:'3-XA'}});
 
+/* ===== Cold War jets, second batch: F-4C, F-5A, J 35D Draken, J 29F Tunnan, J-6A, MiG-21MF (War Thunder wiki for BR, guns, missiles and sizes; est. elsewhere) ===== */
+SRM.RB24=Object.assign({},SRM.AIM9B);                                                              // Swedish licence-built Sidewinder
+SRM.AIM9E=Object.assign({},SRM.AIM9P,{acc:130,gmax:22,maxR:5500,gimbal:.6});
+MRM.AIM7D=Object.assign({},MRM.AIM7E,{acc:140,gmax:18,maxR:18000,termR:22000});
+// F-4C Phantom II: 17.8 m (no gun nose), 2× J79-GE-15, no gun, AIM-9B + AIM-7D, APQ-100
+dv('F4E','F4C','F-4C Phantom II','Phantom',{corner:430,
+  MASS:16500,cdK:1.1,gmax:7,gunRate:0,gunRounds:0,ammo:'20MM',
+  srName:'9B',srFull:'AIM-9B',mrName:'7D',mrFull:'AIM-7D',srN:4,mrN:4,sr:SRM.AIM9B,mr:MRM.AIM7D,
+  radar:{modes:['RWS'],name:'AN/APQ-100',range:60000},
+  cm:cmo(0,0,0,false,null,'','none',stn([['1','9B'],['2','9B'],['3','9B'],['4','9B']],[['5','7D'],['6','7D'],['7','7D'],['8','7D']])),
+  spec:'<span><b>+7 g</b></span><span><b>Mach 2.2</b></span><span>2× J79 <b>~160 kN</b></span><span>No gun</span><span>AIM-7D · AIM-9B</span><span>No countermeasures</span>',
+  rwrSym:'F4',rwrName:'none',srDesc:'AIM-9B Sidewinder (rear aspect, short range)',mrDesc:'AIM-7D Sparrow: semi-active, hold the lock to impact',cmDesc:'none'});
+// F-5A Freedom Fighter: 2× J85-GE-13 (36 kN AB), 15.8 m² wing, 2× M39A2 (560 rds), AIM-9E, no radar
+dv('F5E','F5A','F-5A Freedom Fighter','Freedom',{corner:370,
+  S:15.8,MASS:5600,T_AB:36500,T_MIL:24500,gmax:7.3,roll:6.2,vne:710,
+  srName:'9E',srFull:'AIM-9E',srN:2,sr:SRM.AIM9E,
+  radar:{modes:['RWS'],name:'Gun sight (no radar)',range:3000},
+  cm:cmo(0,0,0,false,null,'','none',stn([['TIP L','9E'],['TIP R','9E']],[])),
+  spec:'<span><b>+7.3 g</b></span><span><b>Mach 1.4</b></span><span>2× J85 <b>36 kN</b></span><span>2× M39A2 · <b>560 rds</b></span><span>2× AIM-9E</span><span>No countermeasures</span>',
+  srDesc:'AIM-9E Sidewinder (rear aspect, short range)'});
+// J 35D Draken: RM6C, 2× Akan m/55 30 mm (200 rds), 2× Rb 24, ranging radar
+dv('J35F','J35D','J 35D Draken','Draken',{corner:400,
+  cdK:.6,gunRate:46.7,gunRounds:200,
+  srName:'RB24',srFull:'Rb 24',srN:2,sr:SRM.RB24,mrName:'-',mrFull:'none',mrN:0,
+  radar:{modes:['RWS'],name:'PS-03 ranging',range:12000},
+  cm:cmo(0,0,0,false,null,'','none',stn([['L','RB24'],['R','RB24']],[])),
+  spec:'<span><b>+7 g</b> · double delta</span><span><b>Mach 2.0</b></span><span>RM6C <b>78 kN</b></span><span>2× Akan · <b>200 rds</b></span><span>2× Rb 24</span><span>No countermeasures</span>',
+  srDesc:'Rb 24 (Sidewinder, rear aspect, short range)',mrDesc:'No radar missiles',cmDesc:'none'});
+// J 29F Tunnan: Svenska Ghost RM2B with afterburner (~61 kN), 24 m² wing, 4× Akan m/47C 20 mm (720 rds), Rb 24
+dv('F104G','J29F','J 29F Tunnan','Tunnan',{corner:340,
+  S:24.2,MASS:6200,CLMAX:1.35,KIND:.12,T_AB:61000,T_MIL:44000,ram:.3,cdK:2.0,supK:.3,gmax:7,roll:4.2,vne:600,
+  gunRate:50,gunRounds:720,muzzle:800,gunDmg:1,gunSnd:1500,ammo:'20MM',
+  fuelCap:1720,sfcDry:.85,sfcAB:1.9,fuelUnit:'KG',engines:1,refuel:null,irstR:0,irstMax:0,
+  srName:'RB24',srFull:'Rb 24',mrName:'-',mrFull:'none',srN:2,mrN:0,sr:SRM.RB24,mr:MRM.AIM7,
+  radar:{modes:['RWS'],name:'Ranging sight',range:3000},
+  cm:cmo(0,0,0,false,null,'','none',stn([['L','RB24'],['R','RB24']],[])),
+  spec:'<span><b>+7 g</b></span><span><b>Mach 0.95</b></span><span>RM2B <b>61 kN</b></span><span>4× Akan m/47 · <b>720 rds</b></span><span>2× Rb 24</span><span>No countermeasures</span>',
+  snd:{f:30,roar:200,wh:.003,twin:0,howl:[190,.012]},seek:{flareP:.02,chaffP:.01},rwrSym:'29',rwrName:'none',srDesc:'Rb 24 (Sidewinder, rear aspect, short range)',mrDesc:'No radar missiles',cmDesc:'none'});
+// J-6A: Chinese MiG-19, 2× WP-6A (64 kN AB), 2× Type 30-1 (140 rds), PL-2, no radar
+dv('MIG19PT','J6A','J-6A','Farmer',{corner:330,
+  gunRate:28,gunRounds:140,
+  srName:'PL2',srFull:'PL-2',srN:2,sr:SRM.R3S,
+  radar:{modes:['RWS'],name:'Gun sight (no radar)',range:3000},
+  cm:cmo(0,0,0,false,null,'','none',stn([['1','PL2'],['2','PL2']],[])),
+  spec:'<span><b>+8 g</b></span><span><b>Mach 1.35</b></span><span>2× WP-6A <b>64 kN</b></span><span>2× Type 30-1 · <b>140 rds</b></span><span>2× PL-2</span><span>No countermeasures</span>',
+  srDesc:'PL-2 heat seeker (rear aspect, short range)'});
+// MiG-21MF: R-13-300 (64.7 kN AB), GSh-23L (200 rds), R-60 + R-3R, Sapfir-21
+dv('MIG21','MIG21MF','MiG-21MF','Fishbed',{corner:370,
+  S:23,MASS:7200,T_AB:64700,T_MIL:40200,cdK:.75,gmax:8,roll:5.6,vne:735,
+  gunRate:56.6,gunRounds:200,muzzle:715,gunDmg:1,gunSnd:1200,ammo:'23MM',
+  fuelCap:2300,
+  srName:'R60',srFull:'R-60',srN:2,sr:SRM.R60,mrName:'R3R',mrFull:'R-3R',mrN:2,mr:MRM.R3R,
+  radar:{modes:['RWS'],name:'RP-21 Sapfir',range:30000},
+  cm:cmo(0,0,0,false,null,'','none',stn([['1','R60'],['2','R60']],[['3','R3R'],['4','R3R']])),
+  spec:'<span><b>+8 g</b></span><span><b>Mach 2.05</b></span><span>R-13 <b>64.7 kN</b></span><span>GSh-23L · <b>200 rds</b></span><span>R-3R · R-60</span><span>No countermeasures</span>',
+  srDesc:'R-60 heat seeker, short range',mrDesc:'R-3R semi-active radar missile: hold the lock to impact',cmDesc:'none'});
+AC_DEFS.J35F.cdK=.6;   // the Draken is a Mach 2 jet: the old drag factor held it near Mach 1
+for(const id of ['F4C','F5A','J35D','J29F','J6A','MIG21MF']){delete AC_DEFS[id].model}
+AC_DEFS.J29F.cut=AC_DEFS.F104G.cut;
+// J 29F Tunnan "flying barrel": 10.2 m, 11.0 m span, round fuselage with a nose intake, 25° wing, tailplane on the tailpipe
+M2.J29F={L:10.2,nz:3.3,radome:null,
+  fus:[[-5.1,.2,.2,.2,0,2],[-4.2,.4,.4,.4,0,2.2],[-2.5,.78,.7,.7,0,2.5],[-.5,.92,.78,.74,0,2.7],[1.2,.9,.76,.72,.05,2.7],[2.8,.8,.68,.66,.05,2.5],[3.8,.7,.6,.6,0,2.3],[4.5,.62,.52,.52,0,2.1],[4.85,.5,.4,.4,0,2],[5.1,0,0,0,0,2]],
+  parts:[{x:0,mouth:1,st:[[3.4,.55,.46,.46,0,3],[4.7,.58,.5,.5,0,3],[5.0,.56,.48,.48,0,5]]}],
+  wings:[{st:[{x:.85,zle:1.2,zte:-1.9,y:-.1,t:.045},{x:5.5,zle:-.9,zte:-2.6,y:-.1,t:.03}]},{st:[{x:.5,zle:-3.9,zte:-4.9,y:.3,t:.03},{x:2.3,zle:-4.2,zte:-5.0,y:.3,t:.025}]}],
+  fins:[{x:0,y:.7,st:[{h:0,zle:-2.2,zte:-4.9,t:.05},{h:1.9,zle:-3.8,zte:-5.1,t:.04}]}],
+  canopy:[1.2,.82,.45,.42,1.6],frame:-1,noz:[[0,0,-4.8,.5,.7]],
+  r9:mir([[3.3,-.35,-.8,-.08]]),r120:[]};
+m2Alias('F4C','F4E');
+m2Alias('F5A','F5E',{wings:[{st:[{x:.6,zle:2.8,zte:-2.8,y:-.15,t:.04},{x:1.3,zle:1.9,zte:-2.8,y:-.15,t:.035},{x:3.85,zle:-.8,zte:-2.4,y:-.15,t:.03}]},M2.F5E.wings[1]],r9:mir([[3.85,-.15,-.4,null]]),r120:[]});
+m2Alias('J35D','J35F',{r120:[]});
+m2Alias('J6A','MIG19PT');
+m2Alias('MIG21MF','MIG21',{r9:mir([[2.4,-.34,-.8,-.06]]),r120:mir([[1.4,-.3,-.4,-.06]])});
+for(const id of ['F4C','F5A','J35D','J29F','J6A','MIG21MF'])m2Fit(id);
+Object.assign(M2K,{F4C:[1,1,.927],MIG21MF:[1,1,.955]});
+ROSTER_IDS.push('F4C','F5A','J35D','J29F','J6A','MIG21MF');
+Object.assign(ROSTER_LIKE,{F4C:'F4E',F5A:'F104G',J35D:'J35F',J29F:'F104G',J6A:'MIG21',MIG21MF:'MIG21'});
+Object.assign(PITS,{F4C:'TEEN',F5A:'TEEN',J35D:'TEEN',J29F:'TEEN',J6A:'RUS',MIG21MF:'RUS'});
+Object.assign(PAINT,{
+  F4C:{p:2,c:['#6f776a','#5b655d','#8b928a'],b:'#aab0b5',nat:'usaf',num:'AF 63-7699'},
+  F5A:{p:2,c:['#b9ad8a','#8f9a82','#7b8a99'],b:'#bcc2c8',nat:'usaf',num:'AF 65-10506'},
+  J35D:{p:2,c:['#5f6b4c','#7a8265','#8a9296'],b:'#b9bcc0',nat:'swe',num:'35-12'},
+  J29F:{p:2,c:['#68744f','#80876a','#8a9296'],b:'#b9bcc0',nat:'swe',num:'29-23'},
+  J6A:{p:0,c:['#a9b0b7','#98a0a7','#b6bcc2'],nat:'prc',num:'6021',nose:'6021'},
+  MIG21MF:{p:2,c:['#7a8663','#8e9475','#7d8c99'],b:'#b0b5ba',nat:'rus',num:'27',nose:'27'}});
+
 /* size corrections measured against public length and span (tools/real-dims.json); [across, up, along] */
 Object.assign(M2K,{MIG21F13:[1,1,.955],MIRAGE3C:[1,1,.96],SU57:[1.156,1.03,.93],TORNADO3:[1,1,.88],J7G:[1.165,1,1],FA18C:[.94,.97,.928],J10C:[1,1,1.073],MIG21:[1,1,1.065],F22A:[1,1,.955],F16:[1.03,1,.975],F16B70:[1.03,1,.975],F16BARAK:[1.03,1,.975],F16I:[1.03,1,.975],FA18E:[1.04,1,1],MIG35:[1.056,1,.978],SU27:[1.035,1,.99],SU35:[1.08,1,.99],SU30SM:[1.035,1,.99],J11B:[1.035,1,.99],J16:[1.035,1,.99],J15:[1.035,1,.957],SU33:[1.035,1,.957],PHANTOM2:[1,1,.917]});
 /* ---------------- cockpit: its own scene in seat coordinates (eye at origin, forward −Z) ---------------- */
@@ -2811,7 +2896,7 @@ const JET_HP={F16:{extra:1,tanks:3,tankKg:1130,ag:['HARM','JDAM']},F16B70:{extra
   MIG29K:{extra:1,tanks:3,tankKg:1150,ag:['KH31P','KAB500KR','FAB500']},MIG35:{extra:1,tanks:3,tankKg:1150,ag:['KH31P','KAB500S','FAB500']},
   SU27:{extra:0,tanks:0,tankKg:0,ag:['FAB500']},SU33:{extra:2,tanks:0,tankKg:0,ag:['FAB500']},SU35:{extra:2,tanks:2,tankKg:1600,ag:['KH31P','KAB500S','FAB500']},
   J10C:{extra:1,tanks:3,tankKg:1100,ag:['YJ91','LS6']},J20:{extra:0,tanks:0,tankKg:0,ag:[]}};
-rosterFill(JET_HP,{F8E:{extra:0,tanks:2,tankKg:1000,ag:[]},F100D:{extra:1,tanks:2,tankKg:1000,ag:[]},MIG19PT:{extra:0,tanks:2,tankKg:400,ag:[]},MIG21F13:{extra:0,tanks:1,tankKg:400,ag:[]},HUNTER:{extra:0,tanks:2,tankKg:540,ag:[]},MIRAGE3C:{extra:0,tanks:2,tankKg:800,ag:[]},F4E:{extra:2,tanks:3,tankKg:1800,ag:['PAVE4']},F35A:{extra:2,tanks:0,tankKg:0,ag:['JDAM']},F22A:{extra:0,tanks:0,tankKg:0,ag:[]},F104G:{extra:1,tanks:2,tankKg:700,ag:[]},
+rosterFill(JET_HP,{F4C:{extra:2,tanks:3,tankKg:1800,ag:[]},F5A:{extra:1,tanks:3,tankKg:700,ag:[]},J35D:{extra:0,tanks:1,tankKg:600,ag:[]},J29F:{extra:0,tanks:0,tankKg:0,ag:[]},J6A:{extra:0,tanks:2,tankKg:400,ag:[]},MIG21MF:{extra:1,tanks:2,tankKg:490,ag:[]},F8E:{extra:0,tanks:2,tankKg:1000,ag:[]},F100D:{extra:1,tanks:2,tankKg:1000,ag:[]},MIG19PT:{extra:0,tanks:2,tankKg:400,ag:[]},MIG21F13:{extra:0,tanks:1,tankKg:400,ag:[]},HUNTER:{extra:0,tanks:2,tankKg:540,ag:[]},MIRAGE3C:{extra:0,tanks:2,tankKg:800,ag:[]},F4E:{extra:2,tanks:3,tankKg:1800,ag:['PAVE4']},F35A:{extra:2,tanks:0,tankKg:0,ag:['JDAM']},F22A:{extra:0,tanks:0,tankKg:0,ag:[]},F104G:{extra:1,tanks:2,tankKg:700,ag:[]},
   MIG21:{extra:1,tanks:2,tankKg:400,ag:['FAB500']},SU57:{extra:2,tanks:0,tankKg:0,ag:['KAB500S']},J35F:{extra:0,tanks:1,tankKg:600,ag:[]},JA37:{extra:1,tanks:1,tankKg:1000,ag:[]},
   LIGHTNING:{extra:0,tanks:1,tankKg:1000,ag:[]},TORNADO3:{extra:1,tanks:2,tankKg:1500,ag:[]},KFIR:{extra:2,tanks:3,tankKg:900,ag:['PAVE4']},F15E:{extra:3,tanks:3,tankKg:1820,ag:['JDAM','SDB']},
   F15I:{extra:3,tanks:3,tankKg:1820,ag:['JDAM','SDB']},F16I:{extra:1,tanks:3,tankKg:1130,ag:['JDAM']},F5E:{extra:1,tanks:3,tankKg:900,ag:[]},F14B:{extra:0,tanks:2,tankKg:1000,ag:[]},MIG23ML:{extra:1,tanks:2,tankKg:800,ag:['FAB500']},MIG25PD:{extra:0,tanks:0,tankKg:0,ag:[]},J8F:{extra:1,tanks:2,tankKg:900,ag:['LS6']},MIRAGEF1:{extra:1,tanks:2,tankKg:1100,ag:[]},M2000:{extra:2,tanks:3,tankKg:1700,ag:['LS6']},J7G:{extra:1,tanks:2,tankKg:400,ag:['LS6']},J11B:{extra:1,tanks:0,tankKg:0,ag:['YJ91','LS6']},J15:{extra:1,tanks:0,tankKg:0,ag:['YJ91','LS6']},J16:{extra:2,tanks:2,tankKg:1600,ag:['YJ91','LS6']},SU30SM:{extra:2,tanks:2,tankKg:1600,ag:['KH31P','KAB500S','FAB500']}});
@@ -3251,7 +3336,7 @@ function photoCapture(){photoGrab=false;let url;try{url=glCanvas.toDataURL('imag
 /* ---------------- radar cross-section: detection range scales with RCS^(1/4) (radar equation) and with aspect ----------------
    frontal RCS in m², public estimates where they exist, otherwise game estimates; external stores add to it */
 const RCS={F16:1.2,F16B70:1.2,F15C:10,F15EX:8,FA18E:1,GRIPEN:.5,GRIPENE:.4,TYPHOON:.5,RAFALE:.5,MIG29:5,MIG29UPG:5,MIG29K:3,MIG35:3,SU27:15,SU33:15,SU35:3,J10C:1.5,J20:.05,CRUISE:.1,BOMBER:60,TRANSPORT:40};
-rosterFill(RCS,{F8E:4,F100D:5,MIG19PT:3,MIG21F13:1.8,HUNTER:4,MIRAGE3C:3,F4E:6,FA18C:1.5,F15E:8,F35A:.02,F22A:.01,SU57:.1,F104G:1.5,MIG21:2,SU30SM:12,J35F:3,JA37:4,LIGHTNING:5,TORNADO3:5,KFIR:3,F2A:1.2,F35B:.02,F35DE:.02,F35AJ:.02,F35BJ:.02,F35I:.015,EF2K1:.6,EF2K3:.5,J7G:2,J11B:15,J15:15,J16:6,MIG29G:5});
+rosterFill(RCS,{F4C:6,F5A:1.5,J35D:3,J29F:3.5,J6A:3,MIG21MF:2,F8E:4,F100D:5,MIG19PT:3,MIG21F13:1.8,HUNTER:4,MIRAGE3C:3,F4E:6,FA18C:1.5,F15E:8,F35A:.02,F22A:.01,SU57:.1,F104G:1.5,MIG21:2,SU30SM:12,J35F:3,JA37:4,LIGHTNING:5,TORNADO3:5,KFIR:3,F2A:1.2,F35B:.02,F35DE:.02,F35AJ:.02,F35BJ:.02,F35I:.015,EF2K1:.6,EF2K3:.5,J7G:2,J11B:15,J15:15,J16:6,MIG29G:5});
 const REF_RCS=5;   // radar ranges in the jet data are quoted against a ~5 m² fighter
 function storesRCS(ac){if(ac.id==='J20')return 0;return (ac.srN+ac.mrN)*.04+(AG.load||[]).reduce((a,l)=>a+l.n*.12,0)+(ac.tanks&&!P.tanksGone?ac.tanks*.4:0)}
 function playerRCS(){return (RCS[AC.id]??3)+storesRCS(AC)}
@@ -3412,7 +3497,7 @@ const FIGHTERS=['F16','F16B70','F15C','F15EX','FA18E','GRIPEN','GRIPENE','TYPHOO
 FIGHTERS.push(...ROSTER_IDS);
 Object.assign(BANDITS,{F4E:'F-4E Phantom II',FA18C:'F/A-18C',F15E:'F-15E',F35A:'F-35A',F22A:'F-22A',MIG21:'MiG-21bis',SU30SM:'Su-30SM',SU57:'Su-57',F104G:'F-104G',F4F:'F-4F ICE',MIG29G:'MiG-29G',EF2K1:'EF2000 T1',EF2K3:'EF2000 T3',F35DE:'F-35A (Luftwaffe)',
   F4EJ:'F-4EJ',F4EJK:'F-4EJ Kai',F4EIL:'F-4E (IAF)',F15J:'F-15J',F15JK:'F-15J Kai',F2A:'F-2A',F35AJ:'F-35A (JASDF)',F35B:'F-35B',F35BJ:'F-35B (JASDF)',KFIR:'Kfir C.7',F4E2K:'Kurnass 2000',F15BAZ:'F-15C Baz',F16BARAK:'F-16C Barak',F16I:'F-16I Sufa',F15I:"F-15I Ra'am",F35I:'F-35I Adir',
-  J35F:'J 35F Draken',JA37:'JA 37 Viggen',LIGHTNING:'Lightning F.6',PHANTOM2:'Phantom FGR.2',TORNADO3:'Tornado F.3',J7G:'J-7G',F5E:'F-5E',F14B:'F-14B',MIG23ML:'MiG-23ML',MIG25PD:'MiG-25PD',J8F:'J-8F',F8E:'F-8E Crusader',F100D:'F-100D Super Sabre',MIG19PT:'MiG-19PT',MIG21F13:'MiG-21F-13',HUNTER:'Hunter F.6',MIRAGE3C:'Mirage IIIC',MIRAGEF1:'Mirage F1C',M2000:'Mirage 2000-5F',J11B:'J-11B',J15:'J-15',J16:'J-16'});
+  J35F:'J 35F Draken',JA37:'JA 37 Viggen',LIGHTNING:'Lightning F.6',PHANTOM2:'Phantom FGR.2',TORNADO3:'Tornado F.3',J7G:'J-7G',F5E:'F-5E',F14B:'F-14B',MIG23ML:'MiG-23ML',MIG25PD:'MiG-25PD',J8F:'J-8F',F8E:'F-8E Crusader',F100D:'F-100D Super Sabre',MIG19PT:'MiG-19PT',MIG21F13:'MiG-21F-13',HUNTER:'Hunter F.6',MIRAGE3C:'Mirage IIIC',F4C:'F-4C Phantom II',F5A:'F-5A',J35D:'J 35D Draken',J29F:'J 29F Tunnan',J6A:'J-6A',MIG21MF:'MiG-21MF',MIRAGEF1:'Mirage F1C',M2000:'Mirage 2000-5F',J11B:'J-11B',J15:'J-15',J16:'J-16'});
 {const m=BANDITS.MIXED;delete BANDITS.MIXED;BANDITS.MIXED=m}
 // matchmaking: bandits are only ever fighters within MM_BR of the battle rating of the jet you fly (Career and Free play alike)
 const MM_BR=1;
@@ -4753,9 +4838,10 @@ const NODES={
   J7G:{n:'CHN',r:1,br:11.3},J10C:{n:'CHN',r:5,br:14.3,req:'J7G'},J11B:{n:'CHN',r:5,br:13.7,req:'J7G'},J15:{n:'CHN',r:4,br:14.7,req:'J11B'},J16:{n:'CHN',r:5,br:14.7,req:'J11B'},J20:{n:'CHN',r:5,br:14.0,req:'J10C'},
   MIRAGEF1:{n:'FRA',r:1,br:12.0},M2000:{n:'FRA',r:3,br:14.0,req:'MIRAGEF1'},RAFALE:{n:'FRA',r:5,br:14.7,req:'M2000'},
   F5E:{n:'USA',r:2,br:11.0,req:'F4E'},F14B:{n:'USA',r:3,br:13.0,req:'F4E'},MIG23ML:{n:'RUS',r:2,br:11.7,req:'MIG21'},MIG25PD:{n:'RUS',r:3,br:11.0,req:'MIG23ML'},J8F:{n:'CHN',r:2,br:13.0,req:'J7G'},
-  F100D:{n:'USA',r:1,br:9.3},F8E:{n:'USA',r:1,br:10.7,req:'F100D'},MIG19PT:{n:'RUS',r:1,br:9.3},MIG21F13:{n:'RUS',r:1,br:9.3,req:'MIG19PT'},HUNTER:{n:'GBR',r:1,br:10.0},MIRAGE3C:{n:'FRA',r:1,br:10.0}};
+  F100D:{n:'USA',r:1,br:9.3},F8E:{n:'USA',r:1,br:10.7,req:'F100D'},MIG19PT:{n:'RUS',r:1,br:9.3},MIG21F13:{n:'RUS',r:1,br:9.3,req:'MIG19PT'},HUNTER:{n:'GBR',r:1,br:10.0},MIRAGE3C:{n:'FRA',r:1,br:10.0},
+  F4C:{n:'USA',r:1,br:10.0,req:'F100D'},F5A:{n:'USA',r:1,br:10.7,req:'F100D'},J29F:{n:'SWE',r:1,br:9.0},J35D:{n:'SWE',r:1,br:10.0,req:'J29F'},J6A:{n:'CHN',r:1,br:9.3,req:'J7G'},MIG21MF:{n:'RUS',r:1,br:10.3,req:'MIG21'}};
 // War Thunder wiki reference (Realistic battles, stock-to-reference column): [max speed km/h, climb m/s, turn time s, BR]; shown beside the flight-model figures in the hangar spec sheet (wiki.warthunder.com, Oct 2026)
-const WTREF={F8E:[2094,108.6,30.3,10.7],F100D:[1419,88.3,41.2,9.3],MIG19PT:[1426,159.4,32.8,9.3],MIG21F13:[2211,98,34.6,9.3],HUNTER:[1139,54.5,26.7,10],MIRAGE3C:[2091,107.4,29.6,10],F4E:[2058,160.6,28.3,11.3],F16:[2108,260.4,20.8,13.7],F15C:[2542,235.2,23.1,13.7],FA18C:[1807,178,24.2,14.0],F15E:[2658,275.8,22,14.0],F16B70:[2116,267,20.8,14.3],FA18E:[1729,167.1,24,14.3],MIG21:[2177,191.3,38.5,11.0],MIG29:[2357,275.1,20.8,12.7],SU27:[2396,195.2,23.5,13.7],MIG29UPG:[2261,257.7,23.5,13.3],SU33:[2203,168.5,25.5,13.0],MIG29K:[2203,285.7,23.4,13.7],SU30SM:[2212,170,25.1,14.3],MIG35:[2203,285,22.4,14.3],F104G:[2342,229,35.9,11.0],F4F:[2058,162.9,28.3,11.0],MIG29G:[2357,270.4,20.6,13.0],EF2K1:[2097,252.1,20.8,14.3],EF2K3:[2097,252.1,20.8,14.3],F4EJ:[2255,141.9,28.2,11.0],F4EJK:[2255,141.9,28.2,12.3],F15J:[2533,263.3,22.9,12.7],F15JK:[2524,263.8,23,13.7],F2A:[1922,242.8,19.5,13.7],F4EIL:[2058,160.6,28.3,11.3],KFIR:[2322,184.5,28.4,12.0],F4E2K:[2058,160.6,28.3,12.3],F15BAZ:[2524,285.2,21.6,13.7],F16BARAK:[2058,229.4,23.9,13.7],F16I:[2058,247.5,21.8,13.7],F15I:[2657,276.4,22,14.0],J35F:[2127,149.8,26.7,10.3],JA37:[1924,168.6,26.6,12.0],GRIPEN:[2185,213.6,25.1,13.7],GRIPENE:[2209,214.5,25.6,14.3],LIGHTNING:[2240,124.3,27.8,9.3],PHANTOM2:[2190,176.1,27.8,12.0],TORNADO3:[2256,168,29.4,13.0],TYPHOON:[2097,252.1,20.8,14.7],J7G:[2313,153.4,25.3,11.3],J10C:[2108,252.2,21.2,14.3],J11B:[2388,195.3,25.2,13.7],J15:[2384,200.6,24.9,14.7],J16:[2410,212.9,23.4,14.7],MIRAGEF1:[2177,126.8,28.7,12.0],M2000:[2246,156.3,26.3,14.0],RAFALE:[1855,237.9,21,14.7],F5E:[1753,130.7,27.2,11.0],F14B:[2191,195.9,24.8,13.0],MIG23ML:[2339,196.8,33.9,11.7],MIG25PD:[2942,86.1,31.4,11.0],J8F:[2227,182.4,28.4,13.0]};
+const WTREF={F4C:[2228,142.4,27.4,10],F5A:[1428,114,28.2,10.7],J35D:[2130,149.4,26.7,10],J29F:[1032,49,30.2,9],J6A:[1426,159.4,32.8,9.3],MIG21MF:[2190,139.9,34.7,10.3],F8E:[2094,108.6,30.3,10.7],F100D:[1419,88.3,41.2,9.3],MIG19PT:[1426,159.4,32.8,9.3],MIG21F13:[2211,98,34.6,9.3],HUNTER:[1139,54.5,26.7,10],MIRAGE3C:[2091,107.4,29.6,10],F4E:[2058,160.6,28.3,11.3],F16:[2108,260.4,20.8,13.7],F15C:[2542,235.2,23.1,13.7],FA18C:[1807,178,24.2,14.0],F15E:[2658,275.8,22,14.0],F16B70:[2116,267,20.8,14.3],FA18E:[1729,167.1,24,14.3],MIG21:[2177,191.3,38.5,11.0],MIG29:[2357,275.1,20.8,12.7],SU27:[2396,195.2,23.5,13.7],MIG29UPG:[2261,257.7,23.5,13.3],SU33:[2203,168.5,25.5,13.0],MIG29K:[2203,285.7,23.4,13.7],SU30SM:[2212,170,25.1,14.3],MIG35:[2203,285,22.4,14.3],F104G:[2342,229,35.9,11.0],F4F:[2058,162.9,28.3,11.0],MIG29G:[2357,270.4,20.6,13.0],EF2K1:[2097,252.1,20.8,14.3],EF2K3:[2097,252.1,20.8,14.3],F4EJ:[2255,141.9,28.2,11.0],F4EJK:[2255,141.9,28.2,12.3],F15J:[2533,263.3,22.9,12.7],F15JK:[2524,263.8,23,13.7],F2A:[1922,242.8,19.5,13.7],F4EIL:[2058,160.6,28.3,11.3],KFIR:[2322,184.5,28.4,12.0],F4E2K:[2058,160.6,28.3,12.3],F15BAZ:[2524,285.2,21.6,13.7],F16BARAK:[2058,229.4,23.9,13.7],F16I:[2058,247.5,21.8,13.7],F15I:[2657,276.4,22,14.0],J35F:[2127,149.8,26.7,10.3],JA37:[1924,168.6,26.6,12.0],GRIPEN:[2185,213.6,25.1,13.7],GRIPENE:[2209,214.5,25.6,14.3],LIGHTNING:[2240,124.3,27.8,9.3],PHANTOM2:[2190,176.1,27.8,12.0],TORNADO3:[2256,168,29.4,13.0],TYPHOON:[2097,252.1,20.8,14.7],J7G:[2313,153.4,25.3,11.3],J10C:[2108,252.2,21.2,14.3],J11B:[2388,195.3,25.2,13.7],J15:[2384,200.6,24.9,14.7],J16:[2410,212.9,23.4,14.7],MIRAGEF1:[2177,126.8,28.7,12.0],M2000:[2246,156.3,26.3,14.0],RAFALE:[1855,237.9,21,14.7],F5E:[1753,130.7,27.2,11.0],F14B:[2191,195.9,24.8,13.0],MIG23ML:[2339,196.8,33.9,11.7],MIG25PD:[2942,86.1,31.4,11.0],J8F:[2227,182.4,28.4,13.0]};
 const RP_COST=[0,0,4000,10000,20000,34000], SL_PRICE=[0,0,25000,70000,150000,280000], ROMAN=['','I','II','III','IV','V'];
 // modules: [key, name, cost tier, effect, requires, family]. A stock aircraft flies with penalties; the first module of each family removes one, the second goes beyond stock.
 // Each is researched with the RP earned in that aircraft, then bought with Silver Lions.
@@ -4766,7 +4852,7 @@ const MODS=[['afr1','Airframe',1,'Removes the stock roll-rate penalty (-10 %)',n
   ['wpn2','Missile seekers II',4,'+6 % missile range, +5 % missile agility','wpn1','Weapons']];
 const STOCK={thr:.94,roll:.9,cm:.5,mr:.9,ag:.9};
 const CREW=[['g','Anti-g training','+0.25 g tolerance per level',8000],['f','Flight skill','+2 % roll rate per level',8000],['d','Ground crew','−8 % repair cost per level',6000]];
-const PROG_START=['F4E','MIG21','F104G','F4EJ','F4EIL','J35F','LIGHTNING','J7G','MIRAGEF1','F100D','MIG19PT','HUNTER','MIRAGE3C'];
+const PROG_START=['F4E','MIG21','F104G','F4EJ','F4EIL','J35F','LIGHTNING','J7G','MIRAGEF1','F100D','MIG19PT','HUNTER','MIRAGE3C','J29F'];
 let prog={sl:30000,frp:0,rp:{},res:{},own:{},mods:{},crew:{g:0,f:0,d:0},sorties:0,fresh:true};
 try{const v=JSON.parse(localStorage.getItem('vsProg')||'null');if(v&&typeof v.sl==='number'){prog=Object.assign(prog,v,{fresh:false});prog.crew=Object.assign({g:0,f:0,d:0},v.crew)}}catch(e){}
 for(const k of ['rp','res','own','mods'])if(!prog[k]||typeof prog[k]!=='object')prog[k]={};
