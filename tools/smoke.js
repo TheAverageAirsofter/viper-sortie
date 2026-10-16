@@ -11,7 +11,7 @@ const url = process.argv[2] || 'file://' + require('path').resolve(__dirname, '.
   await p.goto(url); await p.waitForTimeout(3000);
   const start = await p.$('#bStart');
   console.log('start button:', start ? 'found' : 'none');
-  if (start) { await start.click(); await p.waitForTimeout(5000); }
+  if (start) { await p.click('#mNav [data-go=quick]'); await start.click(); await p.waitForTimeout(5000); }
   console.log('state:', await p.evaluate(() => typeof state !== 'undefined' ? state : 'n/a'));
   console.log(errs.length ? errs.join('\n') : 'no errors');
   await p.screenshot({ path: process.env.SHOT || '/tmp/w/shot.png' });

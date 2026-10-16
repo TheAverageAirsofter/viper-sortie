@@ -46,7 +46,7 @@ const path = require('path'), assert = require('assert');
   const t1 = await p.evaluate(() => __vs.HG.tgt.toArray()); assert(t0.some((v, i) => Math.abs(v - t1[i]) > .3), 'right-drag pans ' + t0 + ' -> ' + t1);
   await p.keyboard.press('w'); await p.keyboard.press('d'); await p.keyboard.press('e'); const t2 = await p.evaluate(() => __vs.HG.tgt.toArray()); assert(t1.some((v, i) => Math.abs(v - t2[i]) > .05), 'WASD walks the view');
   assert(await p.evaluate(() => __vs.hgParked()), 'jet is parked in the hangar scene');
-  await p.click('#hgClose'); assert(await p.isVisible('#ov')); assert(!(await p.isVisible('#hangar'))); assert(!(await p.evaluate(() => __vs.hgParked())), 'jet leaves the hangar');
+  await p.click('#hgClose'); assert(await p.isVisible('#ov')); assert(!(await p.isVisible('#hangar'))); assert(await p.evaluate(() => __vs.hgParked()), 'jet stays parked behind the menu');
   await p.click('#bRole'); assert(await p.isVisible('#hangar')); assert(await p.isVisible('#ldRows'));
   await p.keyboard.press('Escape'); assert(!(await p.isVisible('#hangar')), 'Esc closes the hangar');
   // launch straight from the hangar
@@ -57,7 +57,7 @@ const path = require('path'), assert = require('assert');
   await p.click('#bQuit'); await p.waitForTimeout(500);
   await p.click('#bStart'); await p.waitForTimeout(2000);
   await p.evaluate(() => { const { P } = __vs; P.pos.y = 5; P.vel.set(0, -80, 200); }); await p.waitForFunction(() => __vs.state === 'over', null, { timeout: 25000 });
-  await p.click('#bHangar'); await p.waitForTimeout(800);
+  await p.click('#bOverHg'); await p.waitForTimeout(800);
   assert(await p.evaluate(() => __vs.hgParked()), 'hangar shows the jet after a sortie');
   await p.click('#hgLaunch'); await p.waitForTimeout(1500); assert.equal(await p.evaluate(() => __vs.state), 'play'); assert(!(await p.evaluate(() => __vs.hgParked())), 'jet leaves the hangar on launch');
   assert.deepEqual(errs, []); console.log('hangar ok'); await b.close();

@@ -8,9 +8,9 @@ const path = require('path'), assert = require('assert');
   await p.goto('file://' + path.resolve(__dirname, '../index.html')); await p.waitForTimeout(2000);
   await p.waitForSelector('#firstRun', { state: 'visible', timeout: 10000 }).catch(() => {});   // slow runners
   assert(await p.isVisible('#firstRun'), 'first-run hint shows on a fresh profile');
-  await p.click('#mTabs [data-t=set]'); await p.click('#sCtl .seg [role=radio]:text-is("Blue / orange")'); assert.match(await p.textContent('#bPal'), /blue/);
+  await p.click('#mNav [data-go=set]'); await p.click('#sTabs [data-k=hud]'); await p.click('#sRows .mr[data-name=Colours] .rm'); assert.match(await p.textContent('#bPal'), /blue/);
   assert.equal(await p.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--hud').trim()), '#5cd0ff');
-  await p.click('#mTabs [data-t=fly]'); await p.click('#bFirst'); assert(!(await p.isVisible('#firstRun')));
+  await p.click('#mBack'); await p.click('#bFirst'); assert(!(await p.isVisible('#firstRun')));
   assert.match(await p.textContent('#bMission'), /Train/i);
   await p.click('#bStart'); await p.waitForTimeout(4000);
   await p.waitForTimeout(800);   // let localStorage flush before the reload

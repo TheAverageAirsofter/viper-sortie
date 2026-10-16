@@ -15,15 +15,35 @@ function progDetail(id){
   else if(st==='can'){const c=RP_COST[n.r];h+='<div class="row"><button class="primary" data-act="research" data-id="'+id+'"'+(progPool(n.req)>=c?'':' disabled')+'>Research · '+fmtN(c)+' RP</button></div><p class="hgNote">Paid from the '+fmtN(prog.rp[n.req]||0)+' RP earned in the '+req+' plus '+fmtN(prog.frp)+' free RP.</p>'}
   else h+='<p class="hgNote">Locked: research the '+req+' first.</p>';
   return h+'</div>'}
-function progRender(){const el=$('hgTree');progWallet();
+/* crew skills as cards: name, what it does, five pips, next-level cost; shared by the hangar and the Pilot pane */
+function crewCards(){return '<div class="crew">'+CREW.map(c=>{const k=c[0],lv=prog.crew[k]||0,cost=crewCost(k),maxed=lv>=5,poor=prog.sl<cost,off=maxed||poor||!careerOn;
+  return '<div class="crc"><b>'+c[1]+'</b><p>'+c[2]+'</p><div class="pips" role="img" aria-label="Level '+lv+' of 5">'+[1,2,3,4,5].map(n=>'<i'+(n<=lv?' class="on"':'')+'></i>').join('')+'</div>'+
+    '<button type="button" class="ghost" data-act="crew" data-k="'+k+'"'+(off?' disabled':'')+'>'+(maxed?'Maxed':fmtN(cost)+' SL')+'</button>'+(!careerOn?'<small>Career only</small>':poor&&!maxed?'<small>Need '+fmtN(cost-prog.sl)+' more SL</small>':'')+'</div>'}).join('')+'</div>'}
+/* tech tree: each nation is a small graph; nodes sit in rank columns and hairlines join a node to the one it was researched from */
+const TN_W=88,TN_H=60,TN_GX=14,TN_GY=8;
+function treeLayout(nk){const ids=Object.keys(NODES).filter(i=>NODES[i].n===nk),pos={};let nr=0;
+  const place=(id,row)=>{pos[id]={c:NODES[id].r-1,r:row};ids.filter(k=>NODES[k].req===id).sort((a,b)=>NODES[a].r-NODES[b].r).forEach((k,i)=>place(k,i===0?row:nr++))};
+  for(const root of ids.filter(i=>!NODES[i].req||NODES[NODES[i].req].n!==nk))place(root,nr++);return pos}
+function nodeText(i){const n=NODES[i],st=nodeState(i);return st==='own'?(SL_PRICE[n.r]?'Owned · '+fmtN(SL_PRICE[n.r])+' SL':'Owned'):st==='res'?'Researched · '+fmtN(SL_PRICE[n.r])+' SL':st==='can'?'Research · '+fmtN(RP_COST[n.r])+' RP':'Locked · '+fmtN(RP_COST[n.r])+' RP'}
+// the researchable node worth doing next: the cheapest one you can already afford, else the cheapest overall
+function nextResearch(){const c=Object.keys(NODES).filter(progResearchable);if(!c.length)return null;const cost=i=>RP_COST[NODES[i].r],ok=c.filter(i=>progPool(NODES[i].req)>=cost(i));return (ok.length?ok:c).sort((a,b)=>cost(a)-cost(b))[0]}
+function progRender(){const el=$('hgTree');progWallet();const had=document.activeElement&&el.contains(document.activeElement)?document.activeElement.dataset.id:null;
   if(!careerOn){el.innerHTML='<p class="hgNote">Progression runs in <b>Career mode</b>. Fly sorties to earn Research Points and Silver Lions, research new aircraft down each nation\'s tree, buy them, install modules and train your crew. Bandits are matched to your aircraft\'s battle rating. Free play keeps every aircraft unlocked.</p><div class="row"><button class="primary" data-act="career" type="button">Switch to Career mode</button></div>';return}
-  if(!progSel||!NODES[progSel])progSel=AC.id;
-  let h='<p class="hgNote">'+fmtN(prog.sl)+' Silver Lions · '+fmtN(prog.frp)+' free RP · '+prog.sorties+' career sorties. Tap an aircraft.</p><div class="tree">';
-  for(const nk in NATIONS){const ids=Object.keys(NODES).filter(i=>NODES[i].n===nk).sort((a,b)=>NODES[a].r-NODES[b].r||(NODES[a].req===NODES[b].req?0:1));
-    h+='<div class="tnat" style="--nc:'+NATIONS[nk].c+'"><h4>'+NATIONS[nk].n+'</h4><div class="tnodes">'+ids.map(i=>'<button type="button" class="tn '+nodeState(i)+(i===progSel?' sel':'')+'" data-id="'+i+'"><b>'+AC_DEFS[i].name+'</b><small>'+ROMAN[NODES[i].r]+' · BR '+NODES[i].br.toFixed(1)+'</small></button>').join('')+'</div></div>'}
-  h+='</div>'+progDetail(progSel);
-  h+='<table class="hgT"><caption>Crew training · Silver Lions</caption>'+CREW.map(c=>{const lv=prog.crew[c[0]]||0;return '<tr><th>'+c[1]+' · level '+lv+' / 5<small>'+c[2]+'</small></th><td>'+(lv>=5?'<b class="ok">Maxed</b>':'<button class="ghost" data-act="crew" data-k="'+c[0]+'"'+(prog.sl>=crewCost(c[0])?'':' disabled')+'>'+fmtN(crewCost(c[0]))+' SL</button>')+'</td></tr>'}).join('')+'</table>';
-  el.innerHTML=h}
+  if(!progSel||!NODES[progSel])progSel=AC.id;const nx=nextResearch();
+  let h='<p class="hgNote">'+fmtN(prog.sl)+' Silver Lions · '+fmtN(prog.frp)+' free RP · '+prog.sorties+' career sorties. Tap an aircraft; arrow keys move between them.</p><div class="tree">';
+  for(const nk in NATIONS){const pos=treeLayout(nk),ids=Object.keys(pos),mc=Math.max(...ids.map(i=>pos[i].c)),mr=Math.max(...ids.map(i=>pos[i].r)),W=(mc+1)*(TN_W+TN_GX)-TN_GX,Hh=(mr+1)*(TN_H+TN_GY)-TN_GY;
+    const X=i=>pos[i].c*(TN_W+TN_GX),Y=i=>pos[i].r*(TN_H+TN_GY);
+    const lines=ids.filter(i=>NODES[i].req&&pos[NODES[i].req]).map(i=>{const p=NODES[i].req,x1=X(p)+TN_W,y1=Y(p)+TN_H/2,x2=X(i),y2=Y(i)+TN_H/2,m=(x1+x2)/2,on=progRes(i);
+      return '<path d="M'+x1+' '+y1+'C'+m+' '+y1+' '+m+' '+y2+' '+x2+' '+y2+'" class="'+(on?'on':progRes(p)?'nx':'')+'"/>'}).join('');
+    h+='<div class="tnat" style="--nc:'+NATIONS[nk].c+'"><h4>'+NATIONS[nk].n+'</h4><div class="tgw"><div class="tgrid" style="width:'+W+'px;height:'+Hh+'px"><svg width="'+W+'" height="'+Hh+'" aria-hidden="true">'+lines+'</svg>'+
+      ids.map(i=>'<button type="button" class="tn '+nodeState(i)+(i===progSel?' sel':'')+(i===nx?' next':'')+'" data-id="'+i+'" style="left:'+X(i)+'px;top:'+Y(i)+'px;width:'+TN_W+'px;height:'+TN_H+'px" title="'+AC_DEFS[i].name+'"><b>'+AC_DEFS[i].name+'</b><small>'+ROMAN[NODES[i].r]+' · BR '+NODES[i].br.toFixed(1)+'</small><em>'+nodeText(i)+'</em></button>').join('')+'</div></div></div>'}
+  h+='</div>'+progDetail(progSel)+'<h4 class="hgSub">Crew training</h4>'+crewCards();
+  el.innerHTML=h;if(had){const b=el.querySelector('.tn[data-id="'+had+'"]');if(b)b.focus()}}
+// arrow keys move between aircraft by position
+$('hgTree').addEventListener('keydown',e=>{const k=e.key;if(['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].indexOf(k)<0)return;const cur=document.activeElement;if(!cur||!cur.classList.contains('tn'))return;
+  const all=[...$('hgTree').querySelectorAll('.tn')],c=cur.getBoundingClientRect(),cx=c.left+c.width/2,cy=c.top+c.height/2,dx=k==='ArrowRight'?1:k==='ArrowLeft'?-1:0,dy=k==='ArrowDown'?1:k==='ArrowUp'?-1:0;let best=null,bs=1e9;
+  for(const n of all){if(n===cur)continue;const r=n.getBoundingClientRect(),x=r.left+r.width/2-cx,y=r.top+r.height/2-cy,pr=dx?x*dx:y*dy,sd=dx?Math.abs(y):Math.abs(x);if(pr<4)continue;const sc=pr+sd*2.2;if(sc<bs){bs=sc;best=n}}
+  e.preventDefault();if(best)best.focus()});
 if(/[?&]test\b/.test(location.search))Object.assign(window.__vs||{},{prog,progAward,NODES,pickBanditType});
 $('hgTree').addEventListener('click',e=>{const t=e.target.closest('[data-id],[data-act]');if(!t)return;const id=t.dataset.id,act=t.dataset.act;
   if(!act){progSel=id;progRender();return}

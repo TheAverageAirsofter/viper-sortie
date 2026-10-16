@@ -1881,6 +1881,7 @@ function checkTouchdown(){
   if(!ok){die(P.gear?'landing':'gearup');return true}
   P.onGround=true; const sink=-P.vel.y; P.vel.y=0; P.pos.y=BASE_Y+GEAR_H;
   message(sink<1.5?'GREASED IT':sink<2.8?'TOUCHDOWN':'FIRM TOUCHDOWN',1.6); recEvent('Touched down at '+Math.round(P.kcas)+' kt, sink '+sink.toFixed(1)+' m/s');
+  {const dt=dailyAdd('l',1);if(dt)message('DAILY TASK · '+dt,2.6)}
   if(trainHook)trainHook('touchdown'); return true;
 }
 let startOnRunway=false,startCV=false; try{const v=localStorage.getItem('vsStart');startOnRunway=v==='rwy'||v==='cv';startCV=v==='cv'}catch(e){}
@@ -2540,7 +2541,7 @@ let enemies=[],wave=0,score=0,kills=0,waveClearT=0,gunAcc=0,gunSndT=0,hurtT=0,sh
 let lockTarget=null,lockT=0,lockDist=0,lockAng=0,can9=false,can120=false,toneT=0;
 let msgText='',msgT=0,clock=0,throttle=.8,thrSet=.8;
 let gunHeld=false,brake=false,fire9=false,fire120=false;
-const HG={on:false,ang:.7,el:.2,zoom:1,drag:null,auto:true,pan:false,tgt:new V3(0,2,-4),r:20};   // hangar: turntable camera around the player's jet
+const HG={on:false,bg:false,ang:.7,el:.2,zoom:1,drag:null,auto:true,pan:false,goal:null,t:0,tgt:new V3(0,2,-4),r:20};   // on = hangar editor panel; bg = hangar scene behind the menu   // hangar: turntable camera around the player's jet
 const VIEWS=['CHASE','COCKPIT','PADLOCK','FLYBY']; let view=0; const flyCam=new V3(); let flyCamSet=false;
 const keys={};
 const REDUCED=!!(window.matchMedia&&matchMedia('(prefers-reduced-motion:reduce)').matches);
@@ -2574,6 +2575,9 @@ const DIFF={
   ACE:    {name:'Ace',    g:9,  react:0,  irSee:3500,defP:1,  cmP:1,  notch:true,notchP:.55,rne:true, iK:.75,rK:.8, spread:.012,gunR:1000,lock:1,  cd:1}
 };
 const REMOTE_SK={notchP:.5};
+// Battle presets set existing values only: difficulty (which carries the missile and countermeasure rules), HUD marker level, damage-system severity, and a reward multiplier for progAward.
+const PRESETS={ARCADE:{n:'Arcade',diff:'ROOKIE',marks:2,dmg:.6,reward:1},REALISTIC:{n:'Realistic',diff:'REGULAR',marks:1,dmg:1,reward:1.2},SIMULATOR:{n:'Simulator',diff:'VETERAN',marks:0,dmg:1.5,reward:1.5}};
+let preset='REALISTIC'; try{const v=localStorage.getItem('vsPreset');if(PRESETS[v])preset=v}catch(e){}
 // Engagement range: how far out the fight starts. Short = original; Long/Extreme give time to notch, drag and defend against radar missiles.
 const ENG_RANGES={SHORT:{n:'Short',k:1},LONG:{n:'Long',k:2.5},EXTREME:{n:'Extreme',k:4}};
 let rangeKey='LONG'; try{const r=localStorage.getItem('viperRange');if(ENG_RANGES[r])rangeKey=r}catch(e){}
@@ -2591,8 +2595,9 @@ function clearWorld(){
   for(const e of enemies)scene.remove(e.obj); for(const f of friends)scene.remove(f.obj);
   enemies=[];friends=[];spawnQ=[];[...pBullets,...eBullets,...missiles,...eMissiles].forEach(kill);
 }
+let gunShots=0,gunHits=0;
 function startGame(){
-  clearWorld(); resetPlayer(); resetRadar(); resetCM(); recReset(); rec3Reset(); P.alive=true;
+  gunShots=0;gunHits=0;clearWorld(); resetPlayer(); resetRadar(); resetCM(); recReset(); rec3Reset(); P.alive=true;
   if(mission!=='ONLINE'){netStop();$('bSb').hidden=true;$('sbBox').hidden=true}
   trainHook=null;
   wave=0;score=0;kills=0;waveClearT=1.5;lockTarget=null;lockT=0;hurtT=0;missionT=0;missionDone=false;
@@ -2972,6 +2977,7 @@ function showOverlay(kind){
     $('ovTitle').textContent=win?'Mission Complete':fail?'Mission Failed':deathCause==='abort'?'Sortie Aborted':deathCause==='ejected'?(P.rescued?'Rescued':'Captured'):'Shot Down';
     $('ovLede').textContent=win?'Good work. Scrub the replay below to see how each missile did.':fail?'The replay below shows where it went wrong.':'Watch the replay: every missile shot and why it hit or missed is listed below.';
     if(campNote)$('ovLede').textContent=campNote+' '+$('ovLede').textContent;
+    if(lastAward&&lastAward.daily&&lastAward.daily.length)$('ovLede').textContent='Daily task done: '+lastAward.daily.join(', ')+'. '+$('ovLede').textContent;
     if(deathCause==='ejected'&&P.rescueText)$('ovLede').textContent=P.rescueText+'. '+(P.rescued?'You live to fly again; your career record keeps the streak.':'');
     stats.innerHTML=`<div class="stat"><span>Score</span><b>${score}</b></div><div class="stat"><span>${mission==='WAVES'?'Wave':'Time'}</span><b>${mission==='WAVES'?wave:fmtT(missionT)}</b></div><div class="stat"><span>Kills</span><b>${kills}</b></div><div class="stat"><span>Max G</span><b>${P.maxG.toFixed(1)}</b></div><div class="stat"><span>Best</span><b>${best}</b></div>`;
     const rew=$('ovRew');rew.innerHTML='';
@@ -3049,9 +3055,10 @@ let W=1,H=1,INS={t:0,r:0,b:0,l:0};
 // cockpit uses a tighter field of view and a raised eye point so the HUD and the panel both fit
 let projKey='';
 function applyProj(){
-  const pit=VIEWS[view]==='COCKPIT', key=pit+'|'+W+'|'+H+'|'+HG.on; if(key===projKey)return; projKey=key;
+  // HG.on shifts the jet left of the editor panel; HG.bg parks it right of the menu's aircraft card
+  const pit=VIEWS[view]==='COCKPIT', key=pit+'|'+W+'|'+H+'|'+HG.on+'|'+HG.bg; if(key===projKey)return; projKey=key;
   const fov=pit?(W<H?74:58):(W<H?86:66);
-  for(const cam of [camera,cockCam]){cam.fov=fov;cam.aspect=W/H;if(pit)cam.setViewOffset(W,H,0,H*(W<H?.07:.16),W,H);else if(HG.on)cam.setViewOffset(W,H,W<H?0:W*.2,W<H?H*.2:0,W,H);else cam.clearViewOffset();cam.updateProjectionMatrix()}
+  for(const cam of [camera,cockCam]){cam.fov=fov;cam.aspect=W/H;if(pit)cam.setViewOffset(W,H,0,H*(W<H?.07:.16),W,H);else if(HG.on)cam.setViewOffset(W,H,W<H?0:W*.2,W<H?H*.2:0,W,H);else if(HG.bg)cam.setViewOffset(W,H,W<H?0:-W*.14,W<H?-H*.06:0,W,H);else cam.clearViewOffset();cam.updateProjectionMatrix()}
   pMat.uniforms.scale.value=H*DPR/2/Math.tan(fov*Math.PI/360);
 }
 function resize(){
@@ -3096,6 +3103,7 @@ function refuel(){P.fuel=Math.max(P.fuel||0,.75*AC.fuelCap);resetSystems();P.bin
 const fuelStr=kg=>AC.fuelUnit==='LB'?Math.round(kg*2.2046/10)*10+' LB':Math.round(kg/10)*10+' KG';
 const ENG_NAME=i=>AC.engines>1?(i===0?'LEFT ':'RIGHT '):'';
 function damageSystem(n){
+  n*=PRESETS[preset].dmg;n=Math.floor(n)+(Math.random()<n%1?1:0);   // preset scales how many systems a hit takes out
   for(let i=0;i<n;i++){const r=Math.random();
     if(r<.32){const ok=P.sys.eng.map((v,j)=>v===0?j:-1).filter(j=>j>=0);if(ok.length){const j=ok[Math.random()*ok.length|0];P.sys.eng[j]=1;P.sys.fireT[j]=7;message(ENG_NAME(j)+'ENGINE FIRE',1.8);recEvent(ENG_NAME(j).toLowerCase()+'engine fire');buzz([200,80,200])}}
     else if(r<.52){if(!P.sys.hyd){P.sys.hyd=true;message('HYDRAULICS FAILED · G AND ROLL LIMITED',1.8);recEvent('Hydraulics failed')}}
@@ -3614,7 +3622,7 @@ function updateWeapons(dt){
   // gun: real rate of fire for the selected jet
   if(gunHeld&&P.rounds>0&&state==='play'){
     gunAcc+=dt*AC.gunRate; gunSndT-=dt; if(gunSndT<=0){sndGun();gunSndT=.05;buzz(12)}
-    while(gunAcc>=1&&P.rounds>0){gunAcc--;P.rounds--;
+    while(gunAcc>=1&&P.rounds>0){gunAcc--;P.rounds--;gunShots++;
       _d.copy(P.fwd);_d.x+=rand(-.004,.004);_d.y+=rand(-.004,.004);_d.z+=rand(-.004,.004);_d.normalize();
       const b=take(pBullets);b.on=true;b.life=2;b.m.visible=true;
       b.m.position.copy(P.pos).addScaledVector(P.fwd,5).addScaledVector(P.right,-.9).addScaledVector(P.up,.4).addScaledVector(_d,rand(0,15));
@@ -3623,12 +3631,12 @@ function updateWeapons(dt){
     if(P.rounds===0)message('WINCHESTER · GUN EMPTY',1.4);
   } else gunAcc=0;
   for(const b of pBullets){ if(!b.on)continue;
-    if(ground.length)for(const g of ground)if(g.alive&&distSeg(_s1.copy(g.pos).setY(g.pos.y+2),b.prev,b.m.position)<9){kill(b);g.hp-=AC.gunDmg;puff(b.m.position.x,b.m.position.y,b.m.position.z,0,0,0,1,.8,.3,1,5,16,.25);if(g.hp<=0)killGround(g);break}
+    if(ground.length)for(const g of ground)if(g.alive&&distSeg(_s1.copy(g.pos).setY(g.pos.y+2),b.prev,b.m.position)<9){kill(b);gunHits++;g.hp-=AC.gunDmg;puff(b.m.position.x,b.m.position.y,b.m.position.z,0,0,0,1,.8,.3,1,5,16,.25);if(g.hp<=0)killGround(g);break}
     if(!b.on)continue;
     b.life-=dt; if(b.life<=0){kill(b);continue}
     b.prev.copy(b.m.position); b.vel.y-=G*dt; b.vel.multiplyScalar(gunDrag(b.vel.length(),atm(b.m.position.y).sig,dt)); b.m.position.addScaledVector(b.vel,dt);
     for(const e of enemies){ if(!e.alive)continue;
-      if(distSeg(e.pos,b.prev,b.m.position)<(e.kind==='fighter'?7:14)){kill(b);const p=b.m.position;puff(p.x,p.y,p.z,0,0,0,1,.8,.3,1,5,16,.25);
+      if(distSeg(e.pos,b.prev,b.m.position)<(e.kind==='fighter'?7:14)){kill(b);gunHits++;const p=b.m.position;puff(p.x,p.y,p.z,0,0,0,1,.8,.3,1,5,16,.25);
         hitAI(e,AC.gunDmg,'GUNS',true);break}}
   }
   // missiles: proportional navigation, g-limited by airspeed
@@ -3951,9 +3959,15 @@ function modApply(id,e){if(!careerOn)return e;let thr=1,roll=1,lift=1,cm=1,mr=1,
   const sc=s=>s?Object.assign({},s,{maxR:s.maxR*mr,gmax:s.gmax*ag}):s;
   return Object.assign({},e,{T_AB:e.T_AB*thr,T_MIL:e.T_MIL*thr,roll:e.roll*roll,CLMAX:e.CLMAX*lift,cmK:cm,sr:sc(e.sr),mr:sc(e.mr)})}
 // sortie rewards: RP to the aircraft flown, Free RP, Silver Lions, minus the repair bill if you lost the jet
-function progAward(rp,win,kills,survived,rescued){const id=AC.id,br=progBR(id);
-  const sl=Math.round(rp*1.8+kills*250+(win?1500:0)), rep=survived?0:Math.round(18*br*br*(1-.08*crewLvl('d'))*(rescued?.5:1)), fr=Math.round(rp*.1);
-  prog.rp[id]=(prog.rp[id]||0)+rp;prog.frp+=fr;prog.sl=Math.max(0,prog.sl+sl-rep);prog.sorties++;progSave();return {rp,fr,sl,rep}}
+// parts (optional) names the RP lines; the return value keeps its old fields and adds a breakdown of named lines that add up to the totals
+function progAward(rp,win,kills,survived,rescued,parts){const id=AC.id,br=progBR(id);
+  const sl=Math.round(rp*1.8+kills*250+(win?1500:0)), full=survived?0:Math.round(18*br*br), afterCrew=survived?0:Math.round(18*br*br*(1-.08*crewLvl('d'))), rep=survived?0:Math.round(18*br*br*(1-.08*crewLvl('d'))*(rescued?.5:1)), fr=Math.round(rp*.1);
+  const before=prog.sl;
+  prog.rp[id]=(prog.rp[id]||0)+rp;prog.frp+=fr;prog.sl=Math.max(0,prog.sl+sl-rep);prog.sorties++;progSave();
+  const rpLines=parts&&parts.length?parts.slice():[['Sortie RP',rp]], slLines=[['RP conversion',Math.round(rp*1.8)],['Kill bonus',kills*250],['Win bonus',win?1500:0]].filter(l=>l[1]);
+  if(full){slLines.push(['Repair bill',-full]);if(full-afterCrew)slLines.push(['Crew discount',full-afterCrew]);if(afterCrew-rep)slLines.push(['Rescue discount',afterCrew-rep])}
+  const net=prog.sl-before, gap=net-slLines.reduce((a,l)=>a+l[1],0);if(gap)slLines.push(['Balance floor',gap]);
+  return {rp,fr,sl,rep,breakdown:{rp:rpLines,sl:slLines,totalRp:rp,totalSl:net,repair:rep,freeRp:fr}}}
 function modCost(id,m){const r=NODES[id]?NODES[id].r:1;return {rp:m[2]*(600+700*(r-1)),sl:m[2]*(4000+4500*(r-1))}}
 function progResearchable(id){const n=NODES[id];return !progRes(id)&&n.req&&progRes(n.req)}
 function progPool(id){return (prog.rp[id]||0)+prog.frp}
@@ -3965,6 +3979,17 @@ function progMod(id,mk){const m=MODS.find(x=>x[0]===mk);if(!m||!progOwned(id)||h
   (prog.mods[id]||(prog.mods[id]={}))[mk]=true;progSave();return true}
 function crewCost(k){const c=CREW.find(x=>x[0]===k);return c[3]*((prog.crew[k]||0)+1)}
 function progCrew(k){const lv=prog.crew[k]||0;if(lv>=5||prog.sl<crewCost(k))return false;prog.sl-=crewCost(k);prog.crew[k]=lv+1;progSave();return true}
+
+/* ---------------- daily tasks (Career only): three small goals that pay free RP; progress lives in vsDaily and resets at local midnight ---------------- */
+const DAILY=[['k','Shoot down 2 bandits',2,400],['m','Fly 10 minutes in Career',10,500],['l','Land once',1,300]];
+const dayKey=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')};
+let daily={d:'',k:0,m:0,l:0,done:{}};
+try{const v=JSON.parse(localStorage.getItem('vsDaily')||'null');if(v&&typeof v.d==='string')daily=Object.assign(daily,v,{done:Object.assign({},v.done)})}catch(e){}
+const dailySave=()=>{try{localStorage.setItem('vsDaily',JSON.stringify(daily))}catch(e){}};
+function dailyRoll(){const t=dayKey();if(daily.d!==t){daily={d:t,k:0,m:0,l:0,done:{}};dailySave()}}
+// returns the task text when this call completes it
+function dailyAdd(k,n){if(!careerOn||!(n>0))return null;dailyRoll();const t=DAILY.find(x=>x[0]===k);if(!t||daily.done[k])return null;
+  daily[k]=Math.min(t[2],(daily[k]||0)+n);let hit=null;if(daily[k]>=t[2]){daily.done[k]=1;prog.frp+=t[3];progSave();hit=t[1]+' (+'+t[3]+' RP)'}dailySave();return hit}
 /* ---------------- sortie recorder for the debrief ---------------- */
 const REC={t:0,acc:0,frames:[],events:[],msl:new Map()}; let mslSeq=0;
 function recReset(){REC.t=0;REC.acc=0;REC.frames=[];REC.events=[];REC.msl=new Map();mslSeq=0}
@@ -4232,11 +4257,14 @@ function careerAward(){
   lastAward=null; if(!careerOn||deathCause==='abort'&&missionT<20)return;
   const win=deathCause==='win', before=rankIdx(career.xp);
   const mult=mission==='ONLINE'?1.5:mission==='TRAINING'?.3:DIFF_XP[difficulty];
-  const xp=Math.round((50+score+(win?1000:0)+(P.alive?250:P.rescued?120:0))*mult);   // 50 for flying the sortie
+  const pm=PRESETS[preset].reward, lines=[['Sortie',50],['Kills and score',score],['Mission win',win?1000:0],['Survival',P.alive?250:0],['Rescue',!P.alive&&P.rescued?120:0]].map(l=>[l[0],Math.round(l[1]*mult)]);
+  const xp=Math.round((50+score+(win?1000:0)+(P.alive?250:P.rescued?120:0))*mult*pm);   // 50 for flying the sortie; the preset multiplies the lot
+  {const d=xp-lines.reduce((a,l)=>a+l[1],0);if(pm===1)lines[1][1]+=d;else if(d)lines.push(['Preset ×'+pm.toFixed(1),d])}   // lines always add up to xp
   career.xp+=xp;career.sorties++;career.kills+=kills;if(!P.alive&&!P.rescued)career.deaths++;if(win)career.wins++;
   const after=rankIdx(career.xp), newJets=Object.keys(UNLOCK).filter(k=>UNLOCK[k]>before&&UNLOCK[k]<=after).map(k=>AC_DEFS[k].name);
-  const pg=progAward(xp,win,kills,P.alive||!!P.rescued,!!P.rescued);
-  lastAward={xp,promoted:after>before?RANKS[after][1]:null,newJets:[],prog:pg};
+  const pg=progAward(xp,win,kills,P.alive||!!P.rescued,!!P.rescued,lines.filter(l=>l[1]));
+  const dt=[dailyAdd('k',kills),dailyAdd('m',missionT/60)].filter(Boolean);
+  lastAward={xp,promoted:after>before?RANKS[after][1]:null,newJets:[],prog:pg,daily:dt};
   saveCareer(); syncCareerUI();
 }
 $('bMode').addEventListener('click',()=>{careerOn=!careerOn;try{localStorage.setItem('viperMode',careerOn?'career':'free')}catch(e){};syncCareerUI()});
@@ -4264,8 +4292,11 @@ function padTarget(){
   let b=null,bd=1e9;for(const e of enemies){const d=e.pos.distanceTo(P.pos);if(d<bd){bd=d;b=e}}return b;
 }
 function updateCamera(dt){
-  if(HG.on&&hgSaved){applyProj();   // hangar: orbit and pan around a target point, kept inside the hall
-    playerJet.visible=true; if(!HG.drag&&HG.auto)HG.ang+=dt*.25;
+  if((HG.on||HG.bg)&&hgSaved){applyProj();   // hangar: orbit and pan around a target point, kept inside the hall
+    playerJet.visible=true;
+    if(HG.bg&&!HG.on&&HG.goal){const g=HG.goal,k=1-Math.exp(-dt*1.8);let da=g.ang-HG.ang;da=Math.atan2(Math.sin(da),Math.cos(da));HG.ang+=da*k;HG.el+=(g.el-HG.el)*k;HG.zoom+=(g.zoom-HG.zoom)*k;   // menu: ease toward the section's camera, plus a slow drift
+      HG.t=(HG.t||0)+dt;HG.ang+=Math.cos(HG.t*.17)*dt*.05*g.drift;HG.el+=Math.cos(HG.t*.23)*dt*.012*g.drift}
+    else if(!HG.drag&&HG.auto)HG.ang+=dt*.25;
     const r=HG.r*HG.zoom, ce=Math.cos(HG.el);
     HG.tgt.set(clamp(HG.tgt.x,-26,26),clamp(HG.tgt.y,.4,12),clamp(HG.tgt.z,-29,29));
     camera.position.set(HG.tgt.x+Math.sin(HG.ang)*r*ce,HG.tgt.y+Math.sin(HG.el)*r,HG.tgt.z+Math.cos(HG.ang)*r*ce);
@@ -4405,15 +4436,16 @@ function drawHUD(){
   const cx=W/2,cy=H/2,rx=W/2-46-Math.max(INS.l,INS.r),ry=H/2-64-Math.max(INS.t,INS.b);
   for(const e of [...enemies,...friends]){
     if(!e.alive)continue;
-    const blue=e.team==='blue', col=blue?'#6fb7ff':THREAT;
+    const blue=e.team==='blue', col=blue?'#6fb7ff':THREAT, MK=PRESETS[preset].marks;
+    if(!blue&&MK===0)continue;   // Simulator: no bandit markers, just the gauges and the radar
     const p=proj(e.pos),d=e.pos.distanceTo(P.pos);
     const on=p.ok&&p.x>20&&p.x<W-20&&p.y>20&&p.y<H-20;
     c.strokeStyle=col;c.fillStyle=col;
     if(on){const s=e.kind==='fighter'?9:13;
       if(blue){c.beginPath();c.moveTo(p.x-s,p.y+s*.6);c.lineTo(p.x,p.y-s*.6);c.lineTo(p.x+s,p.y+s*.6);c.stroke();txt(c,e.kind==='transport'?'C-130':'TWO',p.x,p.y+20,'center',col,10,700)}
       else{c.beginPath();c.moveTo(p.x,p.y-s);c.lineTo(p.x+s,p.y);c.lineTo(p.x,p.y+s);c.lineTo(p.x-s,p.y);c.closePath();c.stroke();
-        txt(c,(e.kind==='bomber'?'BMR ':'')+nm(d),p.x,p.y+20,'center',col,11);
-        if(e.remote)txt(c,(e.name||'PILOT').toUpperCase().slice(0,14)+' · '+(AC_DEFS[e.type]?AC_DEFS[e.type].name:''),p.x,p.y-18,'center',col,10,700)}}
+        if(MK>=2||d<9000)txt(c,(e.kind==='bomber'?'BMR ':'')+nm(d),p.x,p.y+20,'center',col,11);   // Realistic: range only when close
+        if(e.remote&&MK>=2)txt(c,(e.name||'PILOT').toUpperCase().slice(0,14)+' · '+(AC_DEFS[e.type]?AC_DEFS[e.type].name:''),p.x,p.y-18,'center',col,10,700)}}
     else{_d.copy(e.pos).applyMatrix4(camera.matrixWorldInverse);
       let dx=_d.x,dy=-_d.y; if(Math.abs(dx)+Math.abs(dy)<1e-3)dy=1;
       const a=Math.atan2(dy,dx),x=cx+Math.cos(a)*rx,y=cy+Math.sin(a)*ry;
@@ -4691,7 +4723,7 @@ function frame(now){
     const steps=Math.max(1,Math.ceil(dt/.0167)), h=dt/steps; // keeps every step <= ~16.7 ms whatever the frame rate
     for(let s=0;s<steps;s++){
       if(state!=='paused'&&state!=='replay')updateCarrier(h);
-      if(state==='menu'){if(!HG.on)updatePlayer(h,true)} else if(state==='play')updatePlayer(h,false);
+      if(state==='menu'){if(!HG.on&&!HG.bg)updatePlayer(h,true)} else if(state==='play')updatePlayer(h,false);
       if(state!=='menu'&&state!=='replay')updateCombat(h);
     }
     rec3(dt); voiceWatch(); updateEject(dt); syncEjectBtn();
@@ -4722,7 +4754,7 @@ function frame(now){
   updateShadow(); gust=1+.35*Math.sin(clock*.7)*Math.sin(clock*1.9+1); updateRain(dt||.016); updateLightning(dt||.016);
   for(const cl of clouds){if(!cl.visible)continue;const d=cl.position.distanceTo(camera.position),o=clamp((d-380)/900,0,1)*.95;if(cl.userData.op!==o){cl.userData.op=o;for(const m of cl.userData.mats)m.opacity=o}}
   sndEngine(); sndExtra(); sndFlyby(); updateGlints(); updateFlareLight(); shadowFollow();
-  renderer.clear(); renderer.render(HG.on&&hgSaved&&hgScene?hgScene:scene,camera); if(VIEWS[view]!=='COCKPIT'&&!(KC.t>0)&&state!=='replay')heatPass();
+  renderer.clear(); renderer.render((HG.on||HG.bg)&&hgSaved&&hgScene?hgScene:scene,camera); if(VIEWS[view]!=='COCKPIT'&&!(KC.t>0)&&state!=='replay')heatPass();
   if(VIEWS[view]==='COCKPIT'&&!(KC.t>0)&&(state==='play'||state==='menu'||state==='paused')){
     updateCockpit(dt||.016); renderer.clearDepth(); renderer.render(cockScene,cockCam);
   }
@@ -4837,7 +4869,7 @@ const _careerAward=careerAward;
 careerAward=function(){lbAdd();return _careerAward.apply(this,arguments)};
 
 /* ---------- test hook (only with ?test in the URL) ---------- */
-if(/[?&]test\b/.test(location.search))window.__vs={setThr,HEAT,explode,puff,camera,LT,townLights,flashLt,P,fly,dlz,flyout,AC_DEFS,V3,atm,clamp,lbAdd,showOverlay:k=>showOverlay(k),setScore:(n,k)=>{score=n;kills=k},get state(){return state},get AC(){return AC}};
+if(/[?&]test\b/.test(location.search))window.__vs={setThr,HEAT,explode,puff,camera,LT,townLights,flashLt,P,fly,dlz,flyout,AC_DEFS,V3,atm,clamp,lbAdd,showOverlay:k=>showOverlay(k),setScore:(n,k)=>{score=n;kills=k},get state(){return state},get preset(){return preset},PRESETS,get daily(){return daily},dailyAdd,endTest:o=>{deathCause=o.cause||'win';score=o.score||0;kills=o.kills||0;missionT=o.t||90;P.alive=o.alive!==false;P.rescued=!!o.rescued;state='over';careerAward();showOverlay('over')},get AC(){return AC}};
 
 /* ---------- hangar: pick the aircraft, edit the loadout, change paint, read every spec; the jet turns on a turntable behind the panel ---------- */
 const hgEl=$('hangar');
@@ -4846,28 +4878,29 @@ function hgTab(t){for(const b of hgEl.querySelectorAll('.hgTabs button'))b.class
 function hgOpen(t){if(state!=='menu'&&state!=='over')return;
   if(!HG.on){HG.on=true;HG.zoom=1;HG.el=.2;HG.ang=.7;HG.auto=true;document.body.classList.add('hangar');hgEl.hidden=false;projKey='';hgEnter()}
   hgTab(t||'load');$('hgName').textContent=AC.name;renderLd()}
-function hgClose(){if(!HG.on)return;hgLeave();HG.on=false;HG.drag=null;document.body.classList.remove('hangar');hgEl.hidden=true;projKey='';camSnap=true}
+function hgClose(){if(!HG.on)return;if(!HG.bg)hgLeave();HG.on=false;HG.drag=null;document.body.classList.remove('hangar');hgEl.hidden=true;projKey='';camSnap=true}
 $('bHangar').addEventListener('click',()=>hgOpen('load'));
 $('bRole').addEventListener('click',()=>hgOpen('load'));
 $('hgClose').addEventListener('click',hgClose);$('ldDone').addEventListener('click',hgClose);
 $('hgLaunch').addEventListener('click',()=>{hgClose();$('bStart').click()});
 for(const b of hgEl.querySelectorAll('.hgTabs button'))b.addEventListener('click',()=>hgTab(b.dataset.tab));
-const hgPtr=new Map(); let hgPinch=0, hgTap=0;
 const hgView=(ang,el,zoom)=>{HG.ang=ang;HG.el=clamp(el,-1.45,1.45);if(zoom)HG.zoom=zoom;HG.auto=false;HG.tgt.set(0,2.2,HG_JZ)};
 const hgPan=(dx,dy)=>{const k=HG.r*HG.zoom*.0018;HG.tgt.addScaledVector(_a.set(1,0,0).applyQuaternion(camera.quaternion),-dx*k).addScaledVector(_b.set(0,1,0).applyQuaternion(camera.quaternion),dy*k)};
-$('hgView').addEventListener('contextmenu',e=>e.preventDefault());
-$('hgView').addEventListener('pointerdown',e=>{hgPtr.set(e.pointerId,{x:e.clientX,y:e.clientY,px:e.clientX,py:e.clientY,pan:e.button===2||e.button===1||e.shiftKey});try{e.target.setPointerCapture(e.pointerId)}catch(er){}
-  HG.drag={x:e.clientX,y:e.clientY,a:HG.ang,l:HG.el};HG.auto=false;
-  const now=performance.now();if(now-hgTap<320){hgView(.7,.2,1);HG.auto=true}hgTap=now;   // double-tap: reset the view and resume the turntable
-  if(hgPtr.size===2){const [p,q]=[...hgPtr.values()];hgPinch=Math.hypot(p.x-q.x,p.y-q.y)}});
-$('hgView').addEventListener('pointermove',e=>{const p=hgPtr.get(e.pointerId);if(!p)return;const dx=e.clientX-p.px,dy=e.clientY-p.py;p.px=p.x=e.clientX;p.py=p.y=e.clientY;
-  if(hgPtr.size>=2){const [a,b]=[...hgPtr.values()],d=Math.hypot(a.x-b.x,a.y-b.y);if(hgPinch>0)HG.zoom=clamp(HG.zoom*hgPinch/d,.2,2.6);hgPinch=d;hgPan(dx/2,dy/2);HG.drag=null;return}   // two fingers: pinch to zoom, drag to pan
-  if(p.pan){hgPan(dx,dy);return}
-  if(HG.drag){HG.ang=HG.drag.a-(e.clientX-HG.drag.x)*.01;HG.el=clamp(HG.drag.l+(e.clientY-HG.drag.y)*.01,-1.45,1.45)}});
-for(const t of ['pointerup','pointercancel'])$('hgView').addEventListener(t,e=>{hgPtr.delete(e.pointerId);hgPinch=0;HG.drag=null;if(hgPtr.size===1){const [p]=[...hgPtr.values()];HG.drag={x:p.x,y:p.y,a:HG.ang,l:HG.el}}});
-$('hgView').addEventListener('wheel',e=>{e.preventDefault();HG.zoom=clamp(HG.zoom*(1+e.deltaY*.0012),.2,2.6)},{passive:false});
+function bindOrbit(el){const ptr=new Map();let pinch=0,tap=0;
+  el.addEventListener('contextmenu',e=>e.preventDefault());
+  el.addEventListener('pointerdown',e=>{ptr.set(e.pointerId,{x:e.clientX,y:e.clientY,px:e.clientX,py:e.clientY,pan:e.button===2||e.button===1||e.shiftKey});try{e.target.setPointerCapture(e.pointerId)}catch(er){}
+    HG.drag={x:e.clientX,y:e.clientY,a:HG.ang,l:HG.el};HG.auto=false;
+    const now=performance.now();if(now-tap<320){hgView(.7,.2,1);HG.auto=true}tap=now;   // double-tap: reset the view and resume the turntable
+    if(ptr.size===2){const [p,q]=[...ptr.values()];pinch=Math.hypot(p.x-q.x,p.y-q.y)}});
+  el.addEventListener('pointermove',e=>{const p=ptr.get(e.pointerId);if(!p)return;const dx=e.clientX-p.px,dy=e.clientY-p.py;p.px=p.x=e.clientX;p.py=p.y=e.clientY;
+    if(ptr.size>=2){const [a,b]=[...ptr.values()],d=Math.hypot(a.x-b.x,a.y-b.y);if(pinch>0)HG.zoom=clamp(HG.zoom*pinch/d,.2,2.6);pinch=d;hgPan(dx/2,dy/2);HG.drag=null;return}   // two fingers: pinch to zoom, drag to pan
+    if(p.pan){hgPan(dx,dy);return}
+    if(HG.drag){HG.ang=HG.drag.a-(e.clientX-HG.drag.x)*.01;HG.el=clamp(HG.drag.l+(e.clientY-HG.drag.y)*.01,-1.45,1.45)}});
+  for(const t of ['pointerup','pointercancel'])el.addEventListener(t,e=>{ptr.delete(e.pointerId);pinch=0;HG.drag=null;if(ptr.size===1){const [p]=[...ptr.values()];HG.drag={x:p.x,y:p.y,a:HG.ang,l:HG.el}}});
+  el.addEventListener('wheel',e=>{e.preventDefault();HG.zoom=clamp(HG.zoom*(1+e.deltaY*.0012),.2,2.6)},{passive:false})}
+bindOrbit($('hgView'));
 // keyboard: WASD / arrows walk the view point across the floor, Q/E lower and raise it
-addEventListener('keydown',e=>{if(!HG.on||e.target&&/INPUT|TEXTAREA/.test(e.target.tagName))return;const s=HG.r*HG.zoom*.04;let used=true;
+addEventListener('keydown',e=>{if(!HG.on||e.target&&(/INPUT|TEXTAREA/.test(e.target.tagName)||e.target.closest&&e.target.closest('.tn')))return;const s=HG.r*HG.zoom*.04;let used=true;
   const fw=_a.set(0,0,-1).applyQuaternion(camera.quaternion).setY(0).normalize(), rt=_b.set(1,0,0).applyQuaternion(camera.quaternion).setY(0).normalize();
   switch(e.key.toLowerCase()){case 'w':case 'arrowup':HG.tgt.addScaledVector(fw,s);break;case 's':case 'arrowdown':HG.tgt.addScaledVector(fw,-s);break;case 'a':case 'arrowleft':HG.tgt.addScaledVector(rt,-s);break;case 'd':case 'arrowright':HG.tgt.addScaledVector(rt,s);break;case 'e':HG.tgt.y+=s;break;case 'q':HG.tgt.y-=s;break;default:used=false}
   if(used){HG.auto=false;e.preventDefault();e.stopPropagation()}},true);
@@ -4878,9 +4911,9 @@ $('hgChips').querySelector('[data-v=auto]').addEventListener('click',()=>{HG.aut
 addEventListener('keydown',e=>{if(e.key==='Escape'&&HG.on){hgClose();e.stopPropagation()}},true);
 // the aircraft or loadout changed: keep the title and the spec sheet in step
 const _applyAC=applyAC;
-applyAC=function(){_applyAC.apply(this,arguments);if(HG.on){hgRefresh();$('hgName').textContent=AC.name;if(!$('hgSpec').hidden)hgSpecs()}};
+applyAC=function(){_applyAC.apply(this,arguments);if(hgSaved)hgRefresh();if(HG.on){$('hgName').textContent=AC.name;if(!$('hgSpec').hidden)hgSpecs()}};
 const _startGame=startGame;
-startGame=function(){hgClose();return _startGame.apply(this,arguments)};   // never start a sortie with the jet still parked in the hangar scene
+startGame=function(){hgClose();HG.bg=false;hgLeave();projKey='';return _startGame.apply(this,arguments)};   // never start a sortie with the jet still parked in the hangar scene
 // no aircraft or loadout changes mid-sortie
 const _showOverlay2=showOverlay;
 showOverlay=function(kind){_showOverlay2(kind);const p=kind==='pause';$('bHangar').hidden=p;$('bRole').hidden=p;if(p)hgClose()};
@@ -5034,15 +5067,35 @@ function progDetail(id){
   else if(st==='can'){const c=RP_COST[n.r];h+='<div class="row"><button class="primary" data-act="research" data-id="'+id+'"'+(progPool(n.req)>=c?'':' disabled')+'>Research · '+fmtN(c)+' RP</button></div><p class="hgNote">Paid from the '+fmtN(prog.rp[n.req]||0)+' RP earned in the '+req+' plus '+fmtN(prog.frp)+' free RP.</p>'}
   else h+='<p class="hgNote">Locked: research the '+req+' first.</p>';
   return h+'</div>'}
-function progRender(){const el=$('hgTree');progWallet();
+/* crew skills as cards: name, what it does, five pips, next-level cost; shared by the hangar and the Pilot pane */
+function crewCards(){return '<div class="crew">'+CREW.map(c=>{const k=c[0],lv=prog.crew[k]||0,cost=crewCost(k),maxed=lv>=5,poor=prog.sl<cost,off=maxed||poor||!careerOn;
+  return '<div class="crc"><b>'+c[1]+'</b><p>'+c[2]+'</p><div class="pips" role="img" aria-label="Level '+lv+' of 5">'+[1,2,3,4,5].map(n=>'<i'+(n<=lv?' class="on"':'')+'></i>').join('')+'</div>'+
+    '<button type="button" class="ghost" data-act="crew" data-k="'+k+'"'+(off?' disabled':'')+'>'+(maxed?'Maxed':fmtN(cost)+' SL')+'</button>'+(!careerOn?'<small>Career only</small>':poor&&!maxed?'<small>Need '+fmtN(cost-prog.sl)+' more SL</small>':'')+'</div>'}).join('')+'</div>'}
+/* tech tree: each nation is a small graph; nodes sit in rank columns and hairlines join a node to the one it was researched from */
+const TN_W=88,TN_H=60,TN_GX=14,TN_GY=8;
+function treeLayout(nk){const ids=Object.keys(NODES).filter(i=>NODES[i].n===nk),pos={};let nr=0;
+  const place=(id,row)=>{pos[id]={c:NODES[id].r-1,r:row};ids.filter(k=>NODES[k].req===id).sort((a,b)=>NODES[a].r-NODES[b].r).forEach((k,i)=>place(k,i===0?row:nr++))};
+  for(const root of ids.filter(i=>!NODES[i].req||NODES[NODES[i].req].n!==nk))place(root,nr++);return pos}
+function nodeText(i){const n=NODES[i],st=nodeState(i);return st==='own'?(SL_PRICE[n.r]?'Owned · '+fmtN(SL_PRICE[n.r])+' SL':'Owned'):st==='res'?'Researched · '+fmtN(SL_PRICE[n.r])+' SL':st==='can'?'Research · '+fmtN(RP_COST[n.r])+' RP':'Locked · '+fmtN(RP_COST[n.r])+' RP'}
+// the researchable node worth doing next: the cheapest one you can already afford, else the cheapest overall
+function nextResearch(){const c=Object.keys(NODES).filter(progResearchable);if(!c.length)return null;const cost=i=>RP_COST[NODES[i].r],ok=c.filter(i=>progPool(NODES[i].req)>=cost(i));return (ok.length?ok:c).sort((a,b)=>cost(a)-cost(b))[0]}
+function progRender(){const el=$('hgTree');progWallet();const had=document.activeElement&&el.contains(document.activeElement)?document.activeElement.dataset.id:null;
   if(!careerOn){el.innerHTML='<p class="hgNote">Progression runs in <b>Career mode</b>. Fly sorties to earn Research Points and Silver Lions, research new aircraft down each nation\'s tree, buy them, install modules and train your crew. Bandits are matched to your aircraft\'s battle rating. Free play keeps every aircraft unlocked.</p><div class="row"><button class="primary" data-act="career" type="button">Switch to Career mode</button></div>';return}
-  if(!progSel||!NODES[progSel])progSel=AC.id;
-  let h='<p class="hgNote">'+fmtN(prog.sl)+' Silver Lions · '+fmtN(prog.frp)+' free RP · '+prog.sorties+' career sorties. Tap an aircraft.</p><div class="tree">';
-  for(const nk in NATIONS){const ids=Object.keys(NODES).filter(i=>NODES[i].n===nk).sort((a,b)=>NODES[a].r-NODES[b].r||(NODES[a].req===NODES[b].req?0:1));
-    h+='<div class="tnat" style="--nc:'+NATIONS[nk].c+'"><h4>'+NATIONS[nk].n+'</h4><div class="tnodes">'+ids.map(i=>'<button type="button" class="tn '+nodeState(i)+(i===progSel?' sel':'')+'" data-id="'+i+'"><b>'+AC_DEFS[i].name+'</b><small>'+ROMAN[NODES[i].r]+' · BR '+NODES[i].br.toFixed(1)+'</small></button>').join('')+'</div></div>'}
-  h+='</div>'+progDetail(progSel);
-  h+='<table class="hgT"><caption>Crew training · Silver Lions</caption>'+CREW.map(c=>{const lv=prog.crew[c[0]]||0;return '<tr><th>'+c[1]+' · level '+lv+' / 5<small>'+c[2]+'</small></th><td>'+(lv>=5?'<b class="ok">Maxed</b>':'<button class="ghost" data-act="crew" data-k="'+c[0]+'"'+(prog.sl>=crewCost(c[0])?'':' disabled')+'>'+fmtN(crewCost(c[0]))+' SL</button>')+'</td></tr>'}).join('')+'</table>';
-  el.innerHTML=h}
+  if(!progSel||!NODES[progSel])progSel=AC.id;const nx=nextResearch();
+  let h='<p class="hgNote">'+fmtN(prog.sl)+' Silver Lions · '+fmtN(prog.frp)+' free RP · '+prog.sorties+' career sorties. Tap an aircraft; arrow keys move between them.</p><div class="tree">';
+  for(const nk in NATIONS){const pos=treeLayout(nk),ids=Object.keys(pos),mc=Math.max(...ids.map(i=>pos[i].c)),mr=Math.max(...ids.map(i=>pos[i].r)),W=(mc+1)*(TN_W+TN_GX)-TN_GX,Hh=(mr+1)*(TN_H+TN_GY)-TN_GY;
+    const X=i=>pos[i].c*(TN_W+TN_GX),Y=i=>pos[i].r*(TN_H+TN_GY);
+    const lines=ids.filter(i=>NODES[i].req&&pos[NODES[i].req]).map(i=>{const p=NODES[i].req,x1=X(p)+TN_W,y1=Y(p)+TN_H/2,x2=X(i),y2=Y(i)+TN_H/2,m=(x1+x2)/2,on=progRes(i);
+      return '<path d="M'+x1+' '+y1+'C'+m+' '+y1+' '+m+' '+y2+' '+x2+' '+y2+'" class="'+(on?'on':progRes(p)?'nx':'')+'"/>'}).join('');
+    h+='<div class="tnat" style="--nc:'+NATIONS[nk].c+'"><h4>'+NATIONS[nk].n+'</h4><div class="tgw"><div class="tgrid" style="width:'+W+'px;height:'+Hh+'px"><svg width="'+W+'" height="'+Hh+'" aria-hidden="true">'+lines+'</svg>'+
+      ids.map(i=>'<button type="button" class="tn '+nodeState(i)+(i===progSel?' sel':'')+(i===nx?' next':'')+'" data-id="'+i+'" style="left:'+X(i)+'px;top:'+Y(i)+'px;width:'+TN_W+'px;height:'+TN_H+'px" title="'+AC_DEFS[i].name+'"><b>'+AC_DEFS[i].name+'</b><small>'+ROMAN[NODES[i].r]+' · BR '+NODES[i].br.toFixed(1)+'</small><em>'+nodeText(i)+'</em></button>').join('')+'</div></div></div>'}
+  h+='</div>'+progDetail(progSel)+'<h4 class="hgSub">Crew training</h4>'+crewCards();
+  el.innerHTML=h;if(had){const b=el.querySelector('.tn[data-id="'+had+'"]');if(b)b.focus()}}
+// arrow keys move between aircraft by position
+$('hgTree').addEventListener('keydown',e=>{const k=e.key;if(['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].indexOf(k)<0)return;const cur=document.activeElement;if(!cur||!cur.classList.contains('tn'))return;
+  const all=[...$('hgTree').querySelectorAll('.tn')],c=cur.getBoundingClientRect(),cx=c.left+c.width/2,cy=c.top+c.height/2,dx=k==='ArrowRight'?1:k==='ArrowLeft'?-1:0,dy=k==='ArrowDown'?1:k==='ArrowUp'?-1:0;let best=null,bs=1e9;
+  for(const n of all){if(n===cur)continue;const r=n.getBoundingClientRect(),x=r.left+r.width/2-cx,y=r.top+r.height/2-cy,pr=dx?x*dx:y*dy,sd=dx?Math.abs(y):Math.abs(x);if(pr<4)continue;const sc=pr+sd*2.2;if(sc<bs){bs=sc;best=n}}
+  e.preventDefault();if(best)best.focus()});
 if(/[?&]test\b/.test(location.search))Object.assign(window.__vs||{},{prog,progAward,NODES,pickBanditType});
 $('hgTree').addEventListener('click',e=>{const t=e.target.closest('[data-id],[data-act]');if(!t)return;const id=t.dataset.id,act=t.dataset.act;
   if(!act){progSel=id;progRender();return}
@@ -5051,9 +5104,8 @@ $('hgTree').addEventListener('click',e=>{const t=e.target.closest('[data-id],[da
   if(act==='research')ok=progResearch(id);else if(act==='buy')ok=progBuy(id);else if(act==='mod')ok=progMod(id,t.dataset.m);else if(act==='crew')ok=progCrew(t.dataset.k);
   else if(act==='use'){AC=AC_DEFS[id];try{localStorage.setItem('viperAC',id)}catch(er){};applyAC();hgTab('load');return}
   if(ok){if(act==='mod'||act==='crew'||act==='buy')applyAC();syncCareerUI();$('hgName').textContent=AC.name}progRender()});
-
-/* ---------------- redesigned menu: Fly / Settings / Pilot tabs, segmented controls, toggles, sliders, card sheets ----------------
-   The original cycle buttons live on, hidden, inside #legacy; every control below drives them (so their handlers, saved settings and tests keep working)
+/* ---------------- AAA-style menu: title, main list, quick mission, campaign, online, training, settings, pilot, pause, debrief, loading ----------------
+   The original cycle buttons live on, hidden, inside #legacy; every row below drives them (so their handlers, saved settings and tests keep working)
    and re-reads the real game variables whenever something changes. */
 const ovEl=$('ov');
 const mk=(tag,cls,html)=>{const e=document.createElement(tag);if(cls)e.className=cls;if(html!=null)e.innerHTML=html;return e};
@@ -5087,137 +5139,379 @@ const MIS_DESC={WAVES:'Endless bandit groups. Survive and rack up score.',STRIKE
 const MAP_DESC={ISLANDS:'Green islands and sheltered bays.',DESERT:'Dry canyons and low valleys.',ALPINE:'Snowy peaks under heavy cloud.',OCEAN:'Open sea. Nothing to hide behind.'};
 const MAP_NAME=k=>({ISLANDS:'Islands',DESERT:'Desert canyons',ALPINE:'Snowy alps',OCEAN:'Open ocean'})[k]||k;
 const LES_DESC={BFM:'Basic fighter manoeuvres and gun shots',DEFENSE:'Defeat three inbound missiles',BVR:'Long-range radar missile shot',LANDING:'Land on the runway',REFUEL:'Take fuel from the tanker'};
-
-/* ---- controls ---- */
-const ctls=[];                                   // each has sync()
-function seg(label,opts,cur,pick,extra){const w=mk('div','ctl'),g=mk('div','seg');g.setAttribute('role','radiogroup');g.setAttribute('aria-label',label);if(label)w.appendChild(mk('span','cap',label));w.appendChild(g);
-  if(extra&&extra.span)w.classList.add('w'+extra.span);const c={w,sync(){const o=opts(),had=g.contains(document.activeElement);g.innerHTML='';const cv=cur();o.forEach((x,i)=>{const b=mk('button','',x.t);b.type='button';b.setAttribute('role','radio');b.setAttribute('aria-checked',x.v===cv?'true':'false');b.tabIndex=x.v===cv||(i===0&&!o.some(y=>y.v===cv))?0:-1;if(x.dis)b.disabled=true;
-      b.addEventListener('click',()=>{if(x.v!==cur()){pick(x.v);uiSync()}});g.appendChild(b)});if(had){const n=g.querySelector('[aria-checked=true]')||g.firstChild;if(n)n.focus()}if(extra&&extra.hidden)w.hidden=extra.hidden()}};
-  g.addEventListener('keydown',e=>{if(e.key!=='ArrowLeft'&&e.key!=='ArrowRight')return;const bs=[...g.querySelectorAll('button:not(:disabled)')],i=bs.indexOf(document.activeElement);if(i<0)return;e.preventDefault();bs[(i+(e.key==='ArrowRight'?1:bs.length-1))%bs.length].click();setTimeout(()=>{const n=g.querySelector('[aria-checked=true]');if(n)n.focus()},0)});
-  ctls.push(c);return w}
-function tog(label,cur,click){const b=mk('button','tog','<span>'+label+'</span><i></i>');b.type='button';b.setAttribute('role','switch');
-  b.addEventListener('click',()=>{click();uiSync()});ctls.push({w:b,sync(){b.setAttribute('aria-checked',cur()?'true':'false')}});return b}
-function rng(label,n,cur,set,fmt){const w=mk('div','rng','<div><span>'+label+'</span><output></output></div>'),i=mk('input');i.type='range';i.min=0;i.max=n-1;i.step=1;i.setAttribute('aria-label',label);w.appendChild(i);
-  i.addEventListener('input',()=>{set(+i.value);uiSync()});ctls.push({w,sync(){i.value=cur();w.querySelector('output').textContent=fmt(cur())}});return w}
-function chip(label,txt,onclick,hid){const b=mk('button','chipbtn','<em style="font-style:normal">'+label+'</em><span></span>');b.type='button';b.addEventListener('click',onclick);const w=mk('div','ctl');w.appendChild(b);ctls.push({w,sync(){b.querySelector('span').textContent=txt();if(hid)w.hidden=hid()}});return w}
-const short=(t,n)=>t.length>n?t.slice(0,n-1)+'.':t;
-const WXN={CLEAR:'Clear',SCATTERED:'Partly',OVERCAST:'Overcast',RAIN:'Rain'}, TMN={DAY:'Day',DUSK:'Dusk',NIGHT:'Night'};
+const MIS_BRIEF={WAVES:'Bandit groups arrive in waves from every bearing. Each wave is bigger and meaner than the last. Stay alive, keep your energy up and push the score.',
+  STRIKE:'A SAM and AAA site covers the approach to the target. Suppress it, destroy the objective, then bring the jet home.',
+  INTERCEPT:'Four bombers are inbound on the base. Kill them before they reach the release point; escorts will try to stop you.',
+  RUSH:'Eight bandits, five minutes. Nothing to protect and nowhere to hide. Kill fast, keep the speed up.',
+  ESCORT:'A C-130 is crossing the sector. Keep it alive until it clears the far side; bandits will go for it first.',
+  '2V4':'You and your wingman against four bandits. Call targets, split them and keep your wingman in the fight.',
+  '4SHIP':'Lead a four-ship against six bandits behind a SAM belt. Command the flight and manage the threats.',
+  CONVOY:'Trucks are running for the border. Stop at least four of the five before they escape.',
+  ANTISHIP:'A frigate sits north-east of the base with SAM cover. Find it, sink it and avoid the missile envelope.',
+  CRUISE:'Cruise missiles are inbound on the base. They are fast and low. Shoot down as many as you can.'};
+const LES_BRIEF={BFM:'Learn to turn, use energy and put the gun on target. Kill three drones with the guns.',DEFENSE:'Three missiles are coming for you. Break, chaff and flare your way through them.',
+  BVR:'Lock a contact at long range and shoot it down with a radar missile before it ever sees you.',LANDING:'Fly the pattern, line up with the runway and put the jet on the ground in one piece.',REFUEL:'Join up with the tanker, plug in and take on fuel in flight.'};
+const WXN={CLEAR:'Clear',SCATTERED:'Partly cloudy',OVERCAST:'Overcast',RAIN:'Rain'}, TMN={DAY:'Day',DUSK:'Dusk',NIGHT:'Night'};
 const startCur=()=>!startOnRunway?'air':startCV?'cv':'rwy';
+const QUICK_X=['CAMPAIGN','ONLINE','TRAINING'], quickList=()=>Object.keys(MISSIONS).filter(k=>QUICK_X.indexOf(k)<0);
+let lastQuick='WAVES';
+const lsGet=(k,d)=>{try{const v=localStorage.getItem(k);return v===null?d:v}catch(e){return d}}, lsSet=(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}};
+const REDUCE=matchMedia('(prefers-reduced-motion:reduce)').matches;
+const UIS={on:lsGet('vsUiSnd','1')!=='0'}, FX={on:lsGet('vsFx','1')!=='0'};
+const NOLOAD=/[?&]noload\b/.test(location.search);
+ovEl.dataset.fx=FX.on?'on':'off';
 
-/* ---- FLY tab: right-hand controls ---- */
-const fc=$('fCtl');
-fc.appendChild(seg('Start',()=>[{v:'air',t:'Air'},{v:'rwy',t:'Runway'},...(AC.carrier?[{v:'cv',t:'Carrier'}]:[])],startCur,v=>drive($('bStartPos'),startCur,v,4)));
-fc.appendChild(seg('Time',()=>Object.keys(TIMES).map(k=>({v:k,t:TMN[k]})),()=>timeOfDay,v=>drive($('bTime'),()=>timeOfDay,v)));
-fc.appendChild(seg('Weather',()=>Object.keys(WXS).map(k=>({v:k,t:WXN[k]})),()=>weather,v=>drive($('bWx'),()=>weather,v),{span:3}));
-fc.appendChild(seg('Difficulty',()=>Object.keys(DIFF).map(k=>({v:k,t:DIFF[k].name})),()=>difficulty,v=>drive($('bDiff'),()=>difficulty,v),{span:3,hidden:()=>$('bDiff').hidden}));
-fc.appendChild(seg('Engagement range',()=>Object.keys(ENG_RANGES).map(k=>({v:k,t:ENG_RANGES[k].n})),()=>rangeKey,v=>drive($('bRange'),()=>rangeKey,v)));
-fc.appendChild(seg('Mode',()=>[{v:'free',t:'Free'},{v:'career',t:'Career'}],()=>careerOn?'career':'free',v=>drive($('bMode'),()=>careerOn?'career':'free',v,2)));
-fc.appendChild(chip('Bandits',()=>BANDITS[banditType]||banditType,()=>openSheet('bandit'),()=>$('bBandit').hidden));
-fc.appendChild(chip('Lesson',()=>LESSONS[lesson],()=>openSheet('lesson'),()=>$('bLesson').hidden));
-{const on=mk('div','online');fc.appendChild(on);const rr=$('roomRow');on.appendChild(rr);rr.hidden=false;on.appendChild(seg('Online mode',()=>[{v:'TEAMS',t:'Teams'},{v:'FFA',t:'Free for all'}],()=>NET.mode,v=>drive($('bNetMode'),()=>NET.mode,v,2)));
-  on.appendChild(seg('Team',()=>[{v:'A',t:'Auto'},{v:'B',t:'Blue'},{v:'R',t:'Red'}],()=>NET.teamPref,v=>drive($('bTeam'),()=>NET.teamPref,v,3),{hidden:()=>NET.mode!=='TEAMS'}));
-  ctls.push({w:on,sync(){on.hidden=mission!=='ONLINE'}})}
-fc.appendChild($('firstRun'));   // slim first-flight hint across the control grid
-// campaign and lobby panels live under the controls on the Fly tab
-/* ---- SETTINGS tab ---- */
-{const g=$('sCtl'),box=t=>{const b=mk('div','sBox');b.appendChild(mk('p','cap',t));g.appendChild(b);return b};
-  let b=box('Controls');
-  b.appendChild(seg('Stick',()=>[{v:'stick',t:'Touch stick'},{v:'tilt',t:'Tilt'}],()=>tilt.on?'tilt':'stick',v=>{if((v==='tilt')!==tilt.on)$('bTilt').click()}));
-  b.appendChild(tog('Pull back to climb',()=>!invert,()=>$('bInvert').click()));
-  b.appendChild(rng('Stick sensitivity',Object.keys(SENS).length,()=>Object.keys(SENS).indexOf(sens),i=>drive($('bSens'),()=>sens,Object.keys(SENS)[i],4),i=>Object.keys(SENS)[i]));
-  b.appendChild(rng('Dead zone',DZS.length,()=>dz,i=>drive($('bDz'),()=>dz,i,6),i=>Math.round(DZS[i]*100)+' %'));
-  b=box('Sound and feel');
-  b.appendChild(tog('Sound',()=>A.on,()=>$('bSound').click()));b.appendChild(tog('Voice warnings',()=>VOICE.on,()=>$('bVoice').click()));b.appendChild(tog('Vibration',()=>hapticsOn,()=>$('bHaptic').click()));b.appendChild(tog('Kill cam',()=>KC.on,()=>$('bKc').click()));
-  b=box('Display');
-  b.appendChild(seg('Graphics',()=>Object.keys(QUALS).map(k=>({v:k,t:({LOW:'Low',MED:'Medium',HIGH:'High'})[k]})),()=>quality,v=>drive($('bQual'),()=>quality,v,4)));
-  b.appendChild(seg('HUD colours',()=>[{v:'green',t:'Green'},{v:'cb',t:'Blue / orange'}],()=>palKey,v=>drive($('bPal'),()=>palKey,v,3)));
-  b.appendChild(seg('HUD text size',()=>TXT_SIZES.map(k=>({v:k,t:Math.round(k*100)+'%'})),()=>txtK,v=>drive($('bText'),()=>txtK,v,4)))}
+/* ---- UI sounds: quiet, optional, through the existing audio context ---- */
+function uiSnd(k){if(!UIS.on||!A.ctx||!A.on)return;
+  if(k==='move')sndBeep(1500,.022,.014,'sine');
+  else if(k==='sel'){sndBeep(740,.045,.026,'triangle');setTimeout(()=>sndBeep(1110,.06,.022,'triangle'),45)}
+  else if(k==='back')sndBeep(520,.07,.022,'triangle')}
 
-/* ---- sheets (bottom sheet of cards for long lists) ---- */
-let sheetOpener=null;
-function openSheet(kind){const L=$('sheetList');L.innerHTML='';sheetOpener=document.activeElement;let title,items,cur,pick,plain=false;
-  if(kind==='mission'){title='Choose a mission';items=Object.keys(MISSIONS).map(k=>({v:k,name:MISSIONS[k],desc:MIS_DESC[k]||'',art:MIS_ART[k]}));cur=mission;pick=v=>drive($('bMission'),()=>mission,v,30)}
-  else if(kind==='map'){title='Choose a map';items=Object.keys(MAPS).map(k=>({v:k,name:MAP_NAME(k),desc:MAP_DESC[k],art:MAP_ART[k]}));cur=MAP;pick=v=>drive($('bMap'),()=>MAP,v,6)}
-  else if(kind==='bandit'){title='Choose the bandits';plain=true;items=Object.keys(BANDITS).map(k=>({v:k,name:BANDITS[k],desc:k==='MIXED'?'Random jets (matched to your BR in Career)':'BR '+progBR(k).toFixed(1)}));cur=banditType;pick=v=>drive($('bBandit'),()=>banditType,v,24)}
-  else{title='Choose a lesson';items=Object.keys(LESSONS).map(k=>({v:k,name:LESSONS[k],desc:LES_DESC[k],art:MIS_ART.TRAINING}));cur=lesson;pick=v=>drive($('bLesson'),()=>lesson,v,8)}
-  $('sheetTitle').textContent=title;
-  for(const it of items){const b=mk('button','opt'+(plain?' plain':''),(it.art?'<span class="art">'+svgArt(it.art[0],it.art[1],it.art[2])+'</span>':'')+'<span class="ptext"><b>'+it.name+'</b><em>'+it.desc+'</em></span>');b.type='button';b.setAttribute('role','radio');b.setAttribute('aria-checked',it.v===cur?'true':'false');
-    b.addEventListener('click',()=>{pick(it.v);closeSheet();uiSync()});L.appendChild(b)}
-  $('sheet').hidden=false;const s=L.querySelector('[aria-checked=true]')||L.firstChild;if(s){s.focus();s.scrollIntoView({block:'nearest'})}}
-function closeSheet(){if($('sheet').hidden)return;$('sheet').hidden=true;if(sheetOpener&&sheetOpener.isConnected)sheetOpener.focus();sheetOpener=null}
-$('sheetClose').addEventListener('click',closeSheet);$('sheetBack').addEventListener('click',closeSheet);
-$('cMission').addEventListener('click',()=>openSheet('mission'));$('cMap').addEventListener('click',()=>openSheet('map'));
-$('sheet').addEventListener('keydown',e=>{if(e.key==='Escape'){e.stopPropagation();closeSheet()}});
+/* ---- rows: LABEL ........ < Value >, thin slider rows, action rows ---- */
+const mCtls=[], CHEV_L='<svg viewBox="0 0 10 16" aria-hidden="true"><path d="M8 2L2 8l6 6"/></svg>', CHEV_R='<svg viewBox="0 0 10 16" aria-hidden="true"><path d="M2 2l6 6-6 6"/></svg>';
+function mRow(label,opts,cur,pick,o){o=o||{};
+  const w=mk('div','mr'),m=mk('button','rm','<span class="lab">'+label+'</span><i class="lead"></i>'),l=mk('button','chev',CHEV_L),v=mk('button','val'),r=mk('button','chev',CHEV_R);
+  for(const b of [m,l,v,r])b.type='button';for(const b of [l,v,r])b.tabIndex=-1;
+  l.setAttribute('aria-label','Previous '+label);r.setAttribute('aria-label','Next '+label);
+  w.append(m,l,v,r);w.dataset.name=label;if(o.desc)w.dataset.desc=o.desc;
+  const step=d=>{const O=opts();if(!O.length)return;const i=Math.max(0,O.findIndex(x=>x.v===cur())),n=O[(i+d+O.length)%O.length];if(n&&n.v!==cur()){pick(n.v);uiSnd('move')}uiSync()};
+  w._step=step;l.addEventListener('click',()=>step(-1));for(const b of [m,v,r])b.addEventListener('click',()=>step(1));
+  m.addEventListener('keydown',e=>{if(e.key==='ArrowLeft'){e.preventDefault();step(-1)}else if(e.key==='ArrowRight'){e.preventDefault();step(1)}});
+  mCtls.push({w,sync(){const O=opts(),c=O.find(x=>x.v===cur());v.textContent=c?c.t:'';m.setAttribute('aria-label',label+': '+(c?c.t:''));l.disabled=r.disabled=O.length<2;if(o.hidden)w.hidden=o.hidden()}});return w}
+const onoff=(label,cur,click,o)=>mRow(label,()=>[{v:true,t:'On'},{v:false,t:'Off'}],()=>!!cur(),v=>{if(v!==!!cur())click()},o);
+function mSlide(label,n,cur,set,fmt,o){o=o||{};
+  const w=mk('div','mr sl','<span class="lab">'+label+'</span><i class="lead"></i><div class="track"><i class="fill"></i><input type="range" min="0" max="'+(n-1)+'" step="1" aria-label="'+label+'"></div><output class="val"></output>'),i=w.querySelector('input'),f=w.querySelector('.fill');
+  w.dataset.name=label;if(o.desc)w.dataset.desc=o.desc;
+  i.addEventListener('input',()=>{set(+i.value);uiSnd('move');uiSync()});
+  w._step=d=>{i.value=clamp(+i.value+d,0,n-1);i.dispatchEvent(new Event('input'))};
+  mCtls.push({w,sync(){i.value=cur();f.style.width=(n>1?cur()/(n-1)*100:100)+'%';w.querySelector('output').textContent=fmt(cur())}});return w}
+function mAct(label,hint,click,desc){const b=mk('button','mr act','<span class="lab">'+label+'</span><i class="lead"></i><span class="val">'+hint+'</span>');b.type='button';b.dataset.name=label;if(desc)b.dataset.desc=desc;
+  b.addEventListener('click',()=>{uiSnd('sel');click()});return b}
+const mGrp=t=>mk('h3','grp',t);
 
-/* ---- tabs and views ---- */
-function setPane(pane,nav){ovEl.dataset.pane=pane;ovEl.dataset.nav=nav||'';
-  for(const b of $('mTabs').querySelectorAll('button'))b.setAttribute('aria-selected',b.dataset.t===pane?'true':'false');
+/* ---- battle presets: set existing values only (difficulty, which carries the missile and countermeasure rules; HUD markers; damage severity; reward multiplier) ---- */
+let presetPending=null;
+function presetApply(k){presetPending=null;preset=k;lsSet('vsPreset',k);drive($('bDiff'),()=>difficulty,PRESETS[k].diff);uiSync()}
+function presetRow(){const w=mRow('Preset',()=>Object.keys(PRESETS).map(k=>({v:k,t:PRESETS[k].n+' ×'+PRESETS[k].reward.toFixed(1)})),()=>preset,v=>{
+    if(difficulty!==PRESETS[preset].diff){presetPending=v;uiSync()}else presetApply(v)},{desc:'Arcade, Realistic or Simulator: sets difficulty, HUD markers, damage severity and the reward multiplier.'});
+  const chip=mk('div','pchip','<span></span><button type="button" data-y>Apply</button><button type="button" data-n>Keep</button>');chip.hidden=true;w.appendChild(chip);
+  chip.querySelector('[data-y]').addEventListener('click',()=>{uiSnd('sel');presetApply(presetPending)});chip.querySelector('[data-n]').addEventListener('click',()=>{presetPending=null;uiSync()});
+  mCtls.push({w:chip,sync(){chip.hidden=!presetPending;if(presetPending)chip.querySelector('span').textContent='Replace your Difficulty ('+DIFF[difficulty].name+') with '+PRESETS[presetPending].n+' ('+DIFF[PRESETS[presetPending].diff].name+')?'}});
+  return w}
+/* ---- QUICK MISSION rows ---- */
+const qr=$('qRows');
+{const A1=mk('div','col'),B1=mk('div','col');qr.append(A1,B1);
+  A1.append(mGrp('Mission'),
+    presetRow(),
+    mRow('Mission',()=>quickList().map(k=>({v:k,t:MISSIONS[k]})),()=>quickList().indexOf(mission)>=0?mission:lastQuick,v=>{lastQuick=v;drive($('bMission'),()=>mission,v,30)}),
+    mRow('Map',()=>Object.keys(MAPS).map(k=>({v:k,t:MAP_NAME(k)})),()=>MAP,v=>drive($('bMap'),()=>MAP,v,6)),
+    mRow('Start',()=>[{v:'air',t:'In the air'},{v:'rwy',t:'Runway'},...(AC.carrier?[{v:'cv',t:'Carrier'}]:[])],startCur,v=>drive($('bStartPos'),startCur,v,4)),
+    mRow('Mode',()=>[{v:'free',t:'Free play'},{v:'career',t:'Career'}],()=>careerOn?'career':'free',v=>drive($('bMode'),()=>careerOn?'career':'free',v,2)));
+  B1.append(mGrp('Opponents'),
+    mRow('Bandits',()=>Object.keys(BANDITS).map(k=>({v:k,t:BANDITS[k]})),()=>banditType,v=>drive($('bBandit'),()=>banditType,v,30),{hidden:()=>$('bBandit').hidden}),
+    mRow('Difficulty',()=>Object.keys(DIFF).map(k=>({v:k,t:DIFF[k].name})),()=>difficulty,v=>drive($('bDiff'),()=>difficulty,v),{hidden:()=>$('bDiff').hidden}),
+    mRow('Range',()=>Object.keys(ENG_RANGES).map(k=>({v:k,t:ENG_RANGES[k].n})),()=>rangeKey,v=>drive($('bRange'),()=>rangeKey,v)),
+    mGrp('Environment'),
+    mRow('Time',()=>Object.keys(TIMES).map(k=>({v:k,t:TMN[k]})),()=>timeOfDay,v=>drive($('bTime'),()=>timeOfDay,v)),
+    mRow('Weather',()=>Object.keys(WXS).map(k=>({v:k,t:WXN[k]})),()=>weather,v=>drive($('bWx'),()=>weather,v)));
+}
+/* ---- ONLINE rows ---- */
+{const o=$('oRows'),c=mk('div','col');o.appendChild(c);c.append(mGrp('Room'));
+  const rr=$('roomRow'),w=mk('div','mr in','<span class="lab">Room code</span><i class="lead"></i>');w.dataset.name='Room code';w.dataset.desc='Pilots who enter the same code share an arena. Share this page and the code.';
+  w.appendChild(rr);rr.hidden=false;rr.className='rin';c.appendChild(w);
+  c.append(mRow('Mode',()=>[{v:'TEAMS',t:'Teams'},{v:'FFA',t:'Free for all'}],()=>NET.mode,v=>drive($('bNetMode'),()=>NET.mode,v,2)),
+    mRow('Team',()=>[{v:'A',t:'Auto'},{v:'B',t:'Blue'},{v:'R',t:'Red'}],()=>NET.teamPref,v=>drive($('bTeam'),()=>NET.teamPref,v,3),{hidden:()=>NET.mode!=='TEAMS'}))}
+
+/* ---- SETTINGS: tabs, rows and a description area ---- */
+const SDESC={'Stick':'Fly with the on-screen stick, or tilt the phone.','Pull back':'Whether pulling the stick back raises the nose (flight-sim) or lowers it.','Sensitivity':'How far the jet turns for a given stick movement.','Dead zone':'Ignore small stick movements near the centre.',
+  'Vibration':'Haptic feedback for guns, hits and warnings.','Move buttons':'Drag the on-screen buttons where you want them, then save.','Controls guide':'Launch a sortie and show the controls guide on top.',
+  'Graphics':'Lower this if the frame rate drops. Auto-adjusts when the game is struggling.','Cinematic menu':'Film grain, letterbox bars, light flare and the slow camera drift behind the menu.','Kill cam':'A short replay when you shoot something down.',
+  'Sound':'All game sound.','Voice warnings':'Spoken cockpit warnings: pull up, missile, bingo fuel.','UI sounds':'Quiet clicks as you move through the menu.',
+  'Colours':'Switch the HUD to a colour-blind friendly blue and orange.','Text size':'Scale the HUD text.',
+  'Difficulty':'How smart and how deadly the bandits are.','Range':'How far away the fight starts. Longer ranges give you room to notch and use radar missiles.','Mode':'Career keeps your XP, rank and unlocks.'};
+const STABS=[['ctl','Controls'],['dsp','Display'],['aud','Audio'],['hud','HUD'],['gp','Gameplay']];
+let sTab='ctl';
+{const sr=$('sRows'),tabs=$('sTabs'),pane={};
+  for(const [k,t] of STABS){const b=mk('button','',t);b.type='button';b.setAttribute('role','tab');b.dataset.k=k;b.addEventListener('click',()=>{uiSnd('move');setSTab(k)});tabs.appendChild(b);
+    const c=mk('div','col');c.dataset.tab=k;pane[k]=c;sr.appendChild(c)}
+  pane.ctl.append(
+    mRow('Stick',()=>[{v:'stick',t:'Touch stick'},{v:'tilt',t:'Tilt'}],()=>tilt.on?'tilt':'stick',v=>{if((v==='tilt')!==tilt.on)$('bTilt').click()}),
+    mRow('Pull back',()=>[{v:'up',t:'Climbs'},{v:'dn',t:'Dives'}],()=>invert?'dn':'up',v=>{if((v==='dn')!==invert)$('bInvert').click()}),
+    mSlide('Sensitivity',Object.keys(SENS).length,()=>Object.keys(SENS).indexOf(sens),i=>drive($('bSens'),()=>sens,Object.keys(SENS)[i],4),i=>Object.keys(SENS)[i]),
+    mSlide('Dead zone',DZS.length,()=>dz,i=>drive($('bDz'),()=>dz,i,6),i=>Math.round(DZS[i]*100)+' %'),
+    onoff('Vibration',()=>hapticsOn,()=>$('bHaptic').click()),
+    mAct('Move buttons','Edit',()=>$('bLayout').click()),mAct('Controls guide','Show',()=>$('bTips').click()));
+  pane.dsp.append(
+    mRow('Graphics',()=>Object.keys(QUALS).map(k=>({v:k,t:({LOW:'Low',MED:'Medium',HIGH:'High'})[k]})),()=>quality,v=>drive($('bQual'),()=>quality,v,4)),
+    onoff('Cinematic menu',()=>FX.on,()=>{FX.on=!FX.on;lsSet('vsFx',FX.on?'1':'0');ovEl.dataset.fx=FX.on?'on':'off';camGoal(ovEl.dataset.pane)}),
+    onoff('Kill cam',()=>KC.on,()=>$('bKc').click()));
+  pane.aud.append(onoff('Sound',()=>A.on,()=>$('bSound').click()),onoff('Voice warnings',()=>VOICE.on,()=>$('bVoice').click()),onoff('UI sounds',()=>UIS.on,()=>{UIS.on=!UIS.on;lsSet('vsUiSnd',UIS.on?'1':'0');if(UIS.on){audioInit();uiSnd('sel')}}));
+  pane.hud.append(
+    mRow('Colours',()=>[{v:'green',t:'Green'},{v:'cb',t:'Blue / orange'}],()=>palKey,v=>drive($('bPal'),()=>palKey,v,3)),
+    mRow('Text size',()=>TXT_SIZES.map(k=>({v:k,t:Math.round(k*100)+'%'})),()=>txtK,v=>drive($('bText'),()=>txtK,v,4)));
+  pane.gp.append(
+    mRow('Difficulty',()=>Object.keys(DIFF).map(k=>({v:k,t:DIFF[k].name})),()=>difficulty,v=>drive($('bDiff'),()=>difficulty,v),{hidden:()=>$('bDiff').hidden}),
+    mRow('Range',()=>Object.keys(ENG_RANGES).map(k=>({v:k,t:ENG_RANGES[k].n})),()=>rangeKey,v=>drive($('bRange'),()=>rangeKey,v)),
+    mRow('Mode',()=>[{v:'free',t:'Free play'},{v:'career',t:'Career'}],()=>careerOn?'career':'free',v=>drive($('bMode'),()=>careerOn?'career':'free',v,2)));
+  for(const k in pane)for(const e of pane[k].querySelectorAll('.mr'))if(!e.dataset.desc&&SDESC[e.dataset.name])e.dataset.desc=SDESC[e.dataset.name];
+  // the other quick-mission rows get descriptions too
+  for(const e of document.querySelectorAll('#qRows .mr'))if(!e.dataset.desc&&SDESC[e.dataset.name])e.dataset.desc=SDESC[e.dataset.name]}
+function setSTab(k){sTab=k;for(const b of $('sTabs').children)b.setAttribute('aria-selected',b.dataset.k===k?'true':'false');
+  for(const c of $('sRows').children)c.hidden=c.dataset.tab!==k;sdShow(c0())}
+const c0=()=>$('sRows').querySelector('.col:not([hidden]) .mr:not([hidden])');
+function sdShow(row){const t=STABS.find(x=>x[0]===sTab);$('sdKick').textContent=t?t[1]:'Settings';if(!row){$('sdName').textContent=t?t[1]:'Settings';$('sdText').textContent='';return}
+  $('sdName').textContent=row.dataset.name||'';$('sdText').textContent=row.dataset.desc||''}
+$('sRows').addEventListener('focusin',e=>{const r=e.target.closest('.mr');if(r)sdShow(r)});
+$('sRows').addEventListener('pointerover',e=>{const r=e.target.closest('.mr');if(r&&e.pointerType==='mouse')sdShow(r)});
+
+/* ---- panes, header and the camera behind them ---- */
+const PANES={title:{},main:{e:'Operations',t:'Viper Sortie'},quick:{e:'Operations',t:'Quick mission',back:'main'},camp:{e:'Operations',t:'Campaign',back:'main'},online:{e:'Operations',t:'Online',back:'main'},
+  train:{e:'Operations',t:'Training',back:'main'},set:{e:'Options',t:'Settings',back:'main'},pilot:{e:'Pilot record',t:'Pilot',back:'main'},pause:{},over:{},load:{}};
+const CAMG={title:[1.05,.1,1.4],main:[.72,.2,1],quick:[-.55,.12,1.5],camp:[2.5,.62,1.75],online:[1.9,.2,1.35],train:[.4,.04,.6],set:[1.5,.25,1.5],pilot:[.2,.15,1.2],over:[2.7,.15,.95],load:[.72,.2,1.15]};
+function camGoal(p){const g=CAMG[p]||CAMG.main;HG.goal={ang:g[0],el:g[1],zoom:g[2],drift:(FX.on&&!REDUCE)?1:0}}
+let paneBack='';
+function crumbSync(){if(ovEl.dataset.kind==='over'||ovEl.dataset.kind==='pause'&&ovEl.dataset.pane==='pause')return;const p=PANES[ovEl.dataset.pane];if(!p||!p.t)return;
+  $('ovEyebrow').textContent=p.e;$('ovTitle').textContent=p.t}
+function goPane(pane,o){o=o||{};const prev=ovEl.dataset.pane;if(pane==='quick')ensureQuick();else if(pane==='camp'&&mission!=='CAMPAIGN')drive($('bMission'),()=>mission,'CAMPAIGN',30);
+  else if(pane==='online'&&mission!=='ONLINE')drive($('bMission'),()=>mission,'ONLINE',30);else if(pane==='train'&&mission!=='TRAINING')drive($('bMission'),()=>mission,'TRAINING',30);
+  const p=PANES[pane]||{};ovEl.dataset.pane=pane;ovEl.dataset.back=o.back!==undefined?o.back:(p.back||'');
+  if(ovEl.dataset.kind==='menu')crumbSync();
+  else if(pane==='pause'){$('ovEyebrow').textContent='Holding pattern';$('ovTitle').textContent='Paused'}
+  else if(pane==='set'&&ovEl.dataset.kind==='pause'){$('ovEyebrow').textContent='Options';$('ovTitle').textContent='Settings'}
+  if(pane==='set'){setSTab(sTab)}
+  const el=$('mBody').querySelector('.pane[data-pane="'+pane+'"]');
+  if(el){let i=0;for(const c of el.querySelectorAll('.nav>button,.rows .mr,.lessons li,.pList>*,.pGrid>*,.stabs>button')){c.style.setProperty('--i',i++)}
+    el.classList.remove('in');void el.offsetWidth;el.classList.add('in')}
   for(const b of $('oTabs').querySelectorAll('button'))b.setAttribute('aria-selected',b.dataset.o===ovEl.dataset.over?'true':'false');
-  $('mBody').scrollTop=0}
-for(const b of $('mTabs').querySelectorAll('button'))b.addEventListener('click',()=>{setPane(b.dataset.t,'tabs');uiSync()});
-$('mTabs').addEventListener('keydown',e=>{if(e.key!=='ArrowLeft'&&e.key!=='ArrowRight')return;const bs=[...$('mTabs').querySelectorAll('button')],i=bs.indexOf(document.activeElement);if(i<0)return;e.preventDefault();const n=bs[(i+(e.key==='ArrowRight'?1:bs.length-1))%bs.length];n.focus();n.click()});
-for(const b of $('oTabs').querySelectorAll('button'))b.addEventListener('click',()=>{ovEl.dataset.over=b.dataset.o;setPane('over','over')});
-$('bMenu').addEventListener('click',()=>{setPane('fly','tabs');uiSync()});
-$('bPauseSet').addEventListener('click',()=>setPane('set','back'));
-$('mBack').addEventListener('click',()=>setPane('pause',''));
-$('bRestart').addEventListener('click',()=>{if(state!=='paused')return;closeSheet();audioInit();startGame();last=performance.now()});
+  camGoal(pane);prompts();uiSync();if(prev!==pane&&!o.quiet)focusFirst()}
+const setPane=goPane;
+function ensureQuick(){if(quickList().indexOf(mission)<0)drive($('bMission'),()=>mission,lastQuick,30);else lastQuick=mission}
+function focusFirst(){requestAnimationFrame(()=>{if(ovEl.hidden)return;const f=focusables().find(e=>e!==$('mBack'));if(f)f.focus({preventScroll:true})})}
+function focusables(){if(HG.on)return[...$('hangar').querySelectorAll('button:not(:disabled),input,select,[tabindex="0"]')].filter(e=>e.offsetParent!==null);
+  const pane=$('mBody').querySelector('.pane[data-pane="'+ovEl.dataset.pane+'"]'),a=[];
+  if(!$('mBack').hidden&&getComputedStyle($('mBack')).display!=='none')a.push($('mBack'));
+  if(pane)for(const e of pane.querySelectorAll('button:not(:disabled),input,[tabindex="0"]'))if(e.tabIndex>=0&&e.offsetParent!==null&&!e.closest('[hidden]'))a.push(e);
+  for(const e of $('dock').querySelectorAll('button:not(:disabled)'))if(e.offsetParent!==null)a.push(e);return a}
+/* nav */
+for(const b of $('mNav').querySelectorAll('button[data-go]'))b.addEventListener('click',()=>{uiSnd('sel');goPane(b.dataset.go)});
+$('bHangar').addEventListener('click',()=>uiSnd('sel'));
+$('mBack').addEventListener('click',()=>{uiSnd('back');goBack()});
+function goBack(){const b=ovEl.dataset.back;if(b)goPane(b)}
+$('mWallet').addEventListener('click',()=>{uiSnd('sel');if(ovEl.dataset.kind==='menu')goPane('pilot')});
+$('bFirst').addEventListener('click',()=>goPane('train'));
+$('bMenu').addEventListener('click',()=>{ovEl.dataset.kind='menu';$('bStart').textContent='Launch';$('bShare').hidden=true;$('bMenu').hidden=true;$('bOverHg').hidden=true;bgSync();goPane('main')});
+$('bOverHg').addEventListener('click',()=>$('bHangar').click());
+$('bPauseSet').addEventListener('click',()=>goPane('set',{back:'pause'}));
+$('bRestart').addEventListener('click',()=>{if(state!=='paused')return;audioInit();startGame()});
+for(const b of $('oTabs').querySelectorAll('button'))b.addEventListener('click',()=>{uiSnd('move');ovEl.dataset.over=b.dataset.o;goPane('over',{quiet:true});overTab()});
+function overTab(){const o=ovEl.dataset.over,none=$('lbNone')||(()=>{const p=mk('p','dbKey','No scores yet. Fly a sortie.');p.id='lbNone';$('lbBox').parentNode.appendChild(p);return p})();none.hidden=!(o==='scores'&&$('lbBox').hidden)}
+$('pressAny').closest('.pane').addEventListener('pointerdown',()=>dismissTitle());
+
+/* ---- title screen ---- */
+let titleDone=false;
+function dismissTitle(){if(ovEl.dataset.pane!=='title')return;titleDone=true;audioInit();uiSnd('sel');goPane('main')}
+addEventListener('keydown',e=>{if(ovEl.dataset.pane==='title'&&!ovEl.hidden&&!e.metaKey&&!e.ctrlKey&&!e.altKey&&['Shift','Control','Alt','Meta','Tab'].indexOf(e.key)<0){e.preventDefault();e.stopPropagation();dismissTitle()}},true);
+
+/* ---- input prompts that follow the last device used ---- */
+let inputMode=matchMedia('(pointer:coarse)').matches?'touch':'kb';ovEl.dataset.input=inputMode;
+const kcap=k=>'<span class="kc">'+k+'</span>', gbtn=(k,c)=>'<span class="gb'+(c?' '+c:'')+'">'+k+'</span>';
+const PR={kb:{sel:kcap('Enter'),back:kcap('Esc'),chg:kcap('&larr;')+kcap('&rarr;'),tabs:kcap('Q')+kcap('E'),mv:kcap('&uarr;')+kcap('&darr;')},
+  pad:{sel:gbtn('A','a'),back:gbtn('B','b'),chg:gbtn('&#9664;')+gbtn('&#9654;'),tabs:gbtn('LB')+gbtn('RB'),mv:gbtn('&#9650;')+gbtn('&#9660;')},
+  touch:{sel:'<span class="tp">Tap</span>',back:'<span class="tp">Back</span>',chg:'<span class="tp">Tap arrows</span>',tabs:'<span class="tp">Tap tabs</span>',mv:'<span class="tp">Swipe</span>'}};
+function setInput(m){if(m===inputMode)return;inputMode=m;ovEl.dataset.input=m;prompts()}
+addEventListener('keydown',()=>setInput('kb'),true);
+addEventListener('pointerdown',e=>setInput(e.pointerType==='touch'?'touch':'kb'),true);
+function prompts(){const p=ovEl.dataset.pane,m=PR[inputMode],box=$('mPrompts');let h='';
+  const it=(g,t)=>'<span class="pi">'+g+'<em>'+t+'</em></span>';
+  if(p==='title')h='';
+  else if(p==='load')h='';
+  else{if(inputMode!=='touch')h+=it(m.mv,'Move');h+=it(m.sel,'Select');
+    if(['quick','online','set'].indexOf(p)>=0)h+=it(m.chg,'Change');
+    if(p==='set'||p==='over')h+=it(m.tabs,'Tabs');
+    if(ovEl.dataset.back)h+=it(m.back,'Back')}
+  box.innerHTML=h;
+  const lh=$('lHint');if(lh)lh.innerHTML=inputMode==='kb'?kcap('Enter'):inputMode==='pad'?gbtn('Menu','s'):''}
+
+/* ---- briefing panels ---- */
+function diagram(){const m=MIS_ART[mission]||MIS_ART.WAVES,p=MAP_ART[MAP]||MAP_ART.ISLANDS,id='dg'+MAP;
+  return '<svg viewBox="0 0 200 104" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Map diagram"><defs><linearGradient id="'+id+'" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="'+p[0]+'"/><stop offset="1" stop-color="'+p[1]+'"/></linearGradient></defs>'+
+    '<rect width="200" height="104" fill="url(#'+id+')"/><g fill="none" stroke="#fff" stroke-width=".35" opacity=".25">'+[40,80,120,160].map(x=>'<path d="M'+x+' 0v104"/>').join('')+[26,52,78].map(y=>'<path d="M0 '+y+'h200"/>').join('')+'</g>'+
+    '<g transform="scale(2.08,1.73)" fill="none" stroke="#fff" stroke-width="1.2" opacity=".55">'+p[2]+'</g><rect width="200" height="104" fill="#05080b" opacity=".38"/>'+
+    '<g fill="none" stroke="#fff" stroke-width=".6" opacity=".5"><circle cx="150" cy="46" r="26" stroke-dasharray="2 3"/><circle cx="150" cy="46" r="13" stroke-dasharray="2 3"/></g>'+
+    '<g transform="translate(112,8) scale(.82)" stroke="#f2f6f3" stroke-width="1.6" fill="none">'+m[2]+'</g>'+
+    '<path d="M26 82L150 46" stroke="#fff" stroke-width=".7" stroke-dasharray="3 3" opacity=".7"/><g fill="#fff" stroke="none"><path d="M26 78l5 8h-10z"/></g><text x="34" y="90" fill="#fff" font-size="6" letter-spacing="1" font-family="inherit">BASE</text>'+
+    '<text x="170" y="98" fill="#fff" font-size="5.5" letter-spacing="1.2" font-family="inherit" opacity=".8">N &#8593;  50 KM</text></svg>'}
+// the enemy battle-rating range for the selected mission, as the bandit picker will use it
+const NO_FIGHTERS=['CONVOY','ANTISHIP','CRUISE'];
+function enemyBR(){if(NO_FIGHTERS.indexOf(mission)>=0)return null;
+  if(banditType!=='MIXED'){const b=progBR(banditType);return{lo:b,hi:b}}
+  const b=progBR(AC.id);let pool=FIGHTERS;if(careerOn){const near=FIGHTERS.filter(f=>Math.abs(progBR(f)-b)<=1);if(near.length>1)pool=near}
+  const v=pool.map(progBR);return{lo:Math.min(...v),hi:Math.max(...v)}}
+const kvs=a=>'<dl class="kvs">'+a.map(x=>'<div><dt>'+x[0]+'</dt><dd>'+x[1]+'</dd></div>').join('')+'</dl>';
+function briefQuick(){const k=mission,mine=progBR(AC.id),er=enemyBR(),out=er&&(mine<er.lo-.001||mine>er.hi+.001);
+  const rng=er?(er.lo===er.hi?er.lo.toFixed(1):er.lo.toFixed(1)+'–'+er.hi.toFixed(1)):'none';
+  $('qBrief').innerHTML='<p class="eyebrow">Briefing</p><h2>'+MISSIONS[k]+'</h2>'+(out?'<p class="warnchip" role="status">Your BR '+mine.toFixed(1)+' is outside the enemy range '+rng+'</p>':'')+'<p class="txt">'+(MIS_BRIEF[k]||MIS_DESC[k]||'')+'</p><div class="diag">'+diagram()+'</div>'+
+    kvs([['Aircraft',AC.name],['BR','<span id="brMine">'+mine.toFixed(1)+' ±1.0</span>'],['Enemy BR','<span id="brEnemy">'+rng+'</span>'],['Time',TMN[timeOfDay]],['Weather',WXN[weather]],['Map',MAP_NAME(MAP)]])}
+function briefTrain(){const k=lesson,done=lessonsDone();$('trBrief').innerHTML='<p class="eyebrow">Lesson '+String(Object.keys(LESSONS).indexOf(k)+1).padStart(2,'0')+'</p><h2>'+LESSONS[k]+'</h2><p class="txt">'+(LES_BRIEF[k]||LES_DESC[k])+'</p>'+
+  kvs([['Aircraft',AC.name],['Status',done[k]?'Complete':'Not yet flown'],['Lessons done',Object.keys(done).filter(x=>done[x]).length+' / '+Object.keys(LESSONS).length]])}
+const lessonsDone=()=>{try{return JSON.parse(lsGet('vsLessonsDone','{}'))||{}}catch(e){return{}}};
+function trainList(){const L=$('pLessons'),done=lessonsDone();if(!L.childElementCount){let n=0;for(const k of Object.keys(LESSONS)){const li=mk('li'),b=mk('button','les','<span class="no">'+String(++n).padStart(2,'0')+'</span><span class="nm"><b>'+LESSONS[k]+'</b><small>'+LES_DESC[k]+'</small></span><i class="tick" aria-hidden="true"></i>');b.type='button';b.dataset.k=k;
+    b.addEventListener('click',()=>{uiSnd('move');drive($('bLesson'),()=>lesson,k,8);uiSync()});li.appendChild(b);L.appendChild(li)}}
+  for(const li of L.children){const b=li.firstChild,k=b.dataset.k;b.setAttribute('aria-pressed',lesson===k?'true':'false');b.classList.toggle('done',!!done[k]);b.querySelector('.tick').innerHTML=done[k]?'<svg viewBox="0 0 16 12"><path d="M1 6l5 5L15 1"/></svg>':''}}
+/* campaign map: sectors are points on a route from the base up to the enemy capital */
+const OPP=[[56,206],[128,170],[96,126],[190,100],[262,64],[338,34]];
+function campMapSvg(){if(typeof camp!=='object'||!camp)return;const S=SECTORS;let h='<defs><linearGradient id="opg" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#16303a"/><stop offset="1" stop-color="#0a1118"/></linearGradient></defs><rect width="400" height="240" fill="url(#opg)"/>';
+  h+='<g stroke="#fff" stroke-width=".4" opacity=".12">'+[50,100,150,200,250,300,350].map(x=>'<path d="M'+x+' 0v240"/>').join('')+[40,80,120,160,200].map(y=>'<path d="M0 '+y+'h400"/>').join('')+'</g>';
+  h+='<path d="M0 226C60 214 90 190 140 196S230 160 270 120 340 92 400 62V240H0z" fill="#1d3b2c" opacity=".5"/><path d="M0 226C60 214 90 190 140 196S230 160 270 120 340 92 400 62" fill="none" stroke="#9fd4a8" stroke-width=".8" opacity=".5"/>';
+  let d='M'+OPP.map(p=>p.join(' ')).join('L');h+='<path d="'+d+'" fill="none" stroke="#fff" stroke-width="1" stroke-dasharray="4 4" opacity=".45"/>';
+  const held=Math.min(camp.front,5);if(held>0)h+='<path d="M'+OPP.slice(0,held+1).map(p=>p.join(' ')).join('L')+'" fill="none" stroke="var(--acc)" stroke-width="2"/>';
+  for(let i=0;i<6;i++){const [x,y]=OPP[i],blue=i<camp.front,front=i===camp.front;
+    if(blue)h+='<g><circle cx="'+x+'" cy="'+y+'" r="6" fill="var(--acc)"/><path d="M'+(x-3)+' '+y+'l2.2 2.4 4-4.8" stroke="#05080b" stroke-width="1.5" fill="none"/></g>';
+    else if(front)h+='<g><circle cx="'+x+'" cy="'+y+'" r="13" fill="none" stroke="#ffb347" stroke-width="1" opacity=".5"><animate attributeName="r" values="9;17;9" dur="2.4s" repeatCount="indefinite"/><animate attributeName="opacity" values=".7;0;.7" dur="2.4s" repeatCount="indefinite"/></circle><circle cx="'+x+'" cy="'+y+'" r="7" fill="#ffb347"/><circle cx="'+x+'" cy="'+y+'" r="2.4" fill="#05080b"/></g>';
+    else h+='<path d="M'+x+' '+(y-7)+'l7 7-7 7-7-7z" fill="#05080b" stroke="#ff5a4e" stroke-width="1.6"/>';
+    const lab=(front?S[i]+' · '+camp.str[i]+'%':S[i]).toUpperCase(),right=x<240;
+    h+='<text x="'+(right?x+14:x-14)+'" y="'+(y+3.5)+'" text-anchor="'+(right?'start':'end')+'" fill="'+(front?'#ffb347':blue?'#e9eeea':'#c7d0cb')+'" font-size="10" letter-spacing="1.4" font-weight="600" font-family="inherit">'+lab+'</text>'}
+  h+='<text x="14" y="228" fill="#fff" opacity=".6" font-size="8" letter-spacing="2" font-family="inherit">HOME BASE</text><text x="386" y="20" text-anchor="end" fill="#fff" opacity=".6" font-size="8" letter-spacing="2" font-family="inherit">ENEMY CAPITAL</text>';
+  $('opSvg').innerHTML=h;
+  const f=Math.min(camp.front,5);$('cpSec').textContent='Sector '+(f+1)+' of 6 · front line';$('cpName').textContent=SECTORS[f];
+  $('cpKv').innerHTML=kvs([['Resistance',camp.str[f]+'%'],['Sortie',CAMP_SORTIES[campSortie]],['Sorties flown',camp.sorties],['Wins',camp.wins]])}
 
 /* ---- keep everything in step with the game ---- */
-function modeKind(){return ovEl.dataset.kind||'menu'}
+const hgBgWant=()=>{const k=ovEl.dataset.kind;return !ovEl.hidden&&(k==='menu'||k==='over')&&(state==='menu'||state==='over')};
+function bgSync(){const want=hgBgWant();
+  if(want&&!HG.bg){HG.bg=true;projKey='';HG.zoom=1.4;HG.el=.1;HG.ang=1.05;HG.auto=false;hgEnter();HG.tgt.set(0,2.2,HG_JZ);camGoal(ovEl.dataset.pane)}
+  else if(!want&&HG.bg){HG.bg=false;projKey='';if(!HG.on)hgLeave()}}
+function rpTotal(){let t=prog.frp;for(const k in prog.rp)t+=prog.rp[k];return t}   // RP balance shown in the top bar: every aircraft's RP plus free RP
+function wallet(){dailyRoll();const ri=rankIdx(career.xp),nx=RANKS[ri+1],base=RANKS[ri][0],pct=nx?Math.round((career.xp-base)/(nx[0]-base)*100):100;
+  $('wCall').textContent=myCall().toUpperCase();$('wRank').textContent=RANKS[ri][1];const xb=$('wXp');xb.firstChild.style.width=pct+'%';xb.setAttribute('aria-valuenow',pct);xb.title=nx?career.xp.toLocaleString()+' / '+nx[0].toLocaleString()+' XP to '+nx[1]:'Top rank';
+  $('wRP').textContent=rpTotal().toLocaleString();$('wSL').textContent=prog.sl.toLocaleString();$('wSLb').hidden=!careerOn}   // Silver Lions only exist in Career
 const _showOverlay3=showOverlay;
-showOverlay=function(kind){_showOverlay3(kind);if(!kind)return;ovEl.dataset.kind=kind;closeSheet();
-  // the debrief gets the lede (promotions, rescue notes) and a Watch replay button; the pause sheet keeps its own
-  {const over=kind==='over',host=over?$('mpOver'):$('mpPause');host.insertBefore($('ovLede'),host.firstChild);
-   if(over)$('mBar').querySelector('.mActs').insertBefore($('bReplay'),$('bMenu'));else $('pList').insertBefore($('bReplay'),$('bPauseSet'))}
-  if(kind==='pause'){setPane('pause','');$('pSlot').appendChild($('bStart'));$('bStart').classList.add('primary')}
-  else{$('mBar').querySelector('.mActs').appendChild($('bStart'));if(kind==='over'){ovEl.dataset.over='replay';setPane('over','over')}}
-  $('bMenu').hidden=kind!=='over';uiSync()};
+showOverlay=function(kind){_showOverlay3(kind);if(!kind)return;const wasKind=ovEl.dataset.kind;ovEl.dataset.kind=kind;
+  const over=kind==='over';
+  {const host=over?$('mpOver'):$('mpPause');if(over)$('dock').insertBefore($('bReplay'),$('bMenu'));else $('pList').insertBefore($('bReplay'),$('bQuit'));host.querySelector('#ovLede')||host.insertBefore($('ovLede'),host.firstChild);
+   if(over&&!$('oRep').contains($('ovLede')))$('oRep').insertBefore($('ovLede'),$('oRep').firstChild)}
+  if(kind==='pause'){$('pSlot').appendChild($('bStart'));$('bStart').textContent='Resume';ovEl.dataset.result='';goPane('pause',{back:''});}
+  else{$('dock').appendChild($('bStart'));
+    if(over){ovEl.dataset.over='report';const win=deathCause==='win',fail=deathCause==='fail';ovEl.dataset.result=win?'win':'fail';
+      $('ovTitle').textContent=win?'Mission success':deathCause==='abort'?'Sortie aborted':'Mission failed';
+      if(mission==='TRAINING'&&win){const d=lessonsDone();d[lesson]=1;lsSet('vsLessonsDone',JSON.stringify(d))}
+      goPane('over',{back:''});buildReport()}
+    else{ovEl.dataset.result='';$('bStart').textContent='Launch';const p=ovEl.dataset.pane;goPane(['pause','over','load'].indexOf(p)>=0||wasKind!=='menu'?'main':p,{quiet:false})}}
+  $('bMenu').hidden=!over;$('bOverHg').hidden=!over;bgSync();uiSync()};
+/* the after-action report: numbers count up */
+function buildReport(){const src={};for(const e of document.querySelectorAll('#ovStats .stat,#ovRew .stat'))src[e.children[0].textContent]=e.children[1].textContent;
+  const ms=[...REC.msl.values()],mh=ms.filter(r=>r.res==='HIT').length,acc=gunShots>0?Math.round(gunHits/gunShots*100):null;
+  const items=[['Score',src.Score],['Kills',src.Kills],['Gun accuracy',acc===null?'n/a':acc+'%'],['Missiles hit',ms.length?mh+' / '+ms.length:'n/a'],[mission==='WAVES'?'Wave':'Time',src.Wave||src.Time],['Max G',src['Max G']],
+    ...(lastAward&&lastAward.prog&&lastAward.prog.breakdown?[]:[['XP',src.XP],['Silver Lions',src['Silver Lions']],['Free RP',src['Free RP']],['Repair cost',src.Repair]])].filter(x=>x[1]!=null);
+  const g=$('repGrid');g.innerHTML='';let i=0;
+  for(const [l,v] of items){const d=mk('div','rp','<span>'+l+'</span><b></b>');d.style.setProperty('--i',i++);g.appendChild(d);countUp(d.querySelector('b'),String(v),i)}
+  buildItems();overTab()}
+/* itemised rewards (Career): every line comes from progAward's breakdown and the lines add up to the totals */
+const sgn=n=>(n<0?'−':'+')+Math.abs(n).toLocaleString();
+function buildItems(){const box=$('ovItems');box.innerHTML='';const bd=lastAward&&lastAward.prog&&lastAward.prog.breakdown;box.hidden=!bd;if(!bd)return;
+  const col=(h,lines,tot,totTxt)=>'<div class="itCol"><h4>'+h+'</h4>'+lines.map(l=>'<div class="it"><span>'+l[0]+'</span><b>'+sgn(l[1])+'</b></div>').join('')+'<div class="it tot"><span>'+totTxt+'</span><b>'+sgn(tot)+'</b></div></div>';
+  box.innerHTML=col('Research points',bd.rp,bd.totalRp,'Total RP')+col('Silver Lions',bd.sl,bd.totalSl,'Total Silver Lions')+
+    '<div class="itCol sum"><div class="it"><span>Repair cost</span><b>'+(bd.repair?'−'+bd.repair.toLocaleString():'none')+'</b></div><div class="it"><span>Free RP (10 % of RP)</span><b>'+sgn(bd.freeRp)+'</b></div></div>';
+  let i=0;for(const e of box.querySelectorAll('.it')){e.style.setProperty('--i',i++)}}
+function countUp(el,txt,i){const m=/^([+−-]?)([\d,]+)(.*)$/.exec(txt);if(!m||REDUCE||!FX.on){el.textContent=txt;return}
+  const n=+m[2].replace(/,/g,''),t0=performance.now()+i*70,dur=900;el.textContent=m[1]+'0'+m[3];
+  const f=t=>{const k=clamp((t-t0)/dur,0,1),e=1-Math.pow(1-k,3);el.textContent=m[1]+Math.round(n*e).toLocaleString()+m[3];if(k<1&&el.isConnected)requestAnimationFrame(f)};requestAnimationFrame(f)}
 let syncQ=0;const uiSoon=()=>{if(!syncQ)syncQ=requestAnimationFrame(()=>{syncQ=0;uiSync()})};
 new MutationObserver(uiSoon).observe($('legacy'),{subtree:true,childList:true,characterData:true,attributes:true,attributeFilter:['hidden']});
 function uiSync(){
-  for(const c of ctls)c.sync();
-  // aircraft card and mission / map cards
-  $('acName').textContent=AC.name;$('acBr').textContent='BR '+progBR(AC.id).toFixed(1)+(careerOn?' · Career':'');
-  const m=MIS_ART[mission]||MIS_ART.WAVES;$('cMissionArt').innerHTML=svgArt(m[0],m[1],m[2]);$('cMissionName').textContent=MISSIONS[mission];$('cMissionDesc').textContent=mission==='TRAINING'?(LESSONS[lesson]+': '+(LES_DESC[lesson]||'')):(MIS_DESC[mission]||'');
-  const p=MAP_ART[MAP]||MAP_ART.ISLANDS;$('cMapArt').innerHTML=svgArt(p[0],p[1],p[2]);$('cMapName').textContent=MAP_NAME(MAP);$('cMapDesc').textContent=MAP_DESC[MAP]||'';
-  // footer: one-line summary and the hangar button
-  $('mSum').textContent=ovEl.dataset.kind==='over'?(($('ovTitle').textContent||'')+' · '+score+' pts · '+kills+' kill'+(kills===1?'':'s')):AC.name+' · BR '+progBR(AC.id).toFixed(1)+' · '+MISSIONS[mission]+' · '+MAP_NAME(MAP)+' · '+TMN[timeOfDay]+', '+(WXN[weather]||weather);
-  $('hgSub').textContent=AC.name+(careerOn?' · '+prog.sl.toLocaleString()+' SL · '+prog.frp.toLocaleString()+' RP':'');
-  // pilot tab
-  const pc=$('pgCareer');if(pc){const ri=rankIdx(career.xp),nx=RANKS[ri+1],base=RANKS[ri][0],pct=nx?Math.round((career.xp-base)/(nx[0]-base)*100):100;
-    pc.innerHTML='<b>'+RANKS[ri][1]+'</b><div class="bar"><i style="width:'+pct+'%"></i></div><div class="kv"><span>XP</span><b>'+career.xp.toLocaleString()+(nx?' / '+nx[0].toLocaleString():'')+'</b></div><div class="kv"><span>Silver Lions</span><b>'+prog.sl.toLocaleString()+'</b></div><div class="kv"><span>Free RP</span><b>'+prog.frp.toLocaleString()+'</b></div><div class="kv"><span>Sorties · wins · kills</span><b>'+career.sorties+' · '+career.wins+' · '+career.kills+'</b></div>'+(careerOn?'':'<p class="cap" style="color:var(--warn)">Career mode is off</p>')}
-  const cg=$('pgCamp');if(cg){cg.innerHTML=typeof camp==='object'&&camp?'<div class="kv"><span>Front line</span><b>sector '+camp.front+' of 5</b></div><div class="kv"><span>Sorties · wins</span><b>'+camp.sorties+' · '+camp.wins+'</b></div>':'<p>No campaign yet.</p>';
-    const b=mk('button','ghost','Open campaign');b.type='button';b.addEventListener('click',()=>{drive($('bMission'),()=>mission,'CAMPAIGN',30);setPane('fly','tabs');uiSync()});cg.appendChild(b)}
-  const pb=$('pBest');if(pb){const rows=Object.keys(MISSIONS).map(k=>[k,lbGet(k)[0]]).filter(r=>r[1]);pb.innerHTML=rows.length?rows.map(r=>'<div class="kv"><span>'+MISSIONS[r[0]]+'</span><b>'+r[1].s+' pts · '+r[1].k+' kills</b></div>').join(''):'<p>Fly a sortie to set your first score.</p>'}
-  const pl=$('pLessons');if(pl&&!pl.childElementCount){for(const k of Object.keys(LESSONS)){const b=mk('button','lesson',LESSONS[k]+'<span>'+LES_DESC[k]+'</span>');b.type='button';b.dataset.k=k;b.addEventListener('click',()=>{drive($('bMission'),()=>mission,'TRAINING',30);drive($('bLesson'),()=>lesson,k,8);setPane('fly','tabs');uiSync()});pl.appendChild(b)}}
-  if(pl)for(const b of pl.children)b.setAttribute('aria-pressed',mission==='TRAINING'&&lesson===b.dataset.k?'true':'false');
+  for(const c of mCtls)c.sync();
+  if(quickList().indexOf(mission)>=0)lastQuick=mission;
+  wallet();dailyUI();crewUI();bnavSync();
+  // main screen: current aircraft
+  {const n=NODES[AC.id];$('acName').textContent=AC.name;$('acBr').textContent='BR '+progBR(AC.id).toFixed(1)+(careerOn?' · Career':' · Free play');$('hNat').textContent=n?NATIONS[n.n].n+' · Rank '+ROMAN[n.r]:'Aircraft';
+   $('hLoad').textContent=$('bRole').textContent.replace(/^Loadout:\s*/,'').replace(/\s*▸$/,'')}
+  if(ovEl.dataset.kind==='menu')crumbSync();
+  const p=ovEl.dataset.pane;
+  if(p==='quick')briefQuick();else if(p==='train'){trainList();briefTrain()}else if(p==='camp')campMapSvg();
+  if(p==='online'){$('lobRoom').textContent=$('roomCode').value||'arena'}
+  // pilot pane
+  const pc=$('pgCareer');if(pc&&p==='pilot'){const ri=rankIdx(career.xp),nx=RANKS[ri+1],base=RANKS[ri][0],pct=nx?Math.round((career.xp-base)/(nx[0]-base)*100):100;
+    pc.innerHTML='<b>'+RANKS[ri][1]+'</b><div class="bar"><i style="width:'+pct+'%"></i></div><div class="kv"><span>XP</span><b>'+career.xp.toLocaleString()+(nx?' / '+nx[0].toLocaleString():'')+'</b></div><div class="kv"><span>Silver Lions</span><b>'+prog.sl.toLocaleString()+'</b></div><div class="kv"><span>Free RP</span><b>'+prog.frp.toLocaleString()+'</b></div><div class="kv"><span>Sorties</span><b>'+(career.sorties||0)+'</b></div>';
+    const cg=$('pgCamp');cg.innerHTML=typeof camp==='object'&&camp?'<div class="kv"><span>Front line</span><b>sector '+(camp.front+1)+' of 6</b></div><div class="kv"><span>Sorties · wins</span><b>'+camp.sorties+' · '+camp.wins+'</b></div>':'<p class="txt">No campaign yet.</p>';
+    const pb=$('pBest'),rows=Object.keys(MISSIONS).map(k=>[k,lbGet(k)[0]]).filter(r=>r[1]);pb.innerHTML=rows.length?rows.map(r=>'<div class="kv"><span>'+MISSIONS[r[0]]+'</span><b>'+r[1].s+' pts · '+r[1].k+' kills</b></div>').join(''):'<p class="txt">Fly a sortie to set a score.</p>'}
 }
-// other code refreshes these labels, so re-sync after them
 {const _sml=setMenuLabels;setMenuLabels=function(){const r=_sml.apply(this,arguments);uiSoon();return r}}
 {const _ap=applyAC;applyAC=function(){const r=_ap.apply(this,arguments);uiSoon();return r}}
 {const _scu=syncCareerUI;syncCareerUI=function(){const r=_scu.apply(this,arguments);uiSoon();return r}}
-ovEl.dataset.kind='menu';setPane('fly','tabs');uiSync();
+
+/* ---- phones: bottom bar (Fly, Garage, Shop, Pilot) ---- */
+for(const b of $('bNav').querySelectorAll('button'))b.addEventListener('click',()=>{uiSnd('sel');const k=b.dataset.b;
+  if(k==='fly')goPane('main');else if(k==='pilot')goPane('pilot');else if(k==='garage')$('bHangar').click();else hgOpen('tree')});
+function bnavSync(){const p=ovEl.dataset.pane;for(const b of $('bNav').querySelectorAll('button'))b.setAttribute('aria-current',(b.dataset.b==='pilot')===(p==='pilot')&&b.dataset.b!=='garage'&&b.dataset.b!=='shop'?'true':'false')}
+/* ---- daily tasks and crew cards (Pilot pane) ---- */
+function dailyUI(){if(ovEl.dataset.pane!=='pilot')return;const d=$('pgDaily');
+  d.innerHTML=(careerOn?'':'<p class="txt">Daily tasks count in Career mode.</p>')+DAILY.map(t=>{const v=Math.min(t[2],Math.floor(daily[t[0]]||0)),done=!!daily.done[t[0]];
+    return '<div class="dt'+(done?' done':'')+'"><span class="tk" aria-hidden="true">'+(done?'<svg viewBox="0 0 16 12"><path d="M1 6l5 5L15 1"/></svg>':'')+'</span><span class="nm">'+t[1]+'<small>'+v+' / '+t[2]+' · +'+t[3]+' RP</small></span></div>'}).join('')}
+function crewUI(){if(ovEl.dataset.pane==='pilot')$('pgCrew').innerHTML=crewCards()}
+$('pgCrew').addEventListener('click',e=>{const t=e.target.closest('[data-act=crew]');if(!t||t.disabled)return;if(progCrew(t.dataset.k)){uiSnd('sel');applyAC();syncCareerUI();uiSync();if(typeof progRender==='function')progRender()}});
+setInterval(()=>{if(daily.d!==dayKey())uiSoon()},30000);
+/* ---- loading screen between pressing Launch and the cockpit ---- */
+const LOAD_TIPS=['Corner speed is where you turn the tightest. Stay near it in a fight.','Notch a radar missile: put it on your beam and drop chaff.','Flares beat heat seekers, chaff beats radar missiles. Do not mix them up.','Pull too many g for too long and you will black out. Ease off.','Energy is life. Do not trade your speed for a shot you cannot make.','The top of the throttle is afterburner. It burns fuel fast. Watch bingo.','Lock a radar contact with T, then fire when the shot is in range.'];
+let loading=false;const _sg=startGame;
+startGame=function(){if(loading)return;const args=arguments,self=this;
+  if(NOLOAD||ovEl.hidden){return _sg.apply(self,args)}
+  loading=true;ovEl.dataset.back='';const LD=+window.__loadMs||(state==='paused'?1100:4000);
+  const m=mission==='TRAINING'?'Training: '+LESSONS[lesson]:MISSIONS[mission];
+  $('ldKick').textContent='Sortie';$('ldName').textContent=m;$('ldMeta').textContent=AC.name+' · BR '+progBR(AC.id).toFixed(1)+' · '+TMN[timeOfDay]+', '+WXN[weather];
+  // briefing card: the map, the goal, and who you are up against
+  $('ldMap').innerHTML=diagram();$('ldMapName').textContent=MAP_NAME(MAP)+' · '+(MAP_DESC[MAP]||'');$('ldGoal').textContent='Goal: '+(MIS_BRIEF[mission]||MIS_DESC[mission]||'');
+  $('ldWho').textContent=mission==='TRAINING'?'Lesson: '+LESSONS[lesson]+' · '+(LES_DESC[lesson]||''):NO_FIGHTERS.indexOf(mission)>=0?'No fighters expected.':'Bandits: '+(BANDITS[banditType]||banditType);
+  $('ldTip').textContent=LOAD_TIPS[Math.floor(Math.random()*LOAD_TIPS.length)];$('ldState').textContent='Loading';
+  const bar=$('ldBar');bar.style.transition='none';bar.style.width='0%';
+  ovEl.dataset.prev=ovEl.dataset.pane;ovEl.dataset.pane='load';prompts();void bar.offsetWidth;bar.style.transition='width '+(REDUCE?60:Math.min(LD-100,1000))+'ms linear';bar.style.width='100%';
+  let t1=0,t2=0;const pane=$('mpLoad');
+  const go=()=>{if(!loading)return;loading=false;clearTimeout(t1);clearTimeout(t2);pane.removeEventListener('pointerdown',go);removeEventListener('keydown',key,true);try{_sg.apply(self,args)}finally{last=performance.now()}};
+  const key=e=>{if(['Shift','Control','Alt','Meta','Tab'].indexOf(e.key)<0){e.preventDefault();e.stopPropagation();go()}};
+  pane.addEventListener('pointerdown',go);addEventListener('keydown',key,true);   // tap or press anything to skip; it starts by itself when the timer runs out
+  t1=setTimeout(()=>{$('ldState').textContent=inputMode==='touch'?'Ready · tap to start':'Ready · press any key'},REDUCE?40:Math.min(LD-250,1100));
+  t2=setTimeout(go,REDUCE?80:LD)};
 
 /* ---- keyboard and gamepad ---- */
-addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('sheet').hidden){closeSheet();e.stopPropagation()}
-  else if(e.key==='Escape'&&!ovEl.hidden&&ovEl.dataset.nav==='back'){setPane('pause','');e.stopPropagation()}},true);
-const GPM={prev:[],t:0};
-function gpFocusables(){const root=!$('sheet').hidden?$('sheet'):HG.on?$('hangar'):ovEl;return [...root.querySelectorAll('button:not(:disabled),input,summary,[tabindex="0"]')].filter(e=>e.offsetParent!==null&&!e.closest('[hidden]'))}
+function moveFocus(d){const f=focusables(),i=f.indexOf(document.activeElement);if(!f.length)return;f[i<0?(d>0?0:f.length-1):clamp(i+d,0,f.length-1)].focus();uiSnd('move')}
+function tabStep(d){const g=ovEl.dataset.pane==='set'?$('sTabs'):ovEl.dataset.pane==='over'?$('oTabs'):HG.on?$('hangar').querySelector('.hgTabs'):null;if(!g)return false;
+  const bs=[...g.querySelectorAll('button')],i=bs.findIndex(b=>b.getAttribute('aria-selected')==='true'||b.classList.contains('on')||b.getAttribute('aria-pressed')==='true');bs[clamp((i<0?0:i)+d,0,bs.length-1)].click();uiSnd('move');return true}
+addEventListener('keydown',e=>{if(ovEl.hidden||HG.on||loading||ovEl.dataset.pane==='title')return;if(state!=='menu'&&state!=='over'&&state!=='paused')return;
+  const t=e.target;if(t&&t.tagName==='INPUT'&&t.type!=='range')return;
+  if(e.key==='ArrowDown'){e.preventDefault();e.stopPropagation();moveFocus(1)}
+  else if(e.key==='ArrowUp'){e.preventDefault();e.stopPropagation();moveFocus(-1)}
+  else if(e.key==='ArrowLeft'||e.key==='ArrowRight'){const r=t&&t.closest&&t.closest('.mr');if(r&&r._step&&t.type==='range'){e.preventDefault();e.stopPropagation();r._step(e.key==='ArrowRight'?1:-1)}}
+  else if(e.key==='Escape'&&ovEl.dataset.back){e.preventDefault();e.stopPropagation();uiSnd('back');goBack()}
+  else if((e.key==='q'||e.key==='Q'||e.key==='['))tabStep(-1);else if((e.key==='e'||e.key==='E'||e.key===']'))tabStep(1);
+  else if(e.key==='Enter'&&(!t||t===document.body)&&$('dock').offsetParent&&!$('bStart').hidden&&['quick','camp','online','train','over','pause'].indexOf(ovEl.dataset.pane)>=0){e.preventDefault();$('bStart').click()}},true);
+const GPM={prev:[],dir:[0,0,0,0],t:0};
 function gpMenuTick(){const menuUp=(!ovEl.hidden||HG.on)&&(state==='menu'||state==='over'||state==='paused');if(!menuUp)return;
   let pad=null;try{pad=[...(navigator.getGamepads?navigator.getGamepads():[])].find(p=>p&&p.connected)}catch(e){}if(!pad)return;
   const b=i=>!!(pad.buttons[i]&&pad.buttons[i].pressed),edge=i=>b(i)&&!GPM.prev[i];
-  const f=gpFocusables(),cur=f.indexOf(document.activeElement);const go=d=>{if(!f.length)return;f[(cur<0?(d>0?0:f.length-1):(cur+d+f.length)%f.length)].focus()};
-  if(edge(13)||edge(15))go(1);if(edge(12)||edge(14))go(-1);
-  if(edge(0)&&document.activeElement&&f.includes(document.activeElement))document.activeElement.click();
-  if(edge(1)){if(!$('sheet').hidden)closeSheet();else if(HG.on)hgClose();else if(ovEl.dataset.nav==='back')setPane('pause','')}
-  if(edge(4)||edge(5)){const t=['fly','set','pilot'],i=t.indexOf(ovEl.dataset.pane);if(i>=0&&ovEl.dataset.nav==='tabs'){setPane(t[(i+(edge(5)?1:2))%3],'tabs');uiSync()}}
-  if(edge(9)&&!HG.on&&ovEl.dataset.pane!=='pause')$('bStart').click();
-  GPM.prev=pad.buttons.map(x=>x.pressed)}
+  const ax=pad.axes||[],dir=[b(12)||ax[1]<-.6,b(13)||ax[1]>.6,b(14)||ax[0]<-.6,b(15)||ax[0]>.6].map(Boolean),de=i=>dir[i]&&!GPM.dir[i];
+  if(pad.buttons.some(x=>x.pressed)||dir.some(Boolean))setInput('pad');
+  if(ovEl.dataset.pane==='title'&&!ovEl.hidden){if(pad.buttons.some((x,i)=>x.pressed&&!GPM.prev[i]))dismissTitle()}
+  else if(!loading){
+    const cur=document.activeElement,row=cur&&cur.closest&&cur.closest('.mr');
+    if(HG.on){const f=focusables(),ci=f.indexOf(cur),go=d=>{if(f.length)f[(ci<0?(d>0?0:f.length-1):(ci+d+f.length)%f.length)].focus()};if(de(1)||de(3))go(1);if(de(0)||de(2))go(-1)}
+    else{if(de(1))moveFocus(1);if(de(0))moveFocus(-1);if((de(2)||de(3))&&row&&row._step)row._step(de(3)?1:-1)}
+    if(edge(0)&&cur&&cur!==document.body&&focusables().includes(cur))cur.click();
+    if(edge(1)){if(HG.on)hgClose();else if(ovEl.dataset.back){uiSnd('back');goBack()}}
+    if(edge(4)||edge(5))tabStep(edge(5)?1:-1);
+    if(edge(9)&&!HG.on&&['quick','camp','online','train','over'].indexOf(ovEl.dataset.pane)>=0)$('bStart').click()}
+  GPM.prev=pad.buttons.map(x=>x.pressed);GPM.dir=dir}
 setInterval(gpMenuTick,90);
+/* grain: a tiny noise canvas redrawn a few times a second while the menu is up */
+{const cv=$('grain'),cx=cv.getContext('2d'),im=cx.createImageData(96,96);
+  const draw=()=>{if(ovEl.hidden||ovEl.dataset.fx==='off'||document.hidden)return;const d=im.data;for(let i=0;i<d.length;i+=4){const v=Math.random()*255|0;d[i]=d[i+1]=d[i+2]=v;d[i+3]=Math.random()*70|0}cx.putImageData(im,0,0)};
+  draw();if(!REDUCE)setInterval(draw,120)}
 /* in-flight button states: out of ammo, gear locked on the ground */
 function btnStates(){if($('ctrls').hidden)return;const set=(id,on,cls)=>{const e=$(id);if(e)e.classList.toggle(cls,!!on)};
   set('bGun',P.rounds<=0,'empty');set('b9',P.aim9<=0,'empty');set('b120',P.aim120<=0,'empty');set('bGear',P.onGround,'off');$('bGear').setAttribute('aria-disabled',P.onGround?'true':'false');
   if(typeof AG!=='undefined'&&AG.load)set('bAg',AG.load.reduce((a,l)=>a+l.n,0)<=0,'empty')}
 setInterval(btnStates,200);
-if(/[?&]test\b/.test(location.search))Object.assign(window.__vs||{},{setPane,uiSync,openSheet,closeSheet});
+/* start up: title screen unless switched off (tests, or Settings > Cinematic menu is irrelevant here) */
+ovEl.dataset.kind='menu';setSTab('ctl');
+{const skip=/[?&]notitle\b/.test(location.search)||lsGet('vsTitle','1')==='0';goPane(skip?'main':'title',{quiet:true});if(skip)titleDone=true}
+bgSync();uiSync();
+if(/[?&]test\b/.test(location.search))Object.assign(window.__vs||{},{setPane:goPane,uiSync,dismissTitle});
 })();

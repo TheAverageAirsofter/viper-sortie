@@ -265,11 +265,14 @@ function careerAward(){
   lastAward=null; if(!careerOn||deathCause==='abort'&&missionT<20)return;
   const win=deathCause==='win', before=rankIdx(career.xp);
   const mult=mission==='ONLINE'?1.5:mission==='TRAINING'?.3:DIFF_XP[difficulty];
-  const xp=Math.round((50+score+(win?1000:0)+(P.alive?250:P.rescued?120:0))*mult);   // 50 for flying the sortie
+  const pm=PRESETS[preset].reward, lines=[['Sortie',50],['Kills and score',score],['Mission win',win?1000:0],['Survival',P.alive?250:0],['Rescue',!P.alive&&P.rescued?120:0]].map(l=>[l[0],Math.round(l[1]*mult)]);
+  const xp=Math.round((50+score+(win?1000:0)+(P.alive?250:P.rescued?120:0))*mult*pm);   // 50 for flying the sortie; the preset multiplies the lot
+  {const d=xp-lines.reduce((a,l)=>a+l[1],0);if(pm===1)lines[1][1]+=d;else if(d)lines.push(['Preset ×'+pm.toFixed(1),d])}   // lines always add up to xp
   career.xp+=xp;career.sorties++;career.kills+=kills;if(!P.alive&&!P.rescued)career.deaths++;if(win)career.wins++;
   const after=rankIdx(career.xp), newJets=Object.keys(UNLOCK).filter(k=>UNLOCK[k]>before&&UNLOCK[k]<=after).map(k=>AC_DEFS[k].name);
-  const pg=progAward(xp,win,kills,P.alive||!!P.rescued,!!P.rescued);
-  lastAward={xp,promoted:after>before?RANKS[after][1]:null,newJets:[],prog:pg};
+  const pg=progAward(xp,win,kills,P.alive||!!P.rescued,!!P.rescued,lines.filter(l=>l[1]));
+  const dt=[dailyAdd('k',kills),dailyAdd('m',missionT/60)].filter(Boolean);
+  lastAward={xp,promoted:after>before?RANKS[after][1]:null,newJets:[],prog:pg,daily:dt};
   saveCareer(); syncCareerUI();
 }
 $('bMode').addEventListener('click',()=>{careerOn=!careerOn;try{localStorage.setItem('viperMode',careerOn?'career':'free')}catch(e){};syncCareerUI()});

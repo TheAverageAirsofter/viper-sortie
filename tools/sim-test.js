@@ -6,7 +6,7 @@ const path = require('path'), assert = require('assert');
   p.on('pageerror', e => errs.push(e.message));
   await p.route(/fonts\.(googleapis|gstatic)\.com/, r => r.abort());
   await p.goto('file://' + path.resolve(__dirname, '../index.html') + '?test'); await p.waitForTimeout(1500);
-  await p.click('#bStart'); await p.waitForTimeout(1500); await p.click('#bPause'); await p.waitForTimeout(500);
+  await p.sortie(); await p.waitForTimeout(1500); await p.click('#bPause'); await p.waitForTimeout(500);
   const r = await p.evaluate(() => {
     const { P, fly, dlz, AC_DEFS, V3 } = __vs, out = {};
     const reset = (v, y) => { P.pos.set(0, y, 0); P.obj.quaternion.identity(); P.vel.set(0, 0, v); P.n = 1; P.gLim = 9; };

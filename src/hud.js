@@ -6,8 +6,11 @@ function padTarget(){
   let b=null,bd=1e9;for(const e of enemies){const d=e.pos.distanceTo(P.pos);if(d<bd){bd=d;b=e}}return b;
 }
 function updateCamera(dt){
-  if(HG.on&&hgSaved){applyProj();   // hangar: orbit and pan around a target point, kept inside the hall
-    playerJet.visible=true; if(!HG.drag&&HG.auto)HG.ang+=dt*.25;
+  if((HG.on||HG.bg)&&hgSaved){applyProj();   // hangar: orbit and pan around a target point, kept inside the hall
+    playerJet.visible=true;
+    if(HG.bg&&!HG.on&&HG.goal){const g=HG.goal,k=1-Math.exp(-dt*1.8);let da=g.ang-HG.ang;da=Math.atan2(Math.sin(da),Math.cos(da));HG.ang+=da*k;HG.el+=(g.el-HG.el)*k;HG.zoom+=(g.zoom-HG.zoom)*k;   // menu: ease toward the section's camera, plus a slow drift
+      HG.t=(HG.t||0)+dt;HG.ang+=Math.cos(HG.t*.17)*dt*.05*g.drift;HG.el+=Math.cos(HG.t*.23)*dt*.012*g.drift}
+    else if(!HG.drag&&HG.auto)HG.ang+=dt*.25;
     const r=HG.r*HG.zoom, ce=Math.cos(HG.el);
     HG.tgt.set(clamp(HG.tgt.x,-26,26),clamp(HG.tgt.y,.4,12),clamp(HG.tgt.z,-29,29));
     camera.position.set(HG.tgt.x+Math.sin(HG.ang)*r*ce,HG.tgt.y+Math.sin(HG.el)*r,HG.tgt.z+Math.cos(HG.ang)*r*ce);
@@ -147,15 +150,16 @@ function drawHUD(){
   const cx=W/2,cy=H/2,rx=W/2-46-Math.max(INS.l,INS.r),ry=H/2-64-Math.max(INS.t,INS.b);
   for(const e of [...enemies,...friends]){
     if(!e.alive)continue;
-    const blue=e.team==='blue', col=blue?'#6fb7ff':THREAT;
+    const blue=e.team==='blue', col=blue?'#6fb7ff':THREAT, MK=PRESETS[preset].marks;
+    if(!blue&&MK===0)continue;   // Simulator: no bandit markers, just the gauges and the radar
     const p=proj(e.pos),d=e.pos.distanceTo(P.pos);
     const on=p.ok&&p.x>20&&p.x<W-20&&p.y>20&&p.y<H-20;
     c.strokeStyle=col;c.fillStyle=col;
     if(on){const s=e.kind==='fighter'?9:13;
       if(blue){c.beginPath();c.moveTo(p.x-s,p.y+s*.6);c.lineTo(p.x,p.y-s*.6);c.lineTo(p.x+s,p.y+s*.6);c.stroke();txt(c,e.kind==='transport'?'C-130':'TWO',p.x,p.y+20,'center',col,10,700)}
       else{c.beginPath();c.moveTo(p.x,p.y-s);c.lineTo(p.x+s,p.y);c.lineTo(p.x,p.y+s);c.lineTo(p.x-s,p.y);c.closePath();c.stroke();
-        txt(c,(e.kind==='bomber'?'BMR ':'')+nm(d),p.x,p.y+20,'center',col,11);
-        if(e.remote)txt(c,(e.name||'PILOT').toUpperCase().slice(0,14)+' · '+(AC_DEFS[e.type]?AC_DEFS[e.type].name:''),p.x,p.y-18,'center',col,10,700)}}
+        if(MK>=2||d<9000)txt(c,(e.kind==='bomber'?'BMR ':'')+nm(d),p.x,p.y+20,'center',col,11);   // Realistic: range only when close
+        if(e.remote&&MK>=2)txt(c,(e.name||'PILOT').toUpperCase().slice(0,14)+' · '+(AC_DEFS[e.type]?AC_DEFS[e.type].name:''),p.x,p.y-18,'center',col,10,700)}}
     else{_d.copy(e.pos).applyMatrix4(camera.matrixWorldInverse);
       let dx=_d.x,dy=-_d.y; if(Math.abs(dx)+Math.abs(dy)<1e-3)dy=1;
       const a=Math.atan2(dy,dx),x=cx+Math.cos(a)*rx,y=cy+Math.sin(a)*ry;

@@ -6,7 +6,7 @@ const path = require('path');
   p.on('pageerror', e => errs.push(e.message));
   await p.route(/fonts\.(googleapis|gstatic)\.com/, r => r.abort());
   await p.goto('file://' + path.resolve(__dirname, '../index.html')); await p.waitForTimeout(1500);
-  await p.click('#bStart'); await p.waitForTimeout(2500);
+  await p.sortie(); await p.waitForTimeout(2500);
   for (let i = 0; i < 5; i++) { await p.click('#bCam'); await p.waitForTimeout(700); }
   for (const id of ['#bRdr', '#bGear', '#b120', '#b9']) { await p.click(id).catch(() => {}); await p.waitForTimeout(600); }
   for (const t of ['FLR', 'CHF', 'ECM', 'DCY', 'AUTO', 'TGP', 'AWACS']) { await p.getByText(t, { exact: false }).first().click({ timeout: 500 }).catch(() => {}); await p.waitForTimeout(300); }

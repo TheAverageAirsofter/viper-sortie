@@ -3,7 +3,9 @@
 Mobile-first 3D F-16 combat flight sim. Static site, no framework. See README.md for the file layout.
 
 ## Menu notes
-`src/menu.js` builds the menu controls. The original cycle buttons (bTime, bWx, bMission, bPal ...) live hidden in `#legacy`; the new segmented controls, toggles and sheets drive them with `drive(btn, getter, want)` and re-read the real game variables. Tests that need a setting should click the visible control, or `document.getElementById(id).click()` for the legacy button. Design tokens (spacing, type, radius, stroke) are CSS variables at the top of `css/style.css`.
+`src/menu.js` builds the AAA-style menu: title screen, a left-hand list (Campaign, Quick mission, Online, Hangar, Training, Settings), and panes for each. The original cycle buttons (bTime, bWx, bMission, bPal ...) live hidden in `#legacy`; the "LABEL ... < Value >" rows, sliders and action rows drive them with `drive(btn, getter, want)` and re-read the real game variables in `uiSync()`. Tests that need a setting click the row (`#qRows .mr[data-name=Time] .rm`, `#sRows .mr[...]`) or `document.getElementById(id).click()` for the legacy button. `tools/launch.js` gives test pages the title and the loading delay switched off and a `p.sortie()` helper (Quick mission, then Launch); set `TITLE=1` / `LOAD=1` to keep them. The menu scene is the hangar behind the overlay (`HG.bg`); `camGoal(pane)` eases the camera per pane. Design tokens are CSS variables at the top of `css/style.css` and on `#ov`.
+Fonts (Barlow Condensed and Barlow, SIL OFL) are in `fonts/`; the full single-file build embeds them, the cdn build falls back to the Google Fonts link.
+Progression extras: battle presets (`PRESETS` in state.js: difficulty, HUD marker level, damage severity, reward multiplier fed into `careerAward`), `progAward` also returns a `breakdown` of named RP and Silver Lion lines for the itemised debrief, daily tasks (`DAILY` in progress.js), and `__vs.endTest({cause,score,kills,t,alive})` to simulate a finished sortie in tests.
 
 ## Rules that matter
 - **Edit `src/*.js`, never `js/game.js` or `js/game.min.js`** (built files). After editing run `npm run build`; `npm test` fails if the bundles are stale. Commit the built files.
@@ -28,7 +30,7 @@ node tools/features-test.js   # controls guide, mirror, text size, leaderboard
 node tools/sim-test.js        # flight model and launch zones (uses the ?test hook)
 node tools/hangar-test.js     # hangar: loadout, specs, aircraft, paint
 node tools/progress-test.js   # tech tree, research, buy, modules, crew, rewards
-node tools/menu-test.js       # menu layout fit (844x390), tabs, controls, sheets, pause, debrief
+node tools/menu-test.js       # every menu screen fits 844x390, rows, presets, top bar, itemised debrief, research grid, crew, daily tasks, phone nav, briefing
 node tools/visuals-test.js    # night lights, lightning, explosion, heat shimmer, every aircraft model
 ```
 Headless Chromium is at /opt/pw-browsers/chromium in the cloud sandbox (tools/launch.js finds it). Tests that click through gameplay set `vsTips` in localStorage to skip the controls guide.
@@ -37,4 +39,4 @@ Headless Chromium is at /opt/pw-browsers/chromium in the cloud sandbox (tools/la
 `.github/workflows/android.yml` builds the APK with Capacitor (debug-signed). Manual run or a `v*` tag publishes a GitHub Release. Release signing and the Play Store .aab need the four ANDROID_* secrets described in that file. The sandbox cannot build the APK (no Google Maven access); only GitHub Actions can.
 
 ## Settings stored in localStorage
-vsProg (progression), viperQuality, viperPal, viperLayout, viperText, viperRange, viperMission, vsLb_<mission>, vsTips, vsSeen, plus the original viper* keys.
+vsProg (progression), vsPreset (battle preset), vsDaily (daily task progress: day, counters, done flags; resets at local midnight), vsTitle ('0' skips the title screen), vsFx ('0' turns off grain, letterbox, flare and camera drift), vsUiSnd ('0' mutes menu sounds), vsLessonsDone (completed training lessons), viperQuality, viperPal, viperLayout, viperText, viperRange, viperMission, vsLb_<mission>, vsTips, vsSeen, plus the original viper* keys.
