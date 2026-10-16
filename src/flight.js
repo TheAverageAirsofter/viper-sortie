@@ -131,11 +131,20 @@ $('bWx').addEventListener('click',()=>{const k=Object.keys(WXS);weather=k[(k.ind
 /* ---------------- airbase ---------------- */
 const base=new THREE.Group(); scene.add(base);
 {const rwTex=(()=>{const cv=document.createElement('canvas');cv.width=64;cv.height=1024;const c=cv.getContext('2d');
-    c.fillStyle='#3b3e42';c.fillRect(0,0,64,1024);c.fillStyle='#e8e8e2';
+    c.fillStyle='#3b3e42';c.fillRect(0,0,64,1024);
+    {let r=7;const rnd=()=>(r=(r*16807)%2147483647)/2147483647;                                   // weathered concrete: grain, slab joints, patches, rubber and oil
+      for(let i=0;i<2600;i++){c.fillStyle='rgba('+(rnd()<.5?'255,255,255':'0,0,0')+','+(.03+rnd()*.07)+')';c.fillRect(rnd()*64,rnd()*1024,1+rnd()*2,1+rnd()*2)}
+      for(let i=0;i<14;i++){c.fillStyle='rgba('+(rnd()<.5?'70,72,76':'28,30,32')+',.22)';c.fillRect(rnd()*40,rnd()*980,6+rnd()*18,10+rnd()*40)}
+      c.fillStyle='rgba(0,0,0,.35)';for(let y=64;y<1024;y+=128)c.fillRect(0,y,64,1);c.fillRect(31,0,1,1024);
+      for(const y0 of [70,800]){for(const x0 of [20,40]){for(let k=0;k<5;k++){c.fillStyle='rgba(8,8,10,'+(.16+rnd()*.14)+')';c.fillRect(x0+rnd()*5-2,y0+k*28+rnd()*10,3+rnd()*4,18+rnd()*34)}}}
+      for(let i=0;i<4;i++){c.fillStyle='rgba(15,12,10,.18)';c.beginPath();c.ellipse(24+rnd()*16,300+rnd()*420,2+rnd()*3,5+rnd()*9,0,0,6.3);c.fill()}}
+    c.fillStyle='#e8e8e2';
+    for(const y of [190,806]){c.fillRect(14,y,12,34);c.fillRect(38,y,12,34)}                          // aiming-point bars
+    for(const y of [250,300,350,400,606,656,706,756])for(const s of [-1,1]){c.fillRect(32+s*14-3,y,6,18);c.fillRect(32+s*22-3,y,6,18)}   // touchdown-zone bars
     for(let y=60;y<964;y+=40)c.fillRect(30,y,4,22);           // centreline
     c.fillRect(2,0,3,1024);c.fillRect(59,0,3,1024);            // edges
     for(const y of [6,1000])for(let x=6;x<58;x+=7)c.fillRect(x,y,4,16);   // threshold bars
-    const t=new THREE.CanvasTexture(cv);return t})();
+    const t=new THREE.CanvasTexture(cv);t.anisotropy=8;return t})();
   const rw=new THREE.Mesh(new THREE.PlaneGeometry(RWY.w,RWY.z1-RWY.z0).rotateX(-Math.PI/2),new THREE.MeshLambertMaterial({map:rwTex}));
   rw.position.set(RWY.x,BASE_Y+.15,0); base.add(rw);
   const tw=new THREE.Mesh(new THREE.PlaneGeometry(22,RWY.z1-RWY.z0-400).rotateX(-Math.PI/2),new THREE.MeshLambertMaterial({color:0x4a4d50}));

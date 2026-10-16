@@ -99,6 +99,19 @@ terrMat.onBeforeCompile=sh=>{sh.uniforms.nTex={value:NOISE};sh.uniforms.mapId=TE
     .replace('#include <project_vertex>','#include <project_vertex>\nvWPos=(modelMatrix*vec4(transformed,1.)).xyz;vWN=normalize(mat3(modelMatrix)*objectNormal);');
   sh.fragmentShader=sh.fragmentShader.replace('#include <common>',`#include <common>
 uniform sampler2D nTex;uniform float mapId;varying vec3 vWPos;varying vec3 vWN;
+float hh(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
+// patchwork farmland on flat lowland: rotated 200 m lots in crop, stubble, plough and pasture colours with row stripes
+vec3 fields(vec3 base,float h,float sl,float n1,float n2){
+ float m=smoothstep(.1,.05,sl)*smoothstep(5.,14.,h)*(1.-smoothstep(120.,170.,h))*smoothstep(.36,.52,n1);
+ if(m<.01)return base;
+ mat2 R=mat2(.9659,-.2588,.2588,.9659);vec2 p=R*vWPos.xz;vec2 id=floor(p/215.);vec2 f=fract(p/215.);
+ float r=hh(id),r2=hh(id+7.3);
+ vec3 c=r<.28?vec3(.62,.58,.27):r<.5?vec3(.37,.5,.2):r<.68?vec3(.45,.34,.22):r<.84?vec3(.29,.43,.17):vec3(.7,.66,.38);
+ vec2 dir=r2<.5?vec2(1.,0.):vec2(0.,1.);float rows=.5+.5*sin(dot(p,dir)*(1.1+r2*.9));
+ c*=.9+.14*rows*step(.28,r)*step(r,.84);
+ float edge=smoothstep(0.,.012,f.x)*smoothstep(0.,.012,f.y)*smoothstep(1.,.988,f.x)*smoothstep(1.,.988,f.y);   // thin hedgerows between lots
+ c=mix(vec3(.2,.3,.13),c,edge*.85+.15);
+ return mix(base,c,m*.8);}
 vec3 terr(){float h=vWPos.y;float sl=1.-normalize(vWN).y;
  float n1=texture2D(nTex,vWPos.xz/2600.).r,n2=texture2D(nTex,vWPos.xz/530.).g,n3=texture2D(nTex,vWPos.xz/95.).b,n4=texture2D(nTex,vWPos.xz/19.).r;
  if(mapId>.5&&mapId<1.5){vec3 c=mix(vec3(.74,.65,.51),vec3(.69,.58,.44),n2*.6+n1*.4);
@@ -123,8 +136,14 @@ vec3 terr(){float h=vWPos.y;float sl=1.-normalize(vWN).y;
  c=mix(c,rk,smoothstep(.2,.36,sl+(n3-.5)*.14));
  c=mix(c,rk,smoothstep(400.,480.,h+(n2-.5)*90.));
  c=mix(c,vec3(.93,.95,.98),smoothstep(500.,560.,h+(n1-.5)*100.)*smoothstep(.5,.22,sl));
+ c=fields(c,h,sl,n1,n2);
  c=mix(vec3(.80,.74,.55),c,smoothstep(4.,15.,h+(n3-.5)*9.));
  c*=.84+.32*n4*(.55+.45*n3);
+ float n5=texture2D(nTex,vWPos.xz/5.3).g,n6=texture2D(nTex,vWPos.xz/1.7).b;   // close-range grain for low flying
+ float cl=1.-smoothstep(500.,2600.,length(cameraPosition-vWPos));
+ c*=1.+cl*((n5-.5)*.26+(n6-.5)*.16);
+ float wet=smoothstep(1.6,.1,h);c=mix(c,c*.62,wet*.8);                                  // wet sand at the waterline
+ float foam=smoothstep(.55,.0,abs(h-.28-(n3-.5)*.5))*(.55+.45*n6);c=mix(c,vec3(.93,.96,.97),foam*.75);   // surf line
  return c;}`).replace('#include <color_fragment>','#include <color_fragment>\ndiffuseColor.rgb*=terr();')};
 const terrain=new THREE.Mesh(buildTerrainGeo(QUALS[quality].seg),terrMat);
 terrain.frustumCulled=false; scene.add(terrain);

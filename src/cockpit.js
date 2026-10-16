@@ -60,6 +60,33 @@ const thrG=new THREE.Group(); thrG.position.set(-.32,-.41,-.18); cock.add(thrG);
 cbox(.02,.02,.24,mGrey,.035,-.005,-.06,thrG);
 const thrGrip=cbox(.05,.08,.06,mBlack,0,.045,0,thrG);
 
+/* surface finish: speckled, scuffed matte plastic on the tub and coaming; switch panels on both side consoles; harness; rounded glare shield */
+const cockGrain=(()=>{const S=128,cv=document.createElement('canvas');cv.width=cv.height=S;const c=cv.getContext('2d');let r=11;const rnd=()=>(r=(r*16807)%2147483647)/2147483647;
+  c.fillStyle='#d8d8d8';c.fillRect(0,0,S,S);
+  for(let i=0;i<1800;i++){const v=rnd()<.5?255:120;c.fillStyle='rgba('+v+','+v+','+v+','+(.05+rnd()*.12)+')';c.fillRect(rnd()*S,rnd()*S,1+rnd()*1.6,1+rnd()*1.6)}
+  for(let i=0;i<10;i++){c.strokeStyle='rgba(255,255,255,'+(.08+rnd()*.12)+')';c.lineWidth=1;c.beginPath();const x=rnd()*S,y=rnd()*S;c.moveTo(x,y);c.lineTo(x+rnd()*30-15,y+rnd()*30-15);c.stroke()}   // scuffs
+  const t=new THREE.CanvasTexture(cv);t.wrapS=t.wrapT=THREE.RepeatWrapping;t.anisotropy=4;return t})();
+for(const m of [mDark,mPanel,mBlack,mGrey]){m.map=cockGrain;m.roughness=.78;m.needsUpdate=true}
+function switchPanel(seed,labels){const W_=256,H_=1024,cv=document.createElement('canvas');cv.width=W_;cv.height=H_;const c=cv.getContext('2d');let r=seed;const rnd=()=>(r=(r*16807)%2147483647)/2147483647;
+  c.fillStyle='#23282b';c.fillRect(0,0,W_,H_);c.strokeStyle='#4a5258';c.lineWidth=3;c.strokeRect(4,4,W_-8,H_-8);
+  c.font='700 15px "B612 Mono",ui-monospace,Menlo,monospace';c.textAlign='center';c.textBaseline='middle';
+  for(let row=0;row<9;row++){const y=60+row*105;c.fillStyle='#8a9298';c.fillText(labels[row%labels.length],W_/2,y-34);
+    c.strokeStyle='#3a4146';c.lineWidth=2;c.strokeRect(22,y-24,W_-44,78);
+    for(let k=0;k<3;k++){const x=62+k*66,kind=(rnd()*3)|0;
+      if(kind===0){c.fillStyle='#0c0e10';c.fillRect(x-14,y-8,28,44);c.fillStyle=rnd()<.5?'#c9cfd4':'#8d959b';c.fillRect(x-5,y+(rnd()<.5?-6:12),10,22)}      // toggle
+      else if(kind===1){c.fillStyle='#0c0e10';c.beginPath();c.arc(x,y+14,20,0,6.3);c.fill();c.strokeStyle='#d0d4d8';c.lineWidth=3;c.beginPath();c.moveTo(x,y+14);const a=rnd()*4.4-2.2-1.57;c.lineTo(x+Math.cos(a)*16,y+14+Math.sin(a)*16);c.stroke()}   // knob
+      else{c.fillStyle=rnd()<.3?'#ffb347':'#16201a';c.fillRect(x-16,y,32,28);c.strokeStyle='#59636a';c.lineWidth=2;c.strokeRect(x-16,y,32,28)}}}                  // lit button
+  const t=new THREE.CanvasTexture(cv);t.anisotropy=4;return t}
+{const lab=['MASTER','FUEL','EXT LT','ANTI-ICE','ENG','HYD','AVIONICS','OXYGEN','CMDS'];
+  for(const [x,seed] of [[-.32,5],[.32,9]]){const p=new THREE.Mesh(new THREE.PlaneGeometry(.18,.62),new THREE.MeshStandardMaterial({map:switchPanel(seed,lab),roughness:.7,metalness:.05}));
+    p.rotation.x=-Math.PI/2; p.position.set(x,-.408,-.12); cock.add(p)}}
+// harness straps over the headrest, headrest cushion
+for(const s of [-1,1]){const st=cbox(.045,.42,.012,cmat(0x2f3b2a),s*.11,-.1,.285);st.rotation.x=.18;st.rotation.z=s*.12}
+cbox(.3,.2,.07,cmat(0x232a30),0,.08,.4);
+// rounded glare-shield lip and HUD combiner frame
+{const lip=new THREE.Mesh(new THREE.CylinderGeometry(.022,.022,1.0,10),mBlack);lip.rotation.z=Math.PI/2;lip.position.set(0,-.2,-.86);cock.add(lip);
+ cbox(.32,.012,.012,mGrey,0,.1,-.585);cbox(.32,.012,.012,mGrey,0,-.12,-.585)}
+
 // re-dress the cockpit for the selected jet: stick position, panel paint (Soviet-era turquoise), layout
 function styleCockpit(){const pit=PITS[AC.id]||'F16', rus=pit==='RUS'||pit==='RUS2';
   mPanel.color.setHex(rus?0x3d7a74:0x2c3135); mDark.color.setHex(rus?0x2a5a55:0x1c2023);

@@ -2,7 +2,7 @@
 const PMAX=4200;
 const pPos=new Float32Array(PMAX*3),pCol=new Float32Array(PMAX*4),pSize=new Float32Array(PMAX);
 const pVel=new Float32Array(PMAX*3),pLife=new Float32Array(PMAX),pMaxL=new Float32Array(PMAX),pGrow=new Float32Array(PMAX),pA=new Float32Array(PMAX);
-let pNext=0;
+let pNext=0; const pGK=new Float32Array(PMAX);   // per-particle gravity factor: 1 falls like a stone, negative rises (hot smoke)
 const pGeo=new THREE.BufferGeometry();
 pGeo.setAttribute('position',new THREE.BufferAttribute(pPos,3).setUsage(THREE.DynamicDrawUsage));
 pGeo.setAttribute('pcol',new THREE.BufferAttribute(pCol,4).setUsage(THREE.DynamicDrawUsage));
@@ -16,8 +16,8 @@ const pMat=new THREE.ShaderMaterial({transparent:true,depthWrite:false,blending:
     'float a=vC.a*smoothstep(.5,.05,r)*(.88+.12*sin(atan(q.y,q.x)*5.+r*20.));vec3 c=mix(vC.rgb,fogC,vF*(1.-vA));a*=1.-vF*vA;'+
     'gl_FragColor=vec4(c*a*(1.-vA*.45),a*(1.-vA));}'});
 const points=new THREE.Points(pGeo,pMat); points.frustumCulled=false; scene.add(points);
-function puff(x,y,z,vx,vy,vz,r,g,b,a,size,grow,life){
-  const i=pNext; pNext=(pNext+1)%PMAX;
+function puff(x,y,z,vx,vy,vz,r,g,b,a,size,grow,life,gk){
+  const i=pNext; pGK[i]=gk||0; pNext=(pNext+1)%PMAX;
   pPos[i*3]=x;pPos[i*3+1]=y;pPos[i*3+2]=z; pVel[i*3]=vx;pVel[i*3+1]=vy;pVel[i*3+2]=vz;
   pCol[i*4]=r;pCol[i*4+1]=g;pCol[i*4+2]=b;pCol[i*4+3]=a; pA[i]=a;
   pSize[i]=size;pGrow[i]=grow;pLife[i]=life;pMaxL[i]=life;
@@ -56,19 +56,61 @@ function updateParticles(dt){
     if(pLife[i]<=0){pSize[i]=0;continue}
     pLife[i]-=dt; if(pLife[i]<=0){pSize[i]=0;continue}
     pPos[i*3]+=pVel[i*3]*dt;pPos[i*3+1]+=pVel[i*3+1]*dt;pPos[i*3+2]+=pVel[i*3+2]*dt;
-    pVel[i*3]*=drag;pVel[i*3+1]*=drag;pVel[i*3+2]*=drag;
+    pVel[i*3+1]-=G*pGK[i]*dt; pVel[i*3]*=drag;pVel[i*3+1]*=drag;pVel[i*3+2]*=drag;
     pSize[i]+=pGrow[i]*dt; pCol[i*4+3]=pA[i]*(pLife[i]/pMaxL[i]);
   }
   pGeo.attributes.position.needsUpdate=true;pGeo.attributes.pcol.needsUpdate=true;pGeo.attributes.psize.needsUpdate=true;pGeo.attributes.padd.needsUpdate=true;
 }
+/* shockwave rings: a few additive billboards that expand and fade */
+const RINGS=[];{const rm=()=>new THREE.ShaderMaterial({transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,uniforms:{a:{value:0},w:{value:.12}},
+    vertexShader:'varying vec2 vU;void main(){vU=uv-.5;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}',
+    fragmentShader:'uniform float a,w;varying vec2 vU;void main(){float r=length(vU)*2.;float d=abs(r-.9);float s=smoothstep(w,0.,d)*a;gl_FragColor=vec4(vec3(1.,.82,.55)*s,s);}'});
+  for(let i=0;i<6;i++){const m=new THREE.Mesh(new THREE.PlaneGeometry(2,2),rm());m.visible=false;m.frustumCulled=false;m.renderOrder=5;scene.add(m);RINGS.push({m,t:0,life:0,R:0})}}
+function ring(p,R){const r=RINGS.find(o=>o.life<=0)||RINGS[0];r.m.position.copy(p);r.t=0;r.life=big_ring_life(R);r.R=R;r.m.visible=true}
+const big_ring_life=R=>.55+R/900;
+function updateRings(dt){for(const r of RINGS){if(r.life<=0)continue;r.t+=dt;const k=r.t/r.life;
+  if(k>=1){r.life=0;r.m.visible=false;continue}
+  const e=1-Math.pow(1-k,2.4);r.m.scale.setScalar(Math.max(1,r.R*e));r.m.material.uniforms.a.value=(1-k)*(1-k)*.8;r.m.material.uniforms.w.value=.05+.2*k;r.m.quaternion.copy(camera.quaternion)}}
+/* engine heat shimmer: copy a small patch of the finished frame around the exhaust and redraw it with a wobbling refraction offset
+   (a screen-space distortion without rendering the scene twice). Needs THREE.FramebufferTexture (r135+), so older builds skip it. */
+const HEAT={ok:typeof THREE.FramebufferTexture==='function',S:256,k:0,tex:null,scene:null,cam:null,mat:null,quad:null,v2:null};
+function heatInit(){
+  HEAT.tex=new THREE.FramebufferTexture(HEAT.S,HEAT.S); HEAT.v2=new THREE.Vector2();
+  HEAT.cam=new THREE.OrthographicCamera(0,1,1,0,-1,1); HEAT.scene=new THREE.Scene();
+  HEAT.mat=new THREE.ShaderMaterial({depthTest:false,depthWrite:false,uniforms:{tex:{value:HEAT.tex},t:{value:0},k:{value:0},rad:{value:.3},dir:{value:new THREE.Vector2(0,1)}},
+    vertexShader:'varying vec2 vU;void main(){vU=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}',
+    fragmentShader:'uniform sampler2D tex;uniform float t,k,rad;uniform vec2 dir;varying vec2 vU;void main(){vec2 c=vU-.5;float al=dot(c,dir),pe=dot(c,vec2(-dir.y,dir.x));'+
+      'float m=exp(-(al*al)/(rad*rad*1.7)-(pe*pe)/(rad*rad*.55))*k;'+   // elongated along the exhaust axis
+      'vec2 q=vU*14.+vec2(-dir.y,dir.x)*0.;float a=sin(q.x*1.3+t*9.+sin(q.y*1.7-t*6.)*2.)+sin(q.y*2.1-t*11.+sin(q.x*1.1+t*5.)*2.);float b=sin(q.y*1.5+t*8.+sin(q.x*2.3+t*7.))+sin(q.x*2.2+t*10.);'+
+      'vec2 o=vec2(a,b)*.0032*m;gl_FragColor=vec4(texture2D(tex,clamp(vU+o,.002,.998)).rgb,1.);}'});
+  HEAT.quad=new THREE.Mesh(new THREE.PlaneGeometry(1,1),HEAT.mat); HEAT.quad.frustumCulled=false; HEAT.scene.add(HEAT.quad)}
+function heatPass(){
+  if(!HEAT.ok||!QUALS[quality].fx||!P.alive||P.onGround&&Math.hypot(P.vel.x,P.vel.z)<8)return;
+  const thr=clamp((throttle-.35)/.65,0,1); HEAT.k+=((thr>0?.25+.75*thr:0)-HEAT.k)*.15; if(HEAT.k<.02)return;
+  if(!HEAT.tex)heatInit();
+  const off=engOff(AC.id)[0][1], a=_s1.copy(P.pos).addScaledVector(P.fwd,off-3), b=_s2.copy(P.pos).addScaledVector(P.fwd,off-45);
+  const pa=proj(a), pb=proj(b); if(!pa.ok)return;
+  const d=camera.position.distanceTo(a), ppm=(H*DPR/2)/Math.tan(camera.fov*Math.PI/360)/Math.max(d,5), S=HEAT.S;
+  const rad=clamp(ppm*20,.04,.5*S)/S*2*.5;                                                     // shimmer radius as a fraction of the patch (patch = S px)
+  if(ppm*20<14)return;                                                                        // too far away to see
+  const cx=pa.x*DPR, cy=(H-pa.y)*DPR, bw=W*DPR, bh=H*DPR, x0=clamp(Math.round(cx-S/2),0,Math.max(0,bw-S)), y0=clamp(Math.round(cy-S/2),0,Math.max(0,bh-S));
+  HEAT.v2.set(x0,y0); renderer.copyFramebufferToTexture(HEAT.v2,HEAT.tex);
+  let dx=(pb.x-pa.x),dy=-(pb.y-pa.y),l=Math.hypot(dx,dy); if(l<2){dx=0;dy=1}else{dx/=l;dy/=l}
+  const u=HEAT.mat.uniforms; u.t.value=clock; u.k.value=HEAT.k; u.rad.value=Math.min(.45,rad); u.dir.value.set(dx,dy);
+  HEAT.cam.right=bw; HEAT.cam.top=bh; HEAT.cam.updateProjectionMatrix(); HEAT.quad.scale.set(S,S,1); HEAT.quad.position.set(x0+S/2,y0+S/2,0);
+  renderer.render(HEAT.scene,HEAT.cam)}
 function explode(p,big,noRec){
-  const n=big?55:22; if(!noRec&&typeof REC3!=='undefined')REC3.booms.push({t:clock,p:p.toArray(),big});
+  if(!noRec&&typeof REC3!=='undefined')REC3.booms.push({t:clock,p:p.toArray(),big});
   boomLight.position.copy(p); boomLight.intensity=(big?4:2.2)*LK; boomLight.distance=big?2600:1500;
-  for(let i=0;i<(big?6:3);i++)puff(p.x,p.y,p.z,rand(-8,8),rand(-8,8),rand(-8,8),1,.9,.6,1,rand(16,26)*(big?1.5:1),40,rand(.15,.3));
-  for(let i=0;i<n;i++){const d=new V3(rand(-1,1),rand(-1,1),rand(-1,1)).normalize().multiplyScalar(rand(20,big?150:70));
-    puff(p.x,p.y,p.z,d.x,d.y,d.z,1,rand(.38,.7),.1,1,rand(8,20)*(big?1.6:1),30,rand(.4,1.0))}
-  for(let i=0;i<n*.6;i++){const d=new V3(rand(-1,1),rand(-.5,1),rand(-1,1)).multiplyScalar(rand(10,50));const s=rand(.24,.4);
-    puff(p.x,p.y,p.z,d.x,d.y+10,d.z,s*1.05,s,s*.95,.62,rand(14,24)*(big?1.5:1),45,rand(1.8,3.6))}
+  const S=big?1:.55, rv=()=>new V3(rand(-1,1),rand(-1,1),rand(-1,1)).normalize();
+  puff(p.x,p.y,p.z,0,0,0,1,.93,.7,1,(big?110:50),(big?260:110),.16);                                   // white-hot flash
+  for(let i=0;i<(big?10:5);i++){const d=rv().multiplyScalar(rand(8,40)*S);puff(p.x,p.y,p.z,d.x,d.y+rand(8,25)*S,d.z,1,.72,.28,.5,rand(34,60)*S,rand(60,100)*S,rand(.7,1.2),-.15)}   // fireball core
+  for(let i=0;i<(big?38:16);i++){const d=rv().multiplyScalar(rand(30,120)*S);puff(p.x,p.y,p.z,d.x,d.y+rand(0,25)*S,d.z,1,rand(.36,.55),.1,.62,rand(20,40)*S,rand(26,46)*S,rand(1,2.2),-.3)}   // orange fire
+  for(let i=0;i<(big?44:18);i++){const d=rv().multiplyScalar(rand(60,230)*S);puff(p.x,p.y,p.z,d.x,d.y+rand(10,60)*S,d.z,1,rand(.75,.95),rand(.4,.6),1,rand(1.4,3)*S+.6,rand(0,2),rand(.5,1.7),.55)}   // embers
+  for(let i=0;i<(big?22:9);i++){const d=rv().multiplyScalar(rand(40,150)*S),s=rand(.08,.16);puff(p.x,p.y,p.z,d.x,d.y+rand(10,50)*S,d.z,s,s*.95,s*.9,.95,rand(2,5)*S+1,0,rand(1.6,3.6),.7)}   // debris
+  for(let i=0;i<(big?30:12);i++){const d=rv().multiplyScalar(rand(10,55)*S),s=rand(.1,.2);puff(p.x,p.y,p.z,d.x,d.y*.5+rand(6,16)*S,d.z,s,s,s,.5,rand(14,26)*S,rand(8,18)*S,rand(4.5,8)*(big?1:.7),-1.1)}   // black smoke column
+  for(let i=0;i<(big?14:5);i++){const d=rv().multiplyScalar(rand(20,70)*S),s=rand(.32,.46);puff(p.x,p.y+rand(5,25)*S,p.z,d.x,d.y*.4+rand(10,20)*S,d.z,s,s,s*1.03,.32,rand(20,36)*S,rand(10,20)*S,rand(6,10)*(big?1:.7),-.8)}   // lighter smoke cap
+  ring(p,big?330:150);
   const dist=p.distanceTo(camera.position), vol=clamp(1-dist/6000,0.05,1)*(big?1:.5), lag=Math.min(dist/340,12);   // you see it first, then hear it
   if(lag<.15||state==='replay')sndBoom(vol); else setTimeout(()=>{if(state==='play')sndBoom(vol)},lag*1000);
 }
