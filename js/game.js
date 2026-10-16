@@ -930,6 +930,10 @@ function buildLoftJet(c,S,type){
     const sh=add(new THREE.BoxGeometry(.46,.3,.32),sm,null,pg);sh.position.set(0,e[1]-.36,e[2]-.18);
     const hr=add(new THREE.BoxGeometry(.5,.55,.12),dark,null,pg);hr.position.set(0,e[1]-.15,e[2]-.42)}
   if(S.irst){const ir=add(new THREE.SphereGeometry(.13,10,8),new THREE.MeshStandardMaterial({color:0x2a2a1a,roughness:.1,metalness:.8}),'irst');ir.position.set(...S.irst)}
+  {const tip=fst[fst.length-1],pt=add(new THREE.CylinderGeometry(.013,.02,1.1,6).rotateX(Math.PI/2),metal);pt.position.set(0,tip[4],tip[0]+.42);                       // pitot boom
+   const aT=cz-S.canopy[4]*1.05-.7,sT=secAt(fst,aT),bl=add(new THREE.BoxGeometry(.018,.2,.14),dark);bl.position.set(0,sT[4]+sT[2]+.08,aT);                       // spine blade antenna
+   const aB=cz-1.9,sB=secAt(fst,aB),bb=add(new THREE.BoxGeometry(.018,.16,.12),dark);bb.position.set(0,sB[4]-sB[3]-.07,aB);                                        // belly blade antenna
+   const zD=Math.min(...S.noz.map(n=>n[2]))+3.4,sD=secAt(fst,zD);for(const sx2 of [-1,1]){const d=add(new THREE.BoxGeometry(.2,.025,.46),black);d.position.set(sx2*Math.min(.32,sD[1]*.45),sD[4]-sD[3]+.005,zD)}}   // chaff/flare dispensers
   if(S.probe){const pr=add(new THREE.CylinderGeometry(.045,.045,S.probe[3],5).rotateX(Math.PI/2),dark);pr.position.set(S.probe[0],S.probe[1],S.probe[2])}
   if(S.stinger)add(loftGeo(S.stinger,{n:10}),body);
   // nozzles: petals open in afterburner; thrust-vectoring ones swivel; a faint heat-haze plume behind each
@@ -988,7 +992,8 @@ const M2={};
 const mir=a=>a.flatMap(p=>p[0]?[p,[-p[0],...p.slice(1)]]:[p]);
 M2.F16={L:15.06,nz:3.0,radome:6.2,
   fus:[[-7.0,.5,.52,.5,.05,2.4],[-6.0,.62,.62,.56,.05,2.5],[-4.5,.78,.66,.62,0,2.6],[-2.5,.9,.66,.66,0,2.8],[-.5,.92,.64,.66,0,2.8],[1.5,.82,.62,.6,0,2.6],[3.0,.7,.6,.5,0,2.4],[4.2,.62,.58,.45,0,2.2],[5.4,.52,.46,.42,0,2.1],[6.2,.42,.36,.36,-.02,2],[7.0,.22,.2,.2,-.05,2],[7.6,0,0,0,-.08,2]],
-  parts:[{x:0,mouth:1,st:[[-2.0,.38,.15,.22,-.62,2.2],[0,.5,.2,.32,-.72,2.4],[2.0,.56,.2,.42,-.82,2.6],[3.3,.56,.2,.44,-.86,3]]}],
+  parts:[{x:0,mouth:1,st:[[-2.0,.38,.15,.22,-.62,2.2],[0,.5,.2,.32,-.72,2.4],[2.0,.56,.2,.42,-.82,2.6],[3.3,.56,.2,.44,-.86,3]]},
+    {x:0,st:[[2.2,.2,.1,.1,.6,2],[1.0,.3,.2,.1,.6,2],[-1.5,.34,.24,.1,.58,2],[-4,.3,.2,.1,.54,2],[-5.6,.2,.1,.1,.5,2],[-6.5,0,0,0,.5,2]]}],
   wings:[{st:[{x:.85,zle:1.3,zte:-3.95,y:-.08,t:.04},{x:4.6,zle:-1.95,zte:-3.05,y:-.08,t:.03}]},{st:[{x:.55,zle:4.4,zte:.6,y:0,t:.02},{x:1.05,zle:1.35,zte:.6,y:-.05,t:.02}]},
     {st:[{x:.7,zle:-5.0,zte:-7.0,y:-.1,t:.035},{x:2.79,zle:-6.55,zte:-7.35,y:-.25,t:.03}]}],
   fins:[{x:0,y:.5,st:[{h:0,zle:-3.4,zte:-6.45,t:.05},{h:.6,zle:-3.9,zte:-6.5},{h:2.9,zle:-5.75,zte:-6.85,t:.04}]},{x:.62,y:-.42,cant:-2.6,mirror:1,st:[{h:0,zle:-3.9,zte:-4.9},{h:.5,zle:-4.3,zte:-4.95}]}],

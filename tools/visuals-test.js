@@ -29,5 +29,10 @@ const path = require('path'), assert = require('assert');
   const hk = await p.evaluate(() => ({ ok: __vs.HEAT.ok, k: __vs.HEAT.k })); assert(!hk.ok || hk.k > .4, 'heat shimmer active at full throttle ' + JSON.stringify(hk));
   await p.click('#bCam'); await p.waitForTimeout(1200);   // cockpit view: switch panels, textures and no shimmer pass must not error
   await p.close();
+  // every aircraft model builds (generic details: pitot, antennas, dispenser bays; F-16 dorsal spine)
+  p = await open([]); await p.evaluate(() => document.getElementById('bPause').click()); await p.waitForTimeout(600);
+  const nAc = await p.evaluate(() => Object.keys(__vs.AC_DEFS).length);
+  for (let i = 0; i < nAc; i++) { const b2 = await p.$('#bAC'); if (b2 && await b2.isVisible()) { await b2.click(); await p.waitForTimeout(250); } }
+  await p.close();
   assert.deepEqual(errs, []); console.log('visuals ok'); await b.close();
 })().catch(e => { console.error(e); process.exit(1); });
