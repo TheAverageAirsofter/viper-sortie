@@ -102,7 +102,7 @@ const qr=$('qRows');
     mRow('Start',()=>[{v:'air',t:'In the air'},{v:'rwy',t:'Runway'},...(AC.carrier?[{v:'cv',t:'Carrier'}]:[])],startCur,v=>drive($('bStartPos'),startCur,v,4)),
     mRow('Mode',()=>[{v:'free',t:'Free play'},{v:'career',t:'Career'}],()=>careerOn?'career':'free',v=>drive($('bMode'),()=>careerOn?'career':'free',v,2)));
   B1.append(mGrp('Opponents'),
-    mRow('Bandits',()=>Object.keys(BANDITS).map(k=>({v:k,t:BANDITS[k]})),()=>banditType,v=>drive($('bBandit'),()=>banditType,v,30),{hidden:()=>$('bBandit').hidden}),
+    mRow('Bandits',()=>Object.keys(BANDITS).map(k=>({v:k,t:BANDITS[k]})),()=>banditType,v=>drive($('bBandit'),()=>banditType,v,90),{hidden:()=>$('bBandit').hidden}),
     mRow('Difficulty',()=>Object.keys(DIFF).map(k=>({v:k,t:DIFF[k].name})),()=>difficulty,v=>drive($('bDiff'),()=>difficulty,v),{hidden:()=>$('bDiff').hidden}),
     mRow('Range',()=>Object.keys(ENG_RANGES).map(k=>({v:k,t:ENG_RANGES[k].n})),()=>rangeKey,v=>drive($('bRange'),()=>rangeKey,v)),
     mGrp('Environment'),

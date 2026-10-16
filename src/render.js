@@ -591,6 +591,9 @@ function decalTex(kind,txt,lowvis){const key=kind+'|'+(txt?txt.s+(txt.red?'r':''
   else if(kind==='raf'){disc(118,lv?'#7d8fa8':'#1d3f8a');disc(50,lv?'#c98f8f':'#c8102e')}
   else if(kind==='fra'){disc(118,lv?'#a35f62':'#c8102e');disc(82,lv?'#c9cdd1':'#ffffff');disc(46,lv?'#56698a':'#0b3d91')}
   else if(kind==='ind'){disc(118,'#ff9933');disc(80,'#ffffff');disc(42,'#138808')}
+  else if(kind==='ger'){c.fillStyle=lv?'#c9ccd0':'#ffffff';c.fillRect(cx-100,cy-36,200,72);c.fillRect(cx-36,cy-100,72,200);c.fillStyle=lv?'#3b4046':'#0a0a0a';c.fillRect(cx-92,cy-28,184,56);c.fillRect(cx-28,cy-92,56,184)}   // Balkenkreuz
+  else if(kind==='jp'){disc(112,lv?'#9aa0a6':'#ffffff');disc(78,lv?'#8f4f56':'#bc002d')}   // hinomaru
+  else if(kind==='isr'){disc(118,lv?'#c9ccd0':'#ffffff');c.strokeStyle=lv?'#5b6f9a':'#0038b8';c.lineWidth=11;c.lineJoin='miter';for(const d of [-1,1]){c.beginPath();for(let i=0;i<3;i++){const a=(d>0?-Math.PI/2:Math.PI/2)+i*2*Math.PI/3;c.lineTo(cx+Math.cos(a)*62,cy+Math.sin(a)*62)}c.closePath();c.stroke()}c.fillStyle=lv?'#5b6f9a':'#0038b8';c.fillRect(cx-98,cy-84,196,10);c.fillRect(cx-98,cy+74,196,10)}   // Magen David
   else if(kind==='prc'){c.fillStyle='#c8102e';c.fillRect(4,104,248,48);c.fillStyle='#f6c400';c.fillRect(4,118,248,6);star(cx,cy,104,42,'#f6c400');star(cx,cy,92,37,'#c8102e');
     c.fillStyle='#f6c400';c.font='bold 46px sans-serif';c.textAlign='center';c.textBaseline='middle';c.fillText('八一',cx,cy+6)}
   else if(kind==='rus'){star(cx,cy+8,124,50,'#c8102e');star(cx,cy+8,112,45,'#ffffff');star(cx,cy+8,96,38,'#c8102e')}
@@ -841,11 +844,12 @@ M2.SU35=Object.assign({},M2.SU27,{probe:[.55,.62,9.2,1.5],stinger:[[-12.6,.12,.1
     fins:G.fins.map(f=>Object.assign({},f,{st:f.st.map(s=>Object.assign({},s,{zle:s.zle*k,zte:s.zte*k}))})),canopy:[G.canopy[0]*k,...G.canopy.slice(1)],noz:G.noz.map(n=>[n[0],n[1],n[2]*k,n[3]*1.04,n[4]]),
     irst:[.22,.62,5.0*k],r9:G.r9.map(r=>[r[0]*1.04,r[1],r[2]*k,r[3]]),r120:G.r120.map(r=>[r[0]*1.04,r[1],r[2]*k,r[3]])})}
 // derived: cockpit eye point, nav lights, engine smoke points, shadow and vapour span for each
-for(const id in M2){const S=M2[id],D=AC_DEFS[id];if(!D)continue;const [cz,cy,sx,sy,sz]=S.canopy;
+function m2Fit(id){const S=M2[id],D=AC_DEFS[id];if(!D)return;const [cz,cy,sx,sy,sz]=S.canopy;
   const wing=S.wings.reduce((a,w)=>{const t=w.st[w.st.length-1];return t.x>a.x?t:a},{x:0});const fin=S.fins[0],ft=fin.st[fin.st.length-1];
   D.eye=[0,cy+sy*.38,cz+sz*.12];
   D.fx=Object.assign({},D.fx||{},{eng:S.noz.map(n=>[n[0],n[2]-n[4]*.6]),vapor:wing.x,nav:[wing.x,ft.zte+.2,(fin.y||0)+ft.h+(fin.x?0:0)],navZ:(wing.zle+wing.zte)/2,shadow:[S.L,wing.x*2],nz:S.nz});
   D.cut={r:.6,full:[-8,cz-1.2],open:[cz-1.2,cz+1.4]}}
+for(const id in M2)m2Fit(id);   // the roster slice fits the later jets the same way
 
 // Tu-22M3-style swing-wing bomber (42 m) and a C-130-style transport (30 m long, 40 m span)
 function buildBomber(c){

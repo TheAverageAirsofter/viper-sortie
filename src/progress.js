@@ -2,17 +2,24 @@
 /* ---------------- progression (War Thunder style): research points, silver lions, tech trees, modules, crew ----------------
    Career mode only. RP earned in a sortie go to the aircraft you flew (and 10 % to Free RP); an aircraft is researched with RP from the
    aircraft it descends from (or Free RP), then bought with Silver Lions. Modules and crew skills improve what you own. Bandits are picked near your BR. */
-const NATIONS={USA:{n:'United States',c:'#6fb7ff'},RUS:{n:'Russia',c:'#ff8a7a'},EUR:{n:'Europe',c:'#ffd166'},CHN:{n:'China',c:'#ff9d4e'}};
+const NATIONS={USA:{n:'United States',c:'#6fb7ff'},RUS:{n:'Russia',c:'#ff8a7a'},GER:{n:'Germany',c:'#cfd3d8'},JPN:{n:'Japan',c:'#ff6f91'},ISR:{n:'Israel',c:'#7fd6ff'},SWE:{n:'Sweden',c:'#ffd166'},GBR:{n:'United Kingdom',c:'#b69cff'},CHN:{n:'China',c:'#ff9d4e'},FRA:{n:'France',c:'#8ea8ff'}};
 const NODES={
-  F16:{n:'USA',r:1,br:11.3},F15C:{n:'USA',r:2,br:12.0,req:'F16'},F16B70:{n:'USA',r:3,br:12.3,req:'F15C'},FA18E:{n:'USA',r:3,br:12.0,req:'F15C'},F15EX:{n:'USA',r:4,br:13.0,req:'F16B70'},
-  MIG29:{n:'RUS',r:1,br:10.7},SU27:{n:'RUS',r:2,br:11.7,req:'MIG29'},MIG29UPG:{n:'RUS',r:3,br:11.7,req:'SU27'},SU33:{n:'RUS',r:3,br:11.7,req:'SU27'},MIG29K:{n:'RUS',r:3,br:11.3,req:'SU27'},MIG35:{n:'RUS',r:4,br:12.7,req:'MIG29UPG'},SU35:{n:'RUS',r:5,br:13.0,req:'MIG35'},
-  GRIPEN:{n:'EUR',r:1,br:11.3},GRIPENE:{n:'EUR',r:2,br:12.7,req:'GRIPEN'},RAFALE:{n:'EUR',r:3,br:12.7,req:'GRIPENE'},TYPHOON:{n:'EUR',r:4,br:12.7,req:'RAFALE'},
-  J10C:{n:'CHN',r:1,br:12.0},J20:{n:'CHN',r:4,br:13.3,req:'J10C'}};
+  F16:{n:'USA',r:1,br:11.3},F4E:{n:'USA',r:1,br:9.3},FA18C:{n:'USA',r:2,br:11.0,req:'F4E'},F15C:{n:'USA',r:2,br:12.0,req:'F16'},F15E:{n:'USA',r:3,br:12.3,req:'F15C'},F16B70:{n:'USA',r:3,br:12.3,req:'F15C'},FA18E:{n:'USA',r:3,br:12.0,req:'F15C'},
+  F35A:{n:'USA',r:4,br:13.0,req:'F16B70'},F15EX:{n:'USA',r:4,br:13.0,req:'F16B70'},F22A:{n:'USA',r:5,br:13.7,req:'F15EX'},
+  MIG21:{n:'RUS',r:1,br:9.0},MIG29:{n:'RUS',r:1,br:10.7},SU27:{n:'RUS',r:2,br:11.7,req:'MIG29'},MIG29UPG:{n:'RUS',r:3,br:11.7,req:'SU27'},SU33:{n:'RUS',r:3,br:11.7,req:'SU27'},MIG29K:{n:'RUS',r:3,br:11.3,req:'SU27'},SU30SM:{n:'RUS',r:3,br:12.3,req:'SU27'},
+  MIG35:{n:'RUS',r:4,br:12.7,req:'MIG29UPG'},SU35:{n:'RUS',r:5,br:13.0,req:'MIG35'},SU57:{n:'RUS',r:5,br:13.3,req:'SU35'},
+  F104G:{n:'GER',r:1,br:9.3},F4F:{n:'GER',r:2,br:10.7,req:'F104G'},MIG29G:{n:'GER',r:2,br:10.7,req:'F104G'},EF2K1:{n:'GER',r:3,br:12.0,req:'F4F'},EF2K3:{n:'GER',r:4,br:12.7,req:'EF2K1'},F35DE:{n:'GER',r:5,br:13.0,req:'EF2K3'},
+  F4EJ:{n:'JPN',r:1,br:10.0},F15J:{n:'JPN',r:2,br:11.4,req:'F4EJ'},F2A:{n:'JPN',r:3,br:11.7,req:'F15J'},F15JK:{n:'JPN',r:3,br:12.3,req:'F15J'},F35AJ:{n:'JPN',r:4,br:13.0,req:'F2A'},F35BJ:{n:'JPN',r:5,br:12.7,req:'F35AJ'},
+  KFIR:{n:'ISR',r:1,br:10.0},F4E2K:{n:'ISR',r:2,br:10.7,req:'KFIR'},F15BAZ:{n:'ISR',r:2,br:11.7,req:'KFIR'},F16BARAK:{n:'ISR',r:2,br:11.0,req:'KFIR'},F16I:{n:'ISR',r:3,br:12.0,req:'F16BARAK'},F15I:{n:'ISR',r:3,br:12.3,req:'F15BAZ'},F35I:{n:'ISR',r:4,br:13.3,req:'F16I'},
+  J35F:{n:'SWE',r:1,br:9.7},JA37:{n:'SWE',r:2,br:10.7,req:'J35F'},GRIPEN:{n:'SWE',r:3,br:11.3,req:'JA37'},GRIPENE:{n:'SWE',r:4,br:12.7,req:'GRIPEN'},
+  LIGHTNING:{n:'GBR',r:1,br:9.7},PHANTOM2:{n:'GBR',r:2,br:10.7,req:'LIGHTNING'},TORNADO3:{n:'GBR',r:3,br:11.0,req:'PHANTOM2'},TYPHOON:{n:'GBR',r:4,br:12.7,req:'TORNADO3'},F35B:{n:'GBR',r:5,br:12.7,req:'TYPHOON'},
+  J7G:{n:'CHN',r:1,br:9.7},J10C:{n:'CHN',r:1,br:12.0},J11B:{n:'CHN',r:2,br:11.7,req:'J7G'},J15:{n:'CHN',r:3,br:11.7,req:'J11B'},J16:{n:'CHN',r:4,br:12.5,req:'J11B'},J20:{n:'CHN',r:4,br:13.3,req:'J10C'},
+  RAFALE:{n:'FRA',r:1,br:12.7}};
 const RP_COST=[0,0,4000,10000,20000,34000], SL_PRICE=[0,0,25000,70000,150000,280000], ROMAN=['','I','II','III','IV','V'];
 const MODS=[['eng1','Engine I',1,'+4 % thrust'],['afr1','Airframe I',1,'+5 % roll rate'],['cms1','Countermeasures I',2,'+25 % flares and chaff'],['wpn1','Missiles I',2,'+6 % missile range, +5 % missile agility'],
   ['eng2','Engine II',3,'+4 % thrust','eng1'],['afr2','Airframe II',3,'+5 % roll rate, +3 % lift','afr1']];
 const CREW=[['g','Anti-g training','+0.25 g tolerance per level',8000],['f','Flight skill','+2 % roll rate per level',8000],['d','Ground crew','−8 % repair cost per level',6000]];
-const PROG_START=['F16','MIG29','GRIPEN','J10C'];
+const PROG_START=['F16','F4E','MIG21','MIG29','F104G','F4EJ','KFIR','J35F','GRIPEN','LIGHTNING','J7G','J10C','RAFALE'];
 let prog={sl:30000,frp:0,rp:{},res:{},own:{},mods:{},crew:{g:0,f:0,d:0},sorties:0,fresh:true};
 try{const v=JSON.parse(localStorage.getItem('vsProg')||'null');if(v&&typeof v.sl==='number'){prog=Object.assign(prog,v,{fresh:false});prog.crew=Object.assign({g:0,f:0,d:0},v.crew)}}catch(e){}
 for(const k of ['rp','res','own','mods'])if(!prog[k]||typeof prog[k]!=='object')prog[k]={};

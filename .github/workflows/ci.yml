@@ -23,3 +23,4 @@ jobs:
       - run: node tools/progress-test.js   # progression: tech tree, research, modules, crew
       - run: node tools/hangar-test.js     # hangar: loadout, specs, aircraft, paint
       - run: node tools/visuals-test.js    # night settlement lights, rain lightning
+      - run: node tools/roster-test.js     # every aircraft: data, tables, a sortie each, and as a bandit

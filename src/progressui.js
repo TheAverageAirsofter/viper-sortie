@@ -22,8 +22,8 @@ function crewCards(){return '<div class="crew">'+CREW.map(c=>{const k=c[0],lv=pr
 /* tech tree: each nation is a small graph; nodes sit in rank columns and hairlines join a node to the one it was researched from */
 const TN_W=88,TN_H=60,TN_GX=14,TN_GY=8;
 function treeLayout(nk){const ids=Object.keys(NODES).filter(i=>NODES[i].n===nk),pos={};let nr=0;
-  const place=(id,row)=>{pos[id]={c:NODES[id].r-1,r:row};ids.filter(k=>NODES[k].req===id).sort((a,b)=>NODES[a].r-NODES[b].r).forEach((k,i)=>place(k,i===0?row:nr++))};
-  for(const root of ids.filter(i=>!NODES[i].req||NODES[NODES[i].req].n!==nk))place(root,nr++);return pos}
+  const place=(id,row,minC)=>{const c=Math.max(NODES[id].r-1,minC);pos[id]={c,r:row};ids.filter(k=>NODES[k].req===id).sort((a,b)=>NODES[a].r-NODES[b].r).forEach((k,i)=>place(k,i===0?row:nr++,c+1))};   // a child always sits right of its parent
+  for(const root of ids.filter(i=>!NODES[i].req||NODES[NODES[i].req].n!==nk))place(root,nr++,0);return pos}
 function nodeText(i){const n=NODES[i],st=nodeState(i);return st==='own'?(SL_PRICE[n.r]?'Owned · '+fmtN(SL_PRICE[n.r])+' SL':'Owned'):st==='res'?'Researched · '+fmtN(SL_PRICE[n.r])+' SL':st==='can'?'Research · '+fmtN(RP_COST[n.r])+' RP':'Locked · '+fmtN(RP_COST[n.r])+' RP'}
 // the researchable node worth doing next: the cheapest one you can already afford, else the cheapest overall
 function nextResearch(){const c=Object.keys(NODES).filter(progResearchable);if(!c.length)return null;const cost=i=>RP_COST[NODES[i].r],ok=c.filter(i=>progPool(NODES[i].req)>=cost(i));return (ok.length?ok:c).sort((a,b)=>cost(a)-cost(b))[0]}

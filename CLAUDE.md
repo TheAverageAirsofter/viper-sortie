@@ -7,6 +7,9 @@ Mobile-first 3D F-16 combat flight sim. Static site, no framework. See README.md
 Fonts (Barlow Condensed and Barlow, SIL OFL) are in `fonts/`; the full single-file build embeds them, the cdn build falls back to the Google Fonts link.
 Progression extras: battle presets (`PRESETS` in state.js: difficulty, HUD marker level, damage severity, reward multiplier fed into `careerAward`), `progAward` also returns a `breakdown` of named RP and Silver Lion lines for the itemised debrief, daily tasks (`DAILY` in progress.js), and `__vs.endTest({cause,score,kills,t,alive})` to simulate a finished sortie in tests.
 
+## Aircraft roster
+Base jets are in `src/data.js`; `src/roster.js` (slice 3, right after render) defines the rest with `dv(base, id, name, callsign, overrides)`, their lofted models (`M2.<id>`, or `m2Alias` to share a hull) and the PAINT / PODS / PITS rows. Tables owned by later slices (GEAR_SPEC, ENG_SND, JET_HP, RCS, FIGHTERS, BANDITS) are filled with `rosterFill(table, rows)` from `ROSTER_LIKE` (copy a row from a similar jet). New aircraft also need a `NODES` row in `src/progress.js` (nation, rank, BR, `req`); a node with no `req` is a root and must be in `PROG_START`. Station counts in `cm.stations` must match the model's `r9` / `r120` nodes; `node tools/roster-test.js` checks this, flies every jet and spawns every type as a bandit.
+
 ## Rules that matter
 - **Edit `src/*.js`, never `js/game.js` or `js/game.min.js`** (built files). After editing run `npm run build`; `npm test` fails if the bundles are stale. Commit the built files.
 - `src/*.js` are ordered slices of ONE strict-mode IIFE (order is in `tools/build.js`). They share scope, so they are not standalone modules and top-level code can only use things defined in earlier slices (or hoisted functions).
@@ -31,6 +34,7 @@ node tools/sim-test.js        # flight model and launch zones (uses the ?test ho
 node tools/hangar-test.js     # hangar: loadout, specs, aircraft, paint
 node tools/progress-test.js   # tech tree, research, buy, modules, crew, rewards
 node tools/menu-test.js       # every menu screen fits 844x390, rows, presets, top bar, itemised debrief, research grid, crew, daily tasks, phone nav, briefing
+node tools/roster-test.js     # every aircraft: data, stations, tables, a short sortie, and as a bandit
 node tools/visuals-test.js    # night lights, lightning, explosion, heat shimmer, every aircraft model
 ```
 Headless Chromium is at /opt/pw-browsers/chromium in the cloud sandbox (tools/launch.js finds it). Tests that click through gameplay set `vsTips` in localStorage to skip the controls guide.

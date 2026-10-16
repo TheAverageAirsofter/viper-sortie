@@ -171,6 +171,8 @@ const GEAR_SPEC={F16:{mx:1.18,mz:-.9,mr:.34,nr:.23,nw:1},F16B70:{mx:1.18,mz:-.9,
   RAFALE:{mx:1.35,mz:-1.4,mr:.34,nr:.24,nw:1},J10C:{mx:1.3,mz:-1.4,mr:.35,nr:.25,nw:1},J20:{mx:1.75,mz:-2.0,mr:.43,nr:.3,nw:1},
   MIG29:{mx:1.55,mz:-1.7,mr:.42,nr:.27,nw:2,mud:1},MIG29UPG:{mx:1.55,mz:-1.7,mr:.42,nr:.27,nw:2,mud:1},MIG35:{mx:1.55,mz:-1.7,mr:.43,nr:.28,nw:2,mud:1},MIG29K:{mx:1.6,mz:-1.7,mr:.43,nr:.3,nw:2,mud:1,navy:1},
   SU27:{mx:2.17,mz:-2.4,mr:.52,nr:.34,nw:1,mud:1},SU33:{mx:2.17,mz:-2.4,mr:.52,nr:.32,nw:2,mud:1,navy:1},SU35:{mx:2.17,mz:-2.4,mr:.53,nr:.34,nw:1,mud:1}};
+rosterFill(GEAR_SPEC,{F4E:{mx:1.7,mz:-.9,mr:.45,nr:.28,nw:2},F35A:{mx:1.2,mz:-1.2,mr:.36,nr:.25,nw:1},F22A:{mx:1.5,mz:-1.3,mr:.38,nr:.26,nw:2},F104G:{mx:1.1,mz:-1.2,mr:.3,nr:.2,nw:1},MIG21:{mx:1.4,mz:-1.2,mr:.35,nr:.22,nw:1},
+  SU57:{mx:1.9,mz:-2.3,mr:.5,nr:.3,nw:2,mud:1},J35F:{mx:1.5,mz:-1.2,mr:.35,nr:.22,nw:1},JA37:{mx:1.6,mz:-1.6,mr:.4,nr:.26,nw:2},LIGHTNING:{mx:1.3,mz:-1.2,mr:.3,nr:.22,nw:1},TORNADO3:{mx:1.6,mz:-1.8,mr:.4,nr:.28,nw:2},KFIR:{mx:1.5,mz:-1.2,mr:.34,nr:.22,nw:1}});
 function buildGear(){
   if(gearObj)playerJet.remove(gearObj);
   gearObj=new THREE.Group(); gearObj.name='gear';
@@ -287,6 +289,8 @@ const ENG_SND={F16:{f:40,roar:250,wh:.003,twin:0,howl:[180,.012]},F16B70:{f:39,r
   TYPHOON:{f:44,roar:290,wh:.012,twin:1,howl:[340,.009]},RAFALE:{f:46,roar:300,wh:.011,twin:1,howl:[300,.009]},J10C:{f:34,roar:220,wh:.005,twin:0,howl:[200,.012]},J20:{f:30,roar:200,wh:.006,twin:1,howl:[190,.012]},
   MIG29:{f:30,roar:200,wh:.004,twin:1,howl:[140,.013]},MIG29UPG:{f:30,roar:200,wh:.004,twin:1,howl:[140,.013]},MIG35:{f:33,roar:215,wh:.005,twin:1,howl:[150,.013]},MIG29K:{f:33,roar:215,wh:.005,twin:1,howl:[150,.013]},
   SU27:{f:27,roar:185,wh:.004,twin:1,howl:[420,.02]},SU33:{f:27,roar:185,wh:.004,twin:1,howl:[410,.02]},SU35:{f:26,roar:180,wh:.006,twin:1,howl:[440,.022]}};
+rosterFill(ENG_SND,{F4E:{f:34,roar:240,wh:.002,twin:1,howl:[130,.01]},F35A:{f:30,roar:205,wh:.007,twin:0,howl:[240,.012]},F22A:{f:29,roar:195,wh:.005,twin:1,howl:[170,.011]},F104G:{f:36,roar:235,wh:.003,twin:0,howl:[190,.011]},MIG21:{f:30,roar:215,wh:.004,twin:0,howl:[150,.012]},
+  SU57:{f:25,roar:178,wh:.006,twin:1,howl:[400,.022]},J35F:{f:36,roar:238,wh:.004,twin:0,howl:[170,.012]},JA37:{f:30,roar:215,wh:.004,twin:0,howl:[170,.014]},LIGHTNING:{f:32,roar:225,wh:.003,twin:1,howl:[200,.012]},TORNADO3:{f:38,roar:230,wh:.007,twin:1,howl:[250,.011]},KFIR:{f:36,roar:235,wh:.003,twin:0,howl:[190,.011]}});
 function sndInitExtra(){if(!A.ctx||A.howl)return;const c=A.ctx;
   A.howl=c.createBufferSource();A.howl.buffer=A.noise;A.howl.loop=true;A.howlF=c.createBiquadFilter();A.howlF.type='bandpass';A.howlF.Q.value=18;A.howlF.frequency.value=400;
   A.howlG=c.createGain();A.howlG.gain.value=0;A.howl.connect(A.howlF).connect(A.howlG).connect(A.master);A.howl.start();
