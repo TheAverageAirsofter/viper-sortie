@@ -2540,7 +2540,7 @@ let enemies=[],wave=0,score=0,kills=0,waveClearT=0,gunAcc=0,gunSndT=0,hurtT=0,sh
 let lockTarget=null,lockT=0,lockDist=0,lockAng=0,can9=false,can120=false,toneT=0;
 let msgText='',msgT=0,clock=0,throttle=.8,thrSet=.8;
 let gunHeld=false,brake=false,fire9=false,fire120=false;
-const HG={on:false,ang:.7,zoom:1,drag:null};   // hangar: turntable camera around the player's jet
+const HG={on:false,ang:.7,el:.2,zoom:1,drag:null,auto:true};   // hangar: turntable camera around the player's jet
 const VIEWS=['CHASE','COCKPIT','PADLOCK','FLYBY']; let view=0; const flyCam=new V3(); let flyCamSet=false;
 const keys={};
 const REDUCED=!!(window.matchMedia&&matchMedia('(prefers-reduced-motion:reduce)').matches);
@@ -4220,9 +4220,9 @@ function updateCamera(dt){
   playerJet.visible=(alive||(state!=='menu'&&P.alive))&&v!=='COCKPIT';
   if(!alive){camera.up.set(0,1,0);if(P.ejected&&chute&&state!=='replay')camera.position.lerp(_a.copy(chute.position).add(_b.set(16,5,16)),1-Math.exp(-dt*3));camera.lookAt(P.pos);return}
   if(HG.on&&state==='menu'){   // hangar turntable: the camera circles the jet in the jet's own frame, so it stays put on screen
-    playerJet.visible=true; if(!HG.drag)HG.ang+=dt*.3;
-    const sp=(typeof M2!=='undefined'&&M2[AC.id]&&M2[AC.id].L)||16, r=sp*1.35*HG.zoom;
-    _a.set(Math.sin(HG.ang)*r,sp*.16,Math.cos(HG.ang)*r).applyQuaternion(playerJet.quaternion).add(P.pos);
+    playerJet.visible=true; if(!HG.drag&&HG.auto)HG.ang+=dt*.3;
+    const sp=(typeof M2!=='undefined'&&M2[AC.id]&&M2[AC.id].L)||16, r=sp*1.35*HG.zoom, ce=Math.cos(HG.el);
+    _a.set(Math.sin(HG.ang)*r*ce,Math.sin(HG.el)*r,Math.cos(HG.ang)*r*ce).applyQuaternion(playerJet.quaternion).add(P.pos);   // full sphere around the jet, in the jet's own frame
     camera.position.copy(_a); camUp.copy(P.up); camera.up.copy(camUp); camera.lookAt(P.pos); camSnap=true; return}
   const q=playerJet.quaternion, k=camSnap?1:1-Math.exp(-dt*8); camSnap=false;
   if(look.id===null){const k2=Math.exp(-dt*3);look.yaw*=k2;look.pitch*=k2}
@@ -4789,7 +4789,7 @@ const hgEl=$('hangar');
 function hgTab(t){for(const b of hgEl.querySelectorAll('.hgTabs button'))b.classList.toggle('on',b.dataset.tab===t);
   $('hgLoad').hidden=t!=='load';$('hgSpec').hidden=t!=='spec';$('hgPaint').hidden=t!=='paint';if(t==='spec')hgSpecs()}
 function hgOpen(t){if(state!=='menu'&&state!=='over')return;
-  if(!HG.on){HG.on=true;HG.zoom=1;document.body.classList.add('hangar');hgEl.hidden=false;projKey=''}
+  if(!HG.on){HG.on=true;HG.zoom=1;HG.el=.2;HG.auto=true;document.body.classList.add('hangar');hgEl.hidden=false;projKey=''}
   hgTab(t||'load');$('hgName').textContent=AC.name;renderLd()}
 function hgClose(){if(!HG.on)return;HG.on=false;HG.drag=null;document.body.classList.remove('hangar');hgEl.hidden=true;projKey='';camSnap=true}
 $('bHangar').addEventListener('click',()=>hgOpen('load'));
@@ -4797,10 +4797,21 @@ $('bRole').addEventListener('click',()=>hgOpen('load'));
 $('hgClose').addEventListener('click',hgClose);$('ldDone').addEventListener('click',hgClose);
 $('hgLaunch').addEventListener('click',()=>{hgClose();$('bStart').click()});
 for(const b of hgEl.querySelectorAll('.hgTabs button'))b.addEventListener('click',()=>hgTab(b.dataset.tab));
-$('hgView').addEventListener('pointerdown',e=>{HG.drag={x:e.clientX,a:HG.ang};try{e.target.setPointerCapture(e.pointerId)}catch(er){}});
-$('hgView').addEventListener('pointermove',e=>{if(HG.drag)HG.ang=HG.drag.a-(e.clientX-HG.drag.x)*.01});
-for(const t of ['pointerup','pointercancel'])$('hgView').addEventListener(t,()=>{HG.drag=null});
-$('hgView').addEventListener('wheel',e=>{e.preventDefault();HG.zoom=clamp(HG.zoom*(1+e.deltaY*.0012),.45,2.4)},{passive:false});
+const hgPtr=new Map(); let hgPinch=0, hgTap=0;
+const hgView=(ang,el,zoom)=>{HG.ang=ang;HG.el=clamp(el,-1.45,1.45);if(zoom)HG.zoom=zoom;HG.auto=false};
+$('hgView').addEventListener('pointerdown',e=>{hgPtr.set(e.pointerId,{x:e.clientX,y:e.clientY});try{e.target.setPointerCapture(e.pointerId)}catch(er){}
+  HG.drag={x:e.clientX,y:e.clientY,a:HG.ang,l:HG.el};HG.auto=false;
+  const now=performance.now();if(now-hgTap<320){hgView(.7,.2,1);HG.auto=true}hgTap=now;   // double-tap: reset the view and resume the turntable
+  if(hgPtr.size===2){const [p,q]=[...hgPtr.values()];hgPinch=Math.hypot(p.x-q.x,p.y-q.y)}});
+$('hgView').addEventListener('pointermove',e=>{const p=hgPtr.get(e.pointerId);if(!p)return;p.x=e.clientX;p.y=e.clientY;
+  if(hgPtr.size>=2){const [a,b]=[...hgPtr.values()],d=Math.hypot(a.x-b.x,a.y-b.y);if(hgPinch>0)HG.zoom=clamp(HG.zoom*hgPinch/d,.22,2.6);hgPinch=d;HG.drag=null;return}
+  if(HG.drag){HG.ang=HG.drag.a-(e.clientX-HG.drag.x)*.01;HG.el=clamp(HG.drag.l+(e.clientY-HG.drag.y)*.01,-1.45,1.45)}});
+for(const t of ['pointerup','pointercancel'])$('hgView').addEventListener(t,e=>{hgPtr.delete(e.pointerId);hgPinch=0;HG.drag=null;if(hgPtr.size===1){const [p]=[...hgPtr.values()];HG.drag={x:p.x,y:p.y,a:HG.ang,l:HG.el}}});
+$('hgView').addEventListener('wheel',e=>{e.preventDefault();HG.zoom=clamp(HG.zoom*(1+e.deltaY*.0012),.22,2.6)},{passive:false});
+// quick views: [yaw, elevation, zoom]
+const HG_VIEWS={front:[0,.12,1],side:[1.5708,.05,1],rear:[3.1416,.12,1],top:[1.5708,1.4,1.05],under:[1.5708,-1.4,1.05],cockpit:[.62,.45,.34],engine:[3.1416,.1,.4]};
+for(const b of document.querySelectorAll('#hgChips button')){const v=HG_VIEWS[b.dataset.v];if(v)b.addEventListener('click',()=>hgView(v[0],v[1],v[2]))}
+$('hgChips').querySelector('[data-v=auto]').addEventListener('click',()=>{HG.auto=true;HG.zoom=1});
 addEventListener('keydown',e=>{if(e.key==='Escape'&&HG.on){hgClose();e.stopPropagation()}},true);
 // the aircraft or loadout changed: keep the title and the spec sheet in step
 const _applyAC=applyAC;

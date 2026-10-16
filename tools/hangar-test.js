@@ -32,6 +32,15 @@ const path = require('path'), assert = require('assert');
   // drag rotates, close returns to the menu, loadout button reopens
   const a0 = await p.evaluate(() => __vs.HG.ang); await p.mouse.move(250, 260); await p.mouse.down(); await p.mouse.move(120, 260, { steps: 5 }); await p.mouse.up();
   assert.notEqual(a0, await p.evaluate(() => __vs.HG.ang), 'dragging turns the jet');
+  // look all around: vertical drag tilts, quick views reach top / under / rear, zoom works
+  const e0 = await p.evaluate(() => __vs.HG.el); await p.mouse.move(250, 200); await p.mouse.down(); await p.mouse.move(250, 330, { steps: 6 }); await p.mouse.up();
+  assert((await p.evaluate(() => __vs.HG.el)) > e0 + .5, 'vertical drag tilts the view');
+  await p.click('#hgChips button[data-v=top]'); await p.waitForTimeout(500); assert((await p.evaluate(() => __vs.HG.el)) > 1.2, 'top view'); await p.screenshot({ path: '/tmp/w/hg-top.png' });
+  await p.click('#hgChips button[data-v=under]'); await p.waitForTimeout(500); assert((await p.evaluate(() => __vs.HG.el)) < -1.2, 'under view'); await p.screenshot({ path: '/tmp/w/hg-under.png' });
+  await p.click('#hgChips button[data-v=rear]'); await p.waitForTimeout(500); await p.screenshot({ path: '/tmp/w/hg-rear.png' });
+  await p.click('#hgChips button[data-v=cockpit]'); await p.waitForTimeout(500); assert((await p.evaluate(() => __vs.HG.zoom)) < .5, 'cockpit close-up'); await p.screenshot({ path: '/tmp/w/hg-cockpit.png' });
+  await p.mouse.move(250, 260); await p.mouse.wheel(0, 800); assert((await p.evaluate(() => __vs.HG.zoom)) > .45, 'wheel zooms out');
+  await p.click('#hgChips button[data-v=auto]'); assert(await p.evaluate(() => __vs.HG.auto), 'spin resumes');
   await p.click('#hgClose'); assert(await p.isVisible('#ov')); assert(!(await p.isVisible('#hangar')));
   await p.click('#bRole'); assert(await p.isVisible('#hangar')); assert(await p.isVisible('#ldRows'));
   await p.keyboard.press('Escape'); assert(!(await p.isVisible('#hangar')), 'Esc closes the hangar');

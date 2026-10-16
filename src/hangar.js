@@ -4,7 +4,7 @@ const hgEl=$('hangar');
 function hgTab(t){for(const b of hgEl.querySelectorAll('.hgTabs button'))b.classList.toggle('on',b.dataset.tab===t);
   $('hgLoad').hidden=t!=='load';$('hgSpec').hidden=t!=='spec';$('hgPaint').hidden=t!=='paint';if(t==='spec')hgSpecs()}
 function hgOpen(t){if(state!=='menu'&&state!=='over')return;
-  if(!HG.on){HG.on=true;HG.zoom=1;document.body.classList.add('hangar');hgEl.hidden=false;projKey=''}
+  if(!HG.on){HG.on=true;HG.zoom=1;HG.el=.2;HG.auto=true;document.body.classList.add('hangar');hgEl.hidden=false;projKey=''}
   hgTab(t||'load');$('hgName').textContent=AC.name;renderLd()}
 function hgClose(){if(!HG.on)return;HG.on=false;HG.drag=null;document.body.classList.remove('hangar');hgEl.hidden=true;projKey='';camSnap=true}
 $('bHangar').addEventListener('click',()=>hgOpen('load'));
@@ -12,10 +12,21 @@ $('bRole').addEventListener('click',()=>hgOpen('load'));
 $('hgClose').addEventListener('click',hgClose);$('ldDone').addEventListener('click',hgClose);
 $('hgLaunch').addEventListener('click',()=>{hgClose();$('bStart').click()});
 for(const b of hgEl.querySelectorAll('.hgTabs button'))b.addEventListener('click',()=>hgTab(b.dataset.tab));
-$('hgView').addEventListener('pointerdown',e=>{HG.drag={x:e.clientX,a:HG.ang};try{e.target.setPointerCapture(e.pointerId)}catch(er){}});
-$('hgView').addEventListener('pointermove',e=>{if(HG.drag)HG.ang=HG.drag.a-(e.clientX-HG.drag.x)*.01});
-for(const t of ['pointerup','pointercancel'])$('hgView').addEventListener(t,()=>{HG.drag=null});
-$('hgView').addEventListener('wheel',e=>{e.preventDefault();HG.zoom=clamp(HG.zoom*(1+e.deltaY*.0012),.45,2.4)},{passive:false});
+const hgPtr=new Map(); let hgPinch=0, hgTap=0;
+const hgView=(ang,el,zoom)=>{HG.ang=ang;HG.el=clamp(el,-1.45,1.45);if(zoom)HG.zoom=zoom;HG.auto=false};
+$('hgView').addEventListener('pointerdown',e=>{hgPtr.set(e.pointerId,{x:e.clientX,y:e.clientY});try{e.target.setPointerCapture(e.pointerId)}catch(er){}
+  HG.drag={x:e.clientX,y:e.clientY,a:HG.ang,l:HG.el};HG.auto=false;
+  const now=performance.now();if(now-hgTap<320){hgView(.7,.2,1);HG.auto=true}hgTap=now;   // double-tap: reset the view and resume the turntable
+  if(hgPtr.size===2){const [p,q]=[...hgPtr.values()];hgPinch=Math.hypot(p.x-q.x,p.y-q.y)}});
+$('hgView').addEventListener('pointermove',e=>{const p=hgPtr.get(e.pointerId);if(!p)return;p.x=e.clientX;p.y=e.clientY;
+  if(hgPtr.size>=2){const [a,b]=[...hgPtr.values()],d=Math.hypot(a.x-b.x,a.y-b.y);if(hgPinch>0)HG.zoom=clamp(HG.zoom*hgPinch/d,.22,2.6);hgPinch=d;HG.drag=null;return}
+  if(HG.drag){HG.ang=HG.drag.a-(e.clientX-HG.drag.x)*.01;HG.el=clamp(HG.drag.l+(e.clientY-HG.drag.y)*.01,-1.45,1.45)}});
+for(const t of ['pointerup','pointercancel'])$('hgView').addEventListener(t,e=>{hgPtr.delete(e.pointerId);hgPinch=0;HG.drag=null;if(hgPtr.size===1){const [p]=[...hgPtr.values()];HG.drag={x:p.x,y:p.y,a:HG.ang,l:HG.el}}});
+$('hgView').addEventListener('wheel',e=>{e.preventDefault();HG.zoom=clamp(HG.zoom*(1+e.deltaY*.0012),.22,2.6)},{passive:false});
+// quick views: [yaw, elevation, zoom]
+const HG_VIEWS={front:[0,.12,1],side:[1.5708,.05,1],rear:[3.1416,.12,1],top:[1.5708,1.4,1.05],under:[1.5708,-1.4,1.05],cockpit:[.62,.45,.34],engine:[3.1416,.1,.4]};
+for(const b of document.querySelectorAll('#hgChips button')){const v=HG_VIEWS[b.dataset.v];if(v)b.addEventListener('click',()=>hgView(v[0],v[1],v[2]))}
+$('hgChips').querySelector('[data-v=auto]').addEventListener('click',()=>{HG.auto=true;HG.zoom=1});
 addEventListener('keydown',e=>{if(e.key==='Escape'&&HG.on){hgClose();e.stopPropagation()}},true);
 // the aircraft or loadout changed: keep the title and the spec sheet in step
 const _applyAC=applyAC;

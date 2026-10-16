@@ -7,7 +7,7 @@ let enemies=[],wave=0,score=0,kills=0,waveClearT=0,gunAcc=0,gunSndT=0,hurtT=0,sh
 let lockTarget=null,lockT=0,lockDist=0,lockAng=0,can9=false,can120=false,toneT=0;
 let msgText='',msgT=0,clock=0,throttle=.8,thrSet=.8;
 let gunHeld=false,brake=false,fire9=false,fire120=false;
-const HG={on:false,ang:.7,zoom:1,drag:null};   // hangar: turntable camera around the player's jet
+const HG={on:false,ang:.7,el:.2,zoom:1,drag:null,auto:true};   // hangar: turntable camera around the player's jet
 const VIEWS=['CHASE','COCKPIT','PADLOCK','FLYBY']; let view=0; const flyCam=new V3(); let flyCamSet=false;
 const keys={};
 const REDUCED=!!(window.matchMedia&&matchMedia('(prefers-reduced-motion:reduce)').matches);
