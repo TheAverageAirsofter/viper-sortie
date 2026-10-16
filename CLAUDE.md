@@ -2,6 +2,9 @@
 
 Mobile-first 3D F-16 combat flight sim. Static site, no framework. See README.md for the file layout.
 
+## Menu notes
+`src/menu.js` builds the menu controls. The original cycle buttons (bTime, bWx, bMission, bPal ...) live hidden in `#legacy`; the new segmented controls, toggles and sheets drive them with `drive(btn, getter, want)` and re-read the real game variables. Tests that need a setting should click the visible control, or `document.getElementById(id).click()` for the legacy button. Design tokens (spacing, type, radius, stroke) are CSS variables at the top of `css/style.css`.
+
 ## Rules that matter
 - **Edit `src/*.js`, never `js/game.js` or `js/game.min.js`** (built files). After editing run `npm run build`; `npm test` fails if the bundles are stale. Commit the built files.
 - `src/*.js` are ordered slices of ONE strict-mode IIFE (order is in `tools/build.js`). They share scope, so they are not standalone modules and top-level code can only use things defined in earlier slices (or hoisted functions).
@@ -25,6 +28,7 @@ node tools/features-test.js   # controls guide, mirror, text size, leaderboard
 node tools/sim-test.js        # flight model and launch zones (uses the ?test hook)
 node tools/hangar-test.js     # hangar: loadout, specs, aircraft, paint
 node tools/progress-test.js   # tech tree, research, buy, modules, crew, rewards
+node tools/menu-test.js       # menu layout fit (844x390), tabs, controls, sheets, pause, debrief
 node tools/visuals-test.js    # night lights, lightning, explosion, heat shimmer, every aircraft model
 ```
 Headless Chromium is at /opt/pw-browsers/chromium in the cloud sandbox (tools/launch.js finds it). Tests that click through gameplay set `vsTips` in localStorage to skip the controls guide.

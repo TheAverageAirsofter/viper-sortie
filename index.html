@@ -100,79 +100,92 @@
   </div>
 </div>
 
-<div class="overlay" id="ov">
-  <div class="card">
-    <p class="eyebrow" id="ovEyebrow">F-16C Block 50 · Callsign Viper 1</p>
-    <h1 id="ovTitle">Viper Sortie</h1>
-    <p class="lede" id="ovLede">Real energy fighting. Thrust, drag and air density set your speed, hard turns bleed it, and holding 9&nbsp;g too long will black you out. Corner speed is about <span id="ovCorner">350</span>&nbsp;knots.</p>
-    <p class="spec" id="ovSpec"><span><b>9 g</b> / −3 g</span><span><b>Mach 2</b> high</span><span>M61A1 <b>6,000 rpm</b> · 500 rds</span><span>AIM-9X <b>Mach 2+</b></span><span>AIM-120C <b>Mach 4 · 40 g</b></span></p>
-    <div class="stats" id="ovStats" hidden></div>
-    <div id="lbBox" hidden><span class="eyebrow">Best scores · <span id="lbMode"></span></span><ol id="lbList"></ol></div>
-    <div id="debrief" hidden>
-      <div class="dbHead"><span class="eyebrow">Debrief</span><button class="ghost" id="dbPlay" type="button">Play</button>
-        <input id="dbSlider" type="range" min="0" max="1000" value="1000" aria-label="Replay time"><span id="dbTime">0:00</span></div>
-      <canvas id="dbCanvas" aria-label="Top-down replay of the sortie"></canvas>
-      <p class="dbKey"><span style="color:#7dff9a">■ you</span> <span style="color:#6fb7ff">■ friendly</span> <span style="color:#ff5a4e">■ bandit</span> · dots are missiles</p>
-      <ol id="dbList"></ol>
+<div class="overlay" id="ov" data-kind="menu" data-view="main" data-tab="fly" data-over="replay">
+  <div class="shell">
+    <header class="mHead">
+      <div class="mTitle"><p class="eyebrow" id="ovEyebrow">F-16C Block 50 · Callsign Viper 1</p><h1 id="ovTitle">Viper Sortie</h1></div>
+      <nav class="mTabs" id="mTabs" role="tablist" aria-label="Menu sections"><button type="button" role="tab" data-t="fly">Fly</button><button type="button" role="tab" data-t="set">Settings</button><button type="button" role="tab" data-t="pilot">Pilot</button></nav>
+      <nav class="mTabs oTabs" id="oTabs" role="tablist" aria-label="Debrief sections"><button type="button" role="tab" data-o="replay">Replay</button><button type="button" role="tab" data-o="scores">Scores</button></nav>
+      <button class="ghost mBack" id="mBack" type="button">Back</button>
+    </header>
+    <div class="mBody" id="mBody">
+      <section class="mPane" data-pane="fly" id="mpFly" role="tabpanel">
+        <div class="fLeft">
+          <div id="firstRun" class="firstRun" hidden><span>First flight? Try the guided lessons first.</span><button class="ghost" id="bFirst" type="button">Start training</button></div>
+          <div class="acCard"><span class="cap">Aircraft</span><b id="acName">F-16C Block 50</b><small id="acBr"></small><button class="ghost" id="bRole" type="button">Loadout ▸</button></div>
+          <button class="pick" id="cMission" type="button" aria-haspopup="dialog"><span class="art" id="cMissionArt"></span><span class="ptext"><small>Mission</small><b id="cMissionName">Waves</b><em id="cMissionDesc"></em></span></button>
+          <button class="pick" id="cMap" type="button" aria-haspopup="dialog"><span class="art" id="cMapArt"></span><span class="ptext"><small>Map</small><b id="cMapName">Islands</b><em id="cMapDesc"></em></span></button>
+        </div>
+        <div class="fRight" id="fCtl"></div>
+        <div class="fWide">
+          <div id="campBox" hidden><p class="eyebrow">Campaign · front line</p><div id="campMap"></div><p class="dbKey" id="campLog"></p>
+            <div class="row"><button class="ghost" id="bSortie" type="button">Sortie</button><button class="ghost" id="bCampReset" type="button">New campaign</button></div></div>
+          <div id="lobby" hidden><p class="eyebrow">Lobby · <span id="lobRoom">arena</span></p><table class="sb" id="lobTbl"></table><p class="dbKey" id="lobNote">Share this page and the room code. Pilots show up here as they join.</p></div>
+        </div>
+      </section>
+      <section class="mPane" data-pane="set" id="mpSet" role="tabpanel"><div class="sGrid" id="sCtl"></div>
+        <div class="sActs"><button class="ghost" id="bLayout" type="button">Move buttons…</button><button class="ghost" id="bTips" type="button">Show controls guide</button></div></section>
+      <section class="mPane" data-pane="pilot" id="mpPilot" role="tabpanel">
+        <div class="pGrid">
+          <div class="pBox"><p class="cap">Career</p><div id="pgCareer"></div><p class="pilot" id="pilotCard" hidden></p></div>
+          <div class="pBox"><p class="cap">Campaign</p><div id="pgCamp"></div></div>
+          <div class="pBox"><p class="cap">Best scores</p><div id="pBest"></div></div>
+          <div class="pBox"><p class="cap">Training lessons</p><div id="pLessons" class="lessons"></div></div>
+        </div>
+        <details class="howto" id="howto"><summary>How to fly</summary>
+          <p class="lede" id="howLede">Real energy fighting. Thrust, drag and air density set your speed, hard turns bleed it, and holding 9&nbsp;g too long will black you out. Corner speed is about <span id="ovCorner">350</span>&nbsp;knots.</p>
+          <p class="spec" id="ovSpec"><span><b>9 g</b> / −3 g</span><span><b>Mach 2</b> high</span><span>M61A1 <b>6,000 rpm</b> · 500 rds</span><span>AIM-9X <b>Mach 2+</b></span><span>AIM-120C <b>Mach 4 · 40 g</b></span></p>
+          <dl class="keys" id="ovKeys">
+            <dt>FLY</dt><dd>Drag left thumb · W A S D</dd>
+            <dt>GUN</dt><dd>Hold · Space. Put the pipper on him.</dd>
+            <dt id="kSr">9X</dt><dd id="kSrD">Heat seeker, short range · F</dd>
+            <dt id="kMr">120</dt><dd id="kMrD">Radar missile, needs STT lock or TWS track · R</dd>
+            <dt>LOCK</dt><dd>Lock nearest radar contact / break lock · T</dd>
+            <dt>CMDS</dt><dd id="kCmD">ALE-47: FLR flares vs heat-seekers, CHF chaff vs radar missiles (hold for salvos) · Z / C</dd>
+            <div id="kJamRow" style="display:contents"><dt id="kJam">ECM</dt><dd id="kJamD">ALQ-184 pod: slows their lock, spoils radar shots outside burn-through · J</dd></div>
+            <div id="kDcyRow" style="display:contents"><dt>DCY</dt><dd>ALE-50 towed decoy (4) on 100 m of cable, pulls radar missiles off you · K</dd></div>
+            <dt>AUTO</dt><dd id="kAutoD">RWR-cued chaff against radar missiles. No missile warner: watch for smoke trails · U</dd>
+            <dt>RDR</dt><dd>Radar panel: tap a contact to lock, modes, range, ACM · X</dd>
+            <dt>THR</dt><dd>Slide throttle, top 20% is afterburner · Shift / Ctrl</dd>
+            <dt>BRK</dt><dd>Speed brake · B</dd>
+            <dt>CAM</dt><dd>Chase, cockpit, padlock, flyby · V</dd>
+          </dl></details>
+        <p class="credit">A VALIDAIRSOFT game</p>
+      </section>
+      <section class="mPane" data-pane="pause" id="mpPause" role="tabpanel"><p class="lede" id="ovLede">Everything holds until you resume.</p><div class="pList" id="pList"><div id="pSlot"></div>
+        <button class="ghost" id="bRestart" type="button">Restart sortie</button><button class="ghost" id="bPhoto" type="button" hidden>Photo mode</button><button class="ghost" id="bReplay" type="button" hidden>Watch replay</button><button class="ghost" id="bPauseSet" type="button">Settings</button><button class="ghost danger" id="bQuit" type="button" hidden>Abort sortie</button></div></section>
+      <section class="mPane" data-pane="over" id="mpOver" role="tabpanel">
+        <div class="stats" id="ovStats" hidden></div><div class="stats rew" id="ovRew"></div>
+        <div id="debrief" hidden>
+          <div class="dbHead"><span class="eyebrow">Debrief</span><button class="ghost" id="dbPlay" type="button">Play</button>
+            <input id="dbSlider" type="range" min="0" max="1000" value="1000" aria-label="Replay time"><span id="dbTime">0:00</span></div>
+          <canvas id="dbCanvas" aria-label="Top-down replay of the sortie"></canvas>
+          <p class="dbKey"><span style="color:#7dff9a">■ you</span> <span style="color:#6fb7ff">■ friendly</span> <span style="color:#ff5a4e">■ bandit</span> · dots are missiles</p>
+          <ol id="dbList"></ol>
+        </div>
+        <div id="lbBox" hidden><span class="eyebrow">Best scores · <span id="lbMode"></span></span><ol id="lbList"></ol></div>
+      </section>
     </div>
-    <div id="campBox" hidden><p class="eyebrow">Campaign · front line</p><div id="campMap"></div><p class="dbKey" id="campLog"></p>
-      <div class="row"><button class="ghost" id="bSortie" type="button">Sortie</button><button class="ghost" id="bCampReset" type="button">New campaign</button></div></div>
-    <div id="lobby" hidden><p class="eyebrow">Lobby · <span id="lobRoom">arena</span></p><table class="sb" id="lobTbl"></table><p class="dbKey" id="lobNote">Share this page and the room code. Pilots show up here as they join.</p></div>
-    <dl class="keys" id="ovKeys">
-      <dt>FLY</dt><dd>Drag left thumb · W A S D</dd>
-      <dt>GUN</dt><dd>Hold · Space. Put the pipper on him.</dd>
-      <dt id="kSr">9X</dt><dd id="kSrD">Heat seeker, short range · F</dd>
-      <dt id="kMr">120</dt><dd id="kMrD">Radar missile, needs STT lock or TWS track · R</dd>
-      <dt>LOCK</dt><dd>Lock nearest radar contact / break lock · T</dd>
-      <dt>CMDS</dt><dd id="kCmD">ALE-47: FLR flares vs heat-seekers, CHF chaff vs radar missiles (hold for salvos) · Z / C</dd>
-      <div id="kJamRow" style="display:contents"><dt id="kJam">ECM</dt><dd id="kJamD">ALQ-184 pod: slows their lock, spoils radar shots outside burn-through · J</dd></div>
-      <div id="kDcyRow" style="display:contents"><dt>DCY</dt><dd>ALE-50 towed decoy (4) on 100 m of cable, pulls radar missiles off you · K</dd></div>
-      <dt>AUTO</dt><dd id="kAutoD">RWR-cued chaff against radar missiles. No missile warner: watch for smoke trails · U</dd>
-      <dt>RDR</dt><dd>Radar panel: tap a contact to lock, modes, range, ACM · X</dd>
-      <dt>THR</dt><dd>Slide throttle, top 20% is afterburner · Shift / Ctrl</dd>
-      <dt>BRK</dt><dd>Speed brake · B</dd>
-      <dt>CAM</dt><dd>Chase, cockpit, padlock, flyby · V</dd>
-    </dl>
-    <div class="row">
-      <button class="ghost" id="bMode" type="button">Mode: Free play</button>
-      <button class="ghost" id="bRole" type="button">Loadout ▸</button>
-      <button class="ghost" id="bHangar" type="button">Hangar: aircraft · loadout · paint · specs ▸</button>
-      <button class="ghost" id="bStartPos" type="button">Start: in the air</button>
-      <button class="ghost" id="bTime" type="button">Time: day</button>
-      <button class="ghost" id="bWx" type="button">Weather: scattered clouds</button>
-      <button class="ghost" id="bMap" type="button">Map: islands</button>
-      <button class="ghost" id="bKc" type="button">Kill cam: on</button>
-      <button class="ghost" id="bMission" type="button">Mission: Waves</button>
-      <label class="roomRow" id="roomRow" hidden>Room <input id="roomCode" maxlength="24" value="arena" autocomplete="off" spellcheck="false" aria-label="Room code"></label>
-      <button class="ghost" id="bNetMode" type="button" hidden>Online: teams</button>
-      <button class="ghost" id="bTeam" type="button" hidden>Team: auto</button>
-      <button class="ghost" id="bLesson" type="button" hidden>Lesson: Dogfighting basics</button>
-      <button class="ghost" id="bBandit" type="button">Bandits: F-16</button>
-      <button class="ghost" id="bRange" type="button">Engagement range: long</button>
-      <button class="ghost" id="bDiff" type="button">Difficulty: Regular</button>
-      <button class="ghost" id="bInvert" type="button">Stick: pull back to climb</button>
-      <button class="ghost" id="bSound" type="button">Sound: on</button>
-      <button class="ghost" id="bVoice" type="button">Voice warnings: on</button>
-      <button class="ghost" id="bSens" type="button">Stick sensitivity: normal</button>
-      <button class="ghost" id="bDz" type="button">Dead zone: 5%</button>
-      <button class="ghost" id="bQual" type="button">Graphics: Medium</button>
-      <button class="ghost" id="bPal" type="button">HUD colours: green</button>
-      <button class="ghost" id="bLayout" type="button">Move buttons…</button>
-      <button class="ghost" id="bText" type="button">HUD text size: 100%</button>
-      <button class="ghost" id="bTips" type="button">Show controls guide</button>
-      <button class="ghost" id="bTilt" type="button">Controls: touch stick</button>
-      <button class="ghost" id="bHaptic" type="button">Vibration: on</button>
-    </div>
-    <div class="row">
-      <div id="firstRun" class="firstRun" hidden><span>First flight? Try the guided lessons: dogfighting, missile defense, landing and more.</span><button class="ghost" id="bFirst" type="button">Start training</button></div>
-      <button class="ghost" id="bShare" type="button" hidden>Share result</button>
-      <button class="primary" id="bStart" type="button">Launch</button>
-      <button class="ghost" id="bReplay" type="button" hidden>Watch replay</button>
-      <button class="ghost" id="bPhoto" type="button" hidden>Photo mode</button>
-      <button class="ghost" id="bQuit" type="button" hidden>Abort sortie</button>
-    </div>
-    <p class="pilot" id="pilotCard" hidden></p>
-    <p class="credit">A VALIDAIRSOFT game</p>
+    <footer class="mBar" id="mBar">
+      <p class="mSum" id="mSum"></p>
+      <div class="mActs">
+        <button class="ghost" id="bShare" type="button" hidden>Share result</button>
+        <button class="ghost" id="bMenu" type="button" hidden>Menu</button>
+        <button class="ghost hgBtn" id="bHangar" type="button"><b>Hangar</b><small id="hgSub"></small></button>
+        <button class="primary" id="bStart" type="button">Launch</button>
+      </div>
+    </footer>
+  </div>
+  <div class="sheetWrap" id="sheet" hidden><div class="sheetBack" id="sheetBack"></div><div class="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle"><div class="sheetHead"><h2 id="sheetTitle">Choose</h2><button class="ghost" id="sheetClose" type="button">Close</button></div><div class="sheetList" id="sheetList"></div></div></div>
+  <div id="legacy" hidden aria-hidden="true">
+    <button id="bMode" type="button">Mode: Free play</button><button id="bStartPos" type="button">Start: in the air</button><button id="bTime" type="button">Time: day</button><button id="bWx" type="button">Weather: scattered clouds</button>
+    <button id="bMap" type="button">Map: islands</button><button id="bKc" type="button">Kill cam: on</button><button id="bMission" type="button">Mission: Waves</button>
+    <label id="roomRow" hidden>Room <input id="roomCode" maxlength="24" value="arena" autocomplete="off" spellcheck="false" aria-label="Room code"></label>
+    <button id="bNetMode" type="button" hidden>Online: teams</button><button id="bTeam" type="button" hidden>Team: auto</button><button id="bLesson" type="button" hidden>Lesson: Dogfighting basics</button>
+    <button id="bBandit" type="button">Bandits: F-16</button><button id="bRange" type="button">Engagement range: long</button><button id="bDiff" type="button">Difficulty: Regular</button>
+    <button id="bInvert" type="button">Stick: pull back to climb</button><button id="bSound" type="button">Sound: on</button><button id="bVoice" type="button">Voice warnings: on</button>
+    <button id="bSens" type="button">Stick sensitivity: normal</button><button id="bDz" type="button">Dead zone: 5%</button><button id="bQual" type="button">Graphics: Medium</button>
+    <button id="bPal" type="button">HUD colours: green</button><button id="bText" type="button">HUD text size: 100%</button><button id="bTilt" type="button">Controls: touch stick</button><button id="bHaptic" type="button">Vibration: on</button>
   </div>
 </div>
 

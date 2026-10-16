@@ -7,7 +7,7 @@ const path = require('path'), assert = require('assert');
     await p.addInitScript(() => { try { localStorage.setItem('vsTips', '1'); } catch (e) {} });
     await p.route(/fonts\.(googleapis|gstatic)\.com/, r => r.abort());
     await p.goto('file://' + path.resolve(__dirname, '../index.html') + '?test&noaq'); await p.waitForTimeout(1200);
-    for (const id of clicks) await p.click(id);
+    for (const id of clicks) await p.evaluate(i => document.getElementById(i.slice(1)).click(), id);   // drive the (hidden) original cycle buttons
     await p.click('#bStart'); await p.waitForTimeout(2500); return p;
   };
   let p = await open([]);   // day: no settlement lights

@@ -8,7 +8,7 @@ const path = require('path'), assert = require('assert');
   const url = 'file://' + path.resolve(__dirname, '../index.html') + '?test';
   await p.goto(url); await p.waitForTimeout(1500);
   // text size cycles and persists
-  await p.click('#bText'); assert.match(await p.textContent('#bText'), /115%/);
+  await p.click('#mTabs [data-t=set]'); await p.click('#sCtl .ctl:has(.cap:text-is("HUD text size")) [role=radio]:text-is("115%")'); assert.match(await p.textContent('#bText'), /115%/);
   // controls guide: first launch shows it, a tap dismisses it, and it stays dismissed
   await p.click('#bStart'); await p.waitForTimeout(1800);
   assert(await p.isVisible('#tips'), 'guide shows after the first launch');
@@ -23,7 +23,7 @@ const path = require('path'), assert = require('assert');
   await p.reload(); await p.waitForTimeout(1200);
   assert.match(await p.textContent('#bText'), /115%/, 'text size persisted');
   // mirror: GUN moves from the right half to the left half
-  await p.click('#bLayout'); const before = await p.$eval('#bGun', e => e.getBoundingClientRect().x);
+  await p.click('#mTabs [data-t=set]'); await p.click('#bLayout'); const before = await p.$eval('#bGun', e => e.getBoundingClientRect().x);
   await p.click('#layMirror'); const after = await p.$eval('#bGun', e => e.getBoundingClientRect().x);
   assert(before > 450 && after < 450, `mirrored (${before} -> ${after})`);
   await p.click('#layReset'); assert((await p.$eval('#bGun', e => e.getBoundingClientRect().x)) > 450);

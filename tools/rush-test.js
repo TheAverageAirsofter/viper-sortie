@@ -6,7 +6,7 @@ const path = require('path'), assert = require('assert');
   p.on('pageerror', e => errs.push(e.message));
   await p.route(/fonts\.(googleapis|gstatic)\.com/, r => r.abort());
   await p.goto('file://' + path.resolve(__dirname, '../index.html')); await p.waitForTimeout(1500);
-  for (let i = 0; i < 15 && !/rush/i.test(await p.textContent('#bMission')); i++) await p.click('#bMission');
+  await p.click('#cMission'); await p.click('#sheetList .opt:has-text("Bandit rush")');
   assert.match(await p.textContent('#bMission'), /rush/i);
   await p.click('#bStart'); await p.waitForTimeout(8000);
   await p.screenshot({ path: '/tmp/w/rush.png' });
