@@ -38,8 +38,8 @@ const LES_DESC={BFM:'Basic fighter manoeuvres and gun shots',DEFENSE:'Defeat thr
 /* ---- controls ---- */
 const ctls=[];                                   // each has sync()
 function seg(label,opts,cur,pick,extra){const w=mk('div','ctl'),g=mk('div','seg');g.setAttribute('role','radiogroup');g.setAttribute('aria-label',label);if(label)w.appendChild(mk('span','cap',label));w.appendChild(g);
-  if(extra&&extra.span)w.classList.add('w'+extra.span);const c={w,sync(){const o=opts();g.innerHTML='';const cv=cur();o.forEach((x,i)=>{const b=mk('button','',x.t);b.type='button';b.setAttribute('role','radio');b.setAttribute('aria-checked',x.v===cv?'true':'false');b.tabIndex=x.v===cv||(i===0&&!o.some(y=>y.v===cv))?0:-1;if(x.dis)b.disabled=true;
-      b.addEventListener('click',()=>{if(x.v!==cur()){pick(x.v);uiSync()}});g.appendChild(b)});if(extra&&extra.hidden)w.hidden=extra.hidden()}};
+  if(extra&&extra.span)w.classList.add('w'+extra.span);const c={w,sync(){const o=opts(),had=g.contains(document.activeElement);g.innerHTML='';const cv=cur();o.forEach((x,i)=>{const b=mk('button','',x.t);b.type='button';b.setAttribute('role','radio');b.setAttribute('aria-checked',x.v===cv?'true':'false');b.tabIndex=x.v===cv||(i===0&&!o.some(y=>y.v===cv))?0:-1;if(x.dis)b.disabled=true;
+      b.addEventListener('click',()=>{if(x.v!==cur()){pick(x.v);uiSync()}});g.appendChild(b)});if(had){const n=g.querySelector('[aria-checked=true]')||g.firstChild;if(n)n.focus()}if(extra&&extra.hidden)w.hidden=extra.hidden()}};
   g.addEventListener('keydown',e=>{if(e.key!=='ArrowLeft'&&e.key!=='ArrowRight')return;const bs=[...g.querySelectorAll('button:not(:disabled)')],i=bs.indexOf(document.activeElement);if(i<0)return;e.preventDefault();bs[(i+(e.key==='ArrowRight'?1:bs.length-1))%bs.length].click();setTimeout(()=>{const n=g.querySelector('[aria-checked=true]');if(n)n.focus()},0)});
   ctls.push(c);return w}
 function tog(label,cur,click){const b=mk('button','tog','<span>'+label+'</span><i></i>');b.type='button';b.setAttribute('role','switch');
@@ -113,6 +113,9 @@ $('bRestart').addEventListener('click',()=>{if(state!=='paused')return;closeShee
 function modeKind(){return ovEl.dataset.kind||'menu'}
 const _showOverlay3=showOverlay;
 showOverlay=function(kind){_showOverlay3(kind);if(!kind)return;ovEl.dataset.kind=kind;closeSheet();
+  // the debrief gets the lede (promotions, rescue notes) and a Watch replay button; the pause sheet keeps its own
+  {const over=kind==='over',host=over?$('mpOver'):$('mpPause');host.insertBefore($('ovLede'),host.firstChild);
+   if(over)$('mBar').querySelector('.mActs').insertBefore($('bReplay'),$('bMenu'));else $('pList').insertBefore($('bReplay'),$('bPauseSet'))}
   if(kind==='pause'){setPane('pause','');$('pSlot').appendChild($('bStart'));$('bStart').classList.add('primary')}
   else{$('mBar').querySelector('.mActs').appendChild($('bStart'));if(kind==='over'){ovEl.dataset.over='replay';setPane('over','over')}}
   $('bMenu').hidden=kind!=='over';uiSync()};
