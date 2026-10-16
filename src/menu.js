@@ -138,6 +138,7 @@ let sTab='ctl';
   pane.dsp.append(
     mRow('Graphics',()=>Object.keys(QUALS).map(k=>({v:k,t:({LOW:'Low',MED:'Medium',HIGH:'High'})[k]})),()=>quality,v=>drive($('bQual'),()=>quality,v,4)),
     onoff('Cinematic menu',()=>FX.on,()=>{FX.on=!FX.on;lsSet('vsFx',FX.on?'1':'0');ovEl.dataset.fx=FX.on?'on':'off';camGoal(ovEl.dataset.pane)}),
+    onoff('Bloom and grading',()=>POST.on,()=>{POST.on=!POST.on;try{localStorage.setItem('vsPost',POST.on?'1':'0')}catch(e){}}),
     onoff('Kill cam',()=>KC.on,()=>$('bKc').click()));
   pane.aud.append(onoff('Sound',()=>A.on,()=>$('bSound').click()),onoff('Voice warnings',()=>VOICE.on,()=>$('bVoice').click()),onoff('UI sounds',()=>UIS.on,()=>{UIS.on=!UIS.on;lsSet('vsUiSnd',UIS.on?'1':'0');if(UIS.on){audioInit();uiSnd('sel')}}));
   pane.hud.append(

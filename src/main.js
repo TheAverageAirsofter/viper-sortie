@@ -149,10 +149,12 @@ function frame(now){
   updateShadow(); gust=1+.35*Math.sin(clock*.7)*Math.sin(clock*1.9+1); updateRain(dt||.016); updateLightning(dt||.016);
   for(const cl of clouds){if(!cl.visible)continue;const d=cl.position.distanceTo(camera.position),o=clamp((d-380)/900,0,1)*.95;if(cl.userData.op!==o){cl.userData.op=o;for(const m of cl.userData.mats)m.opacity=o}}
   sndEngine(); sndExtra(); sndFlyby(); updateGlints(); updateFlareLight(); shadowFollow();
-  renderer.clear(); renderer.render((HG.on||HG.bg)&&hgSaved&&hgScene?hgScene:scene,camera); if(VIEWS[view]!=='COCKPIT'&&!(KC.t>0)&&state!=='replay')heatPass();
-  if(VIEWS[view]==='COCKPIT'&&!(KC.t>0)&&(state==='play'||state==='menu'||state==='paused')){
-    updateCockpit(dt||.016); renderer.clearDepth(); renderer.render(cockScene,cockCam);
-  }
+  const scn=(HG.on||HG.bg)&&hgSaved&&hgScene?hgScene:scene, inCock=VIEWS[view]==='COCKPIT'&&!(KC.t>0)&&(state==='play'||state==='menu'||state==='paused');
+  if(inCock)updateCockpit(dt||.016);
+  if(!postRender(scn,camera,inCock)){
+    renderer.clear(); renderer.render(scn,camera); if(VIEWS[view]!=='COCKPIT'&&!(KC.t>0)&&state!=='replay')heatPass();
+    if(inCock){renderer.clearDepth(); renderer.render(cockScene,cockCam)}
+  }else if(VIEWS[view]!=='COCKPIT'&&!(KC.t>0)&&state!=='replay')heatPass();
   if(TGP.mode&&!PHOTO.on)renderTGP(); else TGP.rect=null;
   if(photoGrab)photoCapture();
   drawHUD(); drawRadarPanel();
