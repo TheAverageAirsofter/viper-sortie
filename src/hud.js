@@ -265,8 +265,9 @@ function drawHUD(){
   if(enemies.length)txt(c,`BANDITS ${enemies.length}`,(pit||W<560)?INS.l+16:W/2,(pit||W<560)?T+52:T+70,(pit||W<560)?'left':'center',THREAT,11,700);
   // stores + hull
   const nar=pit||W<560,bw=nar?80:110,bx=nar?INS.l+52:W/2-bw/2,by=nar?T+36:T+90;
-  txt(c,'HULL',bx-8,by,'right',HUDD,10);
-  c.strokeRect(bx,by-5,bw,10);c.fillStyle=P.hp>35?HUD:THREAT;c.fillRect(bx+2,by-3,(bw-4)*Math.max(0,P.hp)/100,6);
+  if(preset==='ARCADE'){   // Realistic and Simulator show damage only through the module warnings, as in War Thunder
+    txt(c,'HULL',bx-8,by,'right',HUDD,10);
+    c.strokeRect(bx,by-5,bw,10);c.fillStyle=P.hp>35?HUD:THREAT;c.fillRect(bx+2,by-3,(bw-4)*Math.max(0,P.hp)/100,6)}
   const flash=(clock*4%1)<.55;
   // MAW cues (Gripen): bearing to missiles the UV sensors have seen in the last 3 s
   if(AC.cm.maws)for(const m of eMissiles){
