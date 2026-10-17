@@ -2,3 +2,6 @@ node_modules/
 *.png
 android/
 www/
+desktop/www/
+desktop/dist/
+desktop/node_modules/
