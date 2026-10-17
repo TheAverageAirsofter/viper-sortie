@@ -264,14 +264,18 @@ function updateWeapons(dt){
   // gun: real rate of fire for the selected jet
   if(gunHeld&&P.rounds>0&&state==='play'&&!(P.sys&&P.sys.gun)){
     gunAcc+=dt*AC.gunRate; gunSndT-=dt; if(gunSndT<=0){sndGun();gunSndT=.05;buzz(12)}
+    gunHeat=Math.min(3,gunHeat+dt);
     while(gunAcc>=1&&P.rounds>0){gunAcc--;P.rounds--;gunShots++;
-      _d.copy(P.fwd);_d.x+=rand(-.004,.004);_d.y+=rand(-.004,.004);_d.z+=rand(-.004,.004);_d.normalize();
-      const b=take(pBullets);b.on=true;b.life=2;b.m.visible=true;
-      b.m.position.copy(P.pos).addScaledVector(P.fwd,5).addScaledVector(P.right,-.9).addScaledVector(P.up,.4).addScaledVector(_d,rand(0,15));
+      // the barrel sits off the centreline and is harmonised on a point ahead; the pattern opens up as the burst goes on
+      _s2.copy(P.pos).addScaledVector(P.fwd,5).addScaledVector(P.right,-.9).addScaledVector(P.up,.4);
+      _d.copy(P.pos).addScaledVector(P.fwd,AC.gunConv||650).sub(_s2).normalize();
+      const sp=(AC.gunDisp||.0035)*(1+gunHeat*.28);_d.x+=rand(-sp,sp);_d.y+=rand(-sp,sp);_d.z+=rand(-sp,sp);_d.normalize();
+      const b=take(pBullets);b.on=true;b.life=2;b.m.visible=(gunShots%4===0);   // one round in four is a tracer
+      b.m.position.copy(_s2).addScaledVector(_d,rand(0,15));
       b.prev.copy(b.m.position); b.vel.copy(P.vel).addScaledVector(_d,AC.muzzle); b.m.quaternion.setFromUnitVectors(ZF,_d);
     }
     if(P.rounds===0)message('WINCHESTER · GUN EMPTY',1.4);
-  } else gunAcc=0;
+  } else {gunAcc=0;gunHeat=Math.max(0,gunHeat-dt*1.5)}
   for(const b of pBullets){ if(!b.on)continue;
     if(ground.length)for(const g of ground)if(g.alive&&distSeg(_s1.copy(g.pos).setY(g.pos.y+2),b.prev,b.m.position)<9){kill(b);gunHits++;g.hp-=AC.gunDmg*BELT().gnd;if(g.hp>0)scEvent('HIT',2,'','ghit');puff(b.m.position.x,b.m.position.y,b.m.position.z,0,0,0,1,.8,.3,1,5,16,.25);if(g.hp<=0)killGround(g);break}
     if(!b.on)continue;

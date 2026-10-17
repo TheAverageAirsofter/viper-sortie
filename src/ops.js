@@ -209,9 +209,10 @@ function agRelease(){
 /* ammunition choices: the gun belt trades damage against aircraft for damage against armour; the bomb fuse trades blast on soft targets for penetration of hard ones */
 const BELTS=[{id:'MIX',n:'universal',air:1,gnd:1,d:'Balanced mix of AP, HE and tracer.'},{id:'AP',n:'armour piercing',air:.8,gnd:1.7,d:'Armour-piercing rounds: weak against aircraft, much better against vehicles.'},{id:'HEI',n:'high explosive',air:1.3,gnd:.5,d:'High-explosive incendiary: strong against aircraft, poor against armour.'}];
 const FUSES=[{id:'INST',n:'instant',hard:.8,soft:1.15,d:'Bursts on contact: wider damage on soft targets.'},{id:'DELAY',n:'delayed',hard:1.7,soft:.7,d:'Penetrates before it bursts: bunkers, tanks and ships take far more, soft targets less.'}];
-var beltI=0,fuseI=0;try{beltI=Math.max(0,BELTS.findIndex(b=>b.id===localStorage.getItem('vsBelt')));fuseI=Math.max(0,FUSES.findIndex(b=>b.id===localStorage.getItem('vsFuse')))}catch(e){}
+var gunHeat=0,beltI=0,fuseI=0;try{beltI=Math.max(0,BELTS.findIndex(b=>b.id===localStorage.getItem('vsBelt')));fuseI=Math.max(0,FUSES.findIndex(b=>b.id===localStorage.getItem('vsFuse')))}catch(e){}
 const BELT=()=>BELTS[beltI], FUSE=()=>FUSES[fuseI], HARD={bunker:1,tank:1,ifv:1,ship:1,spaa:1,radar:1};
-function ammoLabels(){$('bBelt').textContent='Gun belt: '+BELT().n;$('bBelt').title=BELT().d;$('bFuse').textContent='Bomb fuse: '+FUSE().n;$('bFuse').title=FUSE().d}
+const TRACER_COL={MIX:0xffe27a,AP:0xffffff,HEI:0xff7a3a};
+function ammoLabels(){pBullets[0]&&pBullets[0].m.material.color.setHex(TRACER_COL[BELT().id]||0xffe27a);$('bBelt').textContent='Gun belt: '+BELT().n;$('bBelt').title=BELT().d;$('bFuse').textContent='Bomb fuse: '+FUSE().n;$('bFuse').title=FUSE().d}
 $('bBelt').addEventListener('click',()=>{beltI=(beltI+1)%BELTS.length;try{localStorage.setItem('vsBelt',BELT().id)}catch(e){};ammoLabels()});
 $('bFuse').addEventListener('click',()=>{fuseI=(fuseI+1)%FUSES.length;try{localStorage.setItem('vsFuse',FUSE().id)}catch(e){};ammoLabels()});
 ammoLabels();

@@ -2,15 +2,41 @@
 const _f=new V3(),_u=new V3(),_r=new V3(),_vd=new V3(),qa=new THREE.Quaternion();
 function newJet(obj,gLim,ac){return {ac:ac||AC_DEFS.F16,obj,pos:obj.position,vel:new V3(),n:1,gLim,qd:0,mach:0,kcas:0,fwd:new V3(0,0,1),up:new V3(0,1,0),right:new V3(-1,0,0)}}
 function axes(j){const q=j.obj.quaternion;j.fwd.set(0,0,1).applyQuaternion(q);j.up.set(0,1,0).applyQuaternion(q);j.right.set(-1,0,0).applyQuaternion(q)}
+/* flaps (player): 0 up, 1 combat, 2 landing. More lift and drag; the gear forces landing flaps; over the speed limit they are torn off.
+   Stall and spin (player, jets without stall protection): below stall speed with the nose high and rudder or full roll in, the jet departs into a spin until you centre the stick and build speed. */
+const FLAP_CL=[0,.1,.3], FLAP_CD=[0,.008,.035], FLAP_VMAX=[999,380,270];
+const SPIN_SAFE=/^(F16|F35|F22|FA18|F18|GRIPEN|TYPHOON|EF2|RAFALE|SU27|SU3|SU35|SU57|MIG29|MIG35|J10|J11|J16|J20|F15)/;
 function fly(j,dt,rollIn,pitchIn,yawIn,thr,brake){
-  const q=j.obj.quaternion, A=j.ac; j.ci=[rollIn,pitchIn,yawIn||0,thr];
+  const q=j.obj.quaternion, A=j.ac;
+  let fl=0,CLM=A.CLMAX;
+  if(j===P){
+    if(P.gear)P.flaps=2;else if(P.flaps===2)P.flaps=1;
+    if(P.sys&&P.sys.flapOff)P.flaps=0;
+    if(P.flaps===1&&P.kcas>330)P.flaps=0;   // combat flaps retract by themselves
+    fl=P.flaps||0;if(fl===2&&P.kcas>FLAP_VMAX[fl]&&P.sys&&state==='play'){P.flaps=0;fl=0;P.sys.flapOff=true;message('FLAPS TORN OFF · OVERSPEED',2);recEvent('Flaps torn off by overspeed');sndTear&&sndTear()}
+    CLM=A.CLMAX*(1+FLAP_CL[fl]);
+    if(!j.onGround&&state==='play'&&!SPIN_SAFE.test(A.id||'')){
+      const stallC=Math.sqrt(2*(j.mass||A.MASS)*G/(1.225*A.S*CLM))*1.944, cen=Math.abs(rollIn)<.25&&Math.abs(yawIn||0)<.25;
+      if(!j.spin){
+        const dep=(j.kcas<stallC*.92||(j.fwd.y>.5&&j.kcas<stallC*1.1))&&(Math.abs(yawIn||0)>.4||Math.abs(rollIn)>.6)&&pitchIn>.2;
+        j.dep=dep?(j.dep||0)+dt:Math.max(0,(j.dep||0)-dt*2);
+        if(j.dep>.6){j.spin=(rollIn||yawIn||1)>0?1:-1;j.dep=0;j.spinT=0;message('DEPARTED · SPIN · CENTRE THE CONTROLS AND DIVE',2.6);recEvent('Departed controlled flight')}
+      } else {
+        j.spinT+=dt;
+        if(j.kcas>stallC*1.45&&cen||j.spinT>40){j.spin=0;message('RECOVERED',1.4)}
+        else{j.vel.applyAxisAngle(UP,-j.spin*.9*dt);j.vel.y-=G*.8*dt;j.obj.rotateZ(j.spin*1.5*dt);rollIn=0;pitchIn=0;yawIn=0;shake=Math.max(shake,.15)}
+      }
+    } else if(j.spin)j.spin=0;
+  }
+  j.ci=[rollIn,pitchIn,yawIn||0,thr];
   j.obj.rotateZ(rollIn*A.roll*(j.rollK??1)*clamp(j.qd/9000,A.tvc?.45:.15,1)*dt);
   axes(j);
   if(yawIn){qa.setFromAxisAngle(j.up,-yawIn*.12*dt);q.premultiply(qa);j.vel.applyQuaternion(qa);axes(j)}
   const at=atm(j.pos.y); let v=j.vel.length();
   if(v<5){j.vel.copy(j.fwd).multiplyScalar(5);v=5}
   const qd=.5*at.rho*v*v; j.qd=qd; j.mach=v/at.a; j.kcas=v*Math.sqrt(at.sig)*1.944;
-  const MS=j.mass||A.MASS; const nAero=qd*A.S*A.CLMAX/(MS*G); j.nAero=nAero;
+  const MS=j.mass||A.MASS; const nAero=qd*A.S*CLM/(MS*G); j.nAero=nAero;
+  if(j===P&&state==='play'&&!j.onGround){const stalled=nAero<1.02;if(stalled||(j.n*MS*G/(qd*A.S+1))>.9*CLM){shake=Math.max(shake,stalled?.12:.05);if(stalled&&(clock*2.5%1)<.5&&!P.stallBeep){P.stallBeep=true;sndBeep(760,.12,.05,'square')}else if((clock*2.5%1)>=.5)P.stallBeep=false}}
   // thrust vectoring (MiG-35 option): the nozzles keep pulling the nose round below ~260 kt, past what the wing alone gives
   const tv=A.tvc&&thr>.3?1+.7*clamp((260-j.kcas)/120,0,1):1;
   const nHi=Math.min(j.gLim,nAero*tv), nLo=Math.max(G_MIN,-nAero*.55*tv);
@@ -18,9 +44,9 @@ function fly(j,dt,rollIn,pitchIn,yawIn,thr,brake){
   j.n+=(clamp(nCmd,nLo,nHi)-j.n)*Math.min(1,dt*7);   // FLCS g-onset
   j.n=clamp(j.n,nLo,nHi);
   const CL=j.n*MS*G/(qd*A.S+1);
-  j.alpha=clamp(26*CL/A.CLMAX,-20,45);   // degrees: linear lift curve reaching CLmax at ~26 deg (the F-16 FLCS limits alpha to about 25)
+  j.alpha=clamp(26*CL/CLM,-20,45);   // degrees: linear lift curve reaching CLmax at ~26 deg (the F-16 FLCS limits alpha to about 25)
   const over=A.vne?Math.max(0,j.kcas-A.vne)/50:0;   // past the low-level airspeed limit drag climbs steeply
-  const D=qd*A.S*(cd0(j.mach,A)*A.cdK*(1+over*over*4)+A.KIND*CL*CL*(CL>A.CLMAX?1+(CL-A.CLMAX)*1.5:1)+(brake?.06:0)+(j.xcd||0));
+  const D=qd*A.S*(cd0(j.mach,A)*A.cdK*(1+over*over*4)+A.KIND*CL*CL*(CL>CLM?1+(CL-CLM)*1.5:1)+FLAP_CD[fl]+(brake?.06:0)+(j.xcd||0));
   const T=thrust(A,thr,at.sig,j.mach,j.pos.y)*(j.thrK??1); j.lastT=T;
   _f.copy(j.fwd).multiplyScalar((T-D)/MS).addScaledVector(j.up,j.n*G); _f.y-=G;
   j.vel.addScaledVector(_f,dt); j.pos.addScaledVector(j.vel,dt); j.pos.addScaledVector(WIND,gust*dt);

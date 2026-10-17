@@ -332,7 +332,8 @@ function drawHUD(){
   // fuel + damage readouts
   if(!pit){txt(c,'FUEL '+fuelStr(P.fuel||0),INS.l+16,tapeY()+78,'left',P.bingo?WARN:HUDD,11,700)}
   {const sy=P.sys,w=[];if(sy){sy.eng.forEach((v,i)=>{if(v===1)w.push(ENG_NAME(i)+'ENG FIRE');if(v===2)w.push(ENG_NAME(i)+'ENG OUT')});
-    if(sy.hyd)w.push('HYD');if(sy.radar)w.push('RDR FAIL');if(sy.leak)w.push('FUEL LEAK');if(sy.wL)w.push(sy.wL>=1?'L WING OFF':'L WING');if(sy.wR)w.push(sy.wR>=1?'R WING OFF':'R WING');if(sy.ctl<1)w.push('ELEV');if(sy.gun)w.push('GUN JAM');if(sy.pilot)w.push('WOUNDED')}
+    if(sy.hyd)w.push('HYD');if(sy.radar)w.push('RDR FAIL');if(sy.leak)w.push('FUEL LEAK');if(sy.wL)w.push(sy.wL>=1?'L WING OFF':'L WING');if(sy.wR)w.push(sy.wR>=1?'R WING OFF':'R WING');if(sy.ctl<1)w.push('ELEV');if(sy.flapOff)w.push('FLAPS OFF');if(sy.gun)w.push('GUN JAM');if(sy.pilot)w.push('WOUNDED')}
+    if(P.spin)w.push('SPIN');else if(P.nAero<1.02&&!P.onGround)w.push('STALL');if(P.flaps&&!P.onGround)w.push(P.flaps===2?'FLAPS LDG':'FLAPS CBT');
     if(P.flamedOut)w.push('FLAMEOUT'); else if(P.lowFuel)w.push('FUEL LOW'); else if(P.bingo)w.push('BINGO');
     if(w.length)txt(c,w.join(' · '),W/2,H*.74,'center',(clock*2%1)<.7?WARN:'rgba(255,179,71,.5)',12,700)}
   // warnings

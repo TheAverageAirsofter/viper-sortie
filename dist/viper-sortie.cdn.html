@@ -3689,15 +3689,41 @@ function sndEngine(){
 const _f=new V3(),_u=new V3(),_r=new V3(),_vd=new V3(),qa=new THREE.Quaternion();
 function newJet(obj,gLim,ac){return {ac:ac||AC_DEFS.F16,obj,pos:obj.position,vel:new V3(),n:1,gLim,qd:0,mach:0,kcas:0,fwd:new V3(0,0,1),up:new V3(0,1,0),right:new V3(-1,0,0)}}
 function axes(j){const q=j.obj.quaternion;j.fwd.set(0,0,1).applyQuaternion(q);j.up.set(0,1,0).applyQuaternion(q);j.right.set(-1,0,0).applyQuaternion(q)}
+/* flaps (player): 0 up, 1 combat, 2 landing. More lift and drag; the gear forces landing flaps; over the speed limit they are torn off.
+   Stall and spin (player, jets without stall protection): below stall speed with the nose high and rudder or full roll in, the jet departs into a spin until you centre the stick and build speed. */
+const FLAP_CL=[0,.1,.3], FLAP_CD=[0,.008,.035], FLAP_VMAX=[999,380,270];
+const SPIN_SAFE=/^(F16|F35|F22|FA18|F18|GRIPEN|TYPHOON|EF2|RAFALE|SU27|SU3|SU35|SU57|MIG29|MIG35|J10|J11|J16|J20|F15)/;
 function fly(j,dt,rollIn,pitchIn,yawIn,thr,brake){
-  const q=j.obj.quaternion, A=j.ac; j.ci=[rollIn,pitchIn,yawIn||0,thr];
+  const q=j.obj.quaternion, A=j.ac;
+  let fl=0,CLM=A.CLMAX;
+  if(j===P){
+    if(P.gear)P.flaps=2;else if(P.flaps===2)P.flaps=1;
+    if(P.sys&&P.sys.flapOff)P.flaps=0;
+    if(P.flaps===1&&P.kcas>330)P.flaps=0;   // combat flaps retract by themselves
+    fl=P.flaps||0;if(fl===2&&P.kcas>FLAP_VMAX[fl]&&P.sys&&state==='play'){P.flaps=0;fl=0;P.sys.flapOff=true;message('FLAPS TORN OFF · OVERSPEED',2);recEvent('Flaps torn off by overspeed');sndTear&&sndTear()}
+    CLM=A.CLMAX*(1+FLAP_CL[fl]);
+    if(!j.onGround&&state==='play'&&!SPIN_SAFE.test(A.id||'')){
+      const stallC=Math.sqrt(2*(j.mass||A.MASS)*G/(1.225*A.S*CLM))*1.944, cen=Math.abs(rollIn)<.25&&Math.abs(yawIn||0)<.25;
+      if(!j.spin){
+        const dep=(j.kcas<stallC*.92||(j.fwd.y>.5&&j.kcas<stallC*1.1))&&(Math.abs(yawIn||0)>.4||Math.abs(rollIn)>.6)&&pitchIn>.2;
+        j.dep=dep?(j.dep||0)+dt:Math.max(0,(j.dep||0)-dt*2);
+        if(j.dep>.6){j.spin=(rollIn||yawIn||1)>0?1:-1;j.dep=0;j.spinT=0;message('DEPARTED · SPIN · CENTRE THE CONTROLS AND DIVE',2.6);recEvent('Departed controlled flight')}
+      } else {
+        j.spinT+=dt;
+        if(j.kcas>stallC*1.45&&cen||j.spinT>40){j.spin=0;message('RECOVERED',1.4)}
+        else{j.vel.applyAxisAngle(UP,-j.spin*.9*dt);j.vel.y-=G*.8*dt;j.obj.rotateZ(j.spin*1.5*dt);rollIn=0;pitchIn=0;yawIn=0;shake=Math.max(shake,.15)}
+      }
+    } else if(j.spin)j.spin=0;
+  }
+  j.ci=[rollIn,pitchIn,yawIn||0,thr];
   j.obj.rotateZ(rollIn*A.roll*(j.rollK??1)*clamp(j.qd/9000,A.tvc?.45:.15,1)*dt);
   axes(j);
   if(yawIn){qa.setFromAxisAngle(j.up,-yawIn*.12*dt);q.premultiply(qa);j.vel.applyQuaternion(qa);axes(j)}
   const at=atm(j.pos.y); let v=j.vel.length();
   if(v<5){j.vel.copy(j.fwd).multiplyScalar(5);v=5}
   const qd=.5*at.rho*v*v; j.qd=qd; j.mach=v/at.a; j.kcas=v*Math.sqrt(at.sig)*1.944;
-  const MS=j.mass||A.MASS; const nAero=qd*A.S*A.CLMAX/(MS*G); j.nAero=nAero;
+  const MS=j.mass||A.MASS; const nAero=qd*A.S*CLM/(MS*G); j.nAero=nAero;
+  if(j===P&&state==='play'&&!j.onGround){const stalled=nAero<1.02;if(stalled||(j.n*MS*G/(qd*A.S+1))>.9*CLM){shake=Math.max(shake,stalled?.12:.05);if(stalled&&(clock*2.5%1)<.5&&!P.stallBeep){P.stallBeep=true;sndBeep(760,.12,.05,'square')}else if((clock*2.5%1)>=.5)P.stallBeep=false}}
   // thrust vectoring (MiG-35 option): the nozzles keep pulling the nose round below ~260 kt, past what the wing alone gives
   const tv=A.tvc&&thr>.3?1+.7*clamp((260-j.kcas)/120,0,1):1;
   const nHi=Math.min(j.gLim,nAero*tv), nLo=Math.max(G_MIN,-nAero*.55*tv);
@@ -3705,9 +3731,9 @@ function fly(j,dt,rollIn,pitchIn,yawIn,thr,brake){
   j.n+=(clamp(nCmd,nLo,nHi)-j.n)*Math.min(1,dt*7);   // FLCS g-onset
   j.n=clamp(j.n,nLo,nHi);
   const CL=j.n*MS*G/(qd*A.S+1);
-  j.alpha=clamp(26*CL/A.CLMAX,-20,45);   // degrees: linear lift curve reaching CLmax at ~26 deg (the F-16 FLCS limits alpha to about 25)
+  j.alpha=clamp(26*CL/CLM,-20,45);   // degrees: linear lift curve reaching CLmax at ~26 deg (the F-16 FLCS limits alpha to about 25)
   const over=A.vne?Math.max(0,j.kcas-A.vne)/50:0;   // past the low-level airspeed limit drag climbs steeply
-  const D=qd*A.S*(cd0(j.mach,A)*A.cdK*(1+over*over*4)+A.KIND*CL*CL*(CL>A.CLMAX?1+(CL-A.CLMAX)*1.5:1)+(brake?.06:0)+(j.xcd||0));
+  const D=qd*A.S*(cd0(j.mach,A)*A.cdK*(1+over*over*4)+A.KIND*CL*CL*(CL>CLM?1+(CL-CLM)*1.5:1)+FLAP_CD[fl]+(brake?.06:0)+(j.xcd||0));
   const T=thrust(A,thr,at.sig,j.mach,j.pos.y)*(j.thrK??1); j.lastT=T;
   _f.copy(j.fwd).multiplyScalar((T-D)/MS).addScaledVector(j.up,j.n*G); _f.y-=G;
   j.vel.addScaledVector(_f,dt); j.pos.addScaledVector(j.vel,dt); j.pos.addScaledVector(WIND,gust*dt);
@@ -4266,9 +4292,10 @@ function agRelease(){
 /* ammunition choices: the gun belt trades damage against aircraft for damage against armour; the bomb fuse trades blast on soft targets for penetration of hard ones */
 const BELTS=[{id:'MIX',n:'universal',air:1,gnd:1,d:'Balanced mix of AP, HE and tracer.'},{id:'AP',n:'armour piercing',air:.8,gnd:1.7,d:'Armour-piercing rounds: weak against aircraft, much better against vehicles.'},{id:'HEI',n:'high explosive',air:1.3,gnd:.5,d:'High-explosive incendiary: strong against aircraft, poor against armour.'}];
 const FUSES=[{id:'INST',n:'instant',hard:.8,soft:1.15,d:'Bursts on contact: wider damage on soft targets.'},{id:'DELAY',n:'delayed',hard:1.7,soft:.7,d:'Penetrates before it bursts: bunkers, tanks and ships take far more, soft targets less.'}];
-var beltI=0,fuseI=0;try{beltI=Math.max(0,BELTS.findIndex(b=>b.id===localStorage.getItem('vsBelt')));fuseI=Math.max(0,FUSES.findIndex(b=>b.id===localStorage.getItem('vsFuse')))}catch(e){}
+var gunHeat=0,beltI=0,fuseI=0;try{beltI=Math.max(0,BELTS.findIndex(b=>b.id===localStorage.getItem('vsBelt')));fuseI=Math.max(0,FUSES.findIndex(b=>b.id===localStorage.getItem('vsFuse')))}catch(e){}
 const BELT=()=>BELTS[beltI], FUSE=()=>FUSES[fuseI], HARD={bunker:1,tank:1,ifv:1,ship:1,spaa:1,radar:1};
-function ammoLabels(){$('bBelt').textContent='Gun belt: '+BELT().n;$('bBelt').title=BELT().d;$('bFuse').textContent='Bomb fuse: '+FUSE().n;$('bFuse').title=FUSE().d}
+const TRACER_COL={MIX:0xffe27a,AP:0xffffff,HEI:0xff7a3a};
+function ammoLabels(){pBullets[0]&&pBullets[0].m.material.color.setHex(TRACER_COL[BELT().id]||0xffe27a);$('bBelt').textContent='Gun belt: '+BELT().n;$('bBelt').title=BELT().d;$('bFuse').textContent='Bomb fuse: '+FUSE().n;$('bFuse').title=FUSE().d}
 $('bBelt').addEventListener('click',()=>{beltI=(beltI+1)%BELTS.length;try{localStorage.setItem('vsBelt',BELT().id)}catch(e){};ammoLabels()});
 $('bFuse').addEventListener('click',()=>{fuseI=(fuseI+1)%FUSES.length;try{localStorage.setItem('vsFuse',FUSE().id)}catch(e){};ammoLabels()});
 ammoLabels();
@@ -4755,7 +4782,7 @@ function rearm(){
 }
 function resetPlayer(){
   P.pos.set(0,4000,0); playerJet.quaternion.identity(); playerJet.visible=true;
-  P.vel.set(0,0,230); P.onGround=false; P.onDeck=false; P.ejected=null; P.jetGhost=null; P.rescued=false; if(chute)chute.visible=false; P.scramble=false; P.stopT=0; if(typeof setGear==='function')setGear(false); P.n=1; P.hp=100; P.fuel=.75*(AC.intFuel||AC.fuelCap)+(AC.tankFuel||0); P.flamedOut=false; resetSystems(); P.gStress=0; P.gloc=0; P.gcas=false; P.maxG=1; axes(P); qPrev.copy(playerJet.quaternion); omega.set(0,0,0);
+  P.vel.set(0,0,230); P.onGround=false; P.onDeck=false; P.ejected=null; P.jetGhost=null; P.rescued=false; if(chute)chute.visible=false; P.scramble=false; P.stopT=0; if(typeof setGear==='function')setGear(false); P.n=1; P.hp=100; P.flaps=0; P.spin=0; P.fuel=.75*(AC.intFuel||AC.fuelCap)+(AC.tankFuel||0); P.flamedOut=false; resetSystems(); P.gStress=0; P.gloc=0; P.gcas=false; P.maxG=1; axes(P); qPrev.copy(playerJet.quaternion); omega.set(0,0,0);
   rearm(); throttle=.8; setThr(.8);
 }
 const isBT=()=>mission==='BATTLE'||mission==='COMBINED';
@@ -5180,15 +5207,15 @@ $('bPause').addEventListener('click',()=>pause());
    Every action has up to two keys per control style ('kb' = classic keys, 'kbm' = mouse mode); the mouse buttons and wheel are bound separately.
    Arrow keys always roll and pitch, Right Shift / = and Right Ctrl / - always move the throttle, Esc always pauses. */
 const KB_ACTS=[['pitchPull','Pitch up (pull)','Flight'],['pitchPush','Pitch down (push)','Flight'],['rollL','Roll left','Flight'],['rollR','Roll right','Flight'],['yawL','Rudder left','Flight'],['yawR','Rudder right','Flight'],
-  ['thrUp','Throttle up','Flight'],['thrDn','Throttle down','Flight'],['brake','Speed brake','Flight'],['gear','Landing gear','Flight'],['auto','Autopilot','Flight'],
+  ['thrUp','Throttle up','Flight'],['thrDn','Throttle down','Flight'],['brake','Speed brake','Flight'],['flaps','Flaps','Flight'],['gear','Landing gear','Flight'],['auto','Autopilot','Flight'],
   ['gun','Guns','Weapons'],['aim9','Short-range missile','Weapons'],['aim120','Long-range missile','Weapons'],['agRel','Air-to-ground release','Weapons'],['agNext','Next air-to-ground weapon','Weapons'],
   ['lock','Lock nearest target','Sensors'],['nextTgt','Next target','Sensors'],['radar','Radar panel','Sensors'],['radarMode','Radar mode','Sensors'],['acm','ACM mode','Sensors'],['rangeUp','Radar range up','Sensors'],['rangeDn','Radar range down','Sensors'],
   ['flare','Flares','Defence'],['chaff','Chaff','Defence'],['ecm','Jammer','Defence'],['decoy','Towed decoy','Defence'],
   ['view','Cycle camera','Other'],['map','Tactical map','Other'],['pause','Pause','Other']];
-const KB_COMMON={thrUp:['ShiftLeft','Equal'],thrDn:['ControlLeft','Minus'],brake:['KeyB'],gear:['KeyL'],auto:['KeyU'],gun:['Space'],aim9:['KeyF'],aim120:['KeyR'],agRel:['KeyH'],agNext:['KeyN'],lock:['KeyT'],nextTgt:['KeyY'],radar:['KeyX'],radarMode:['KeyM'],acm:['KeyG'],rangeUp:['BracketRight'],rangeDn:['BracketLeft'],flare:['KeyZ'],chaff:['KeyC'],ecm:['KeyJ'],decoy:['KeyK'],view:['KeyV'],map:['Tab'],pause:['KeyP']};
+const KB_COMMON={thrUp:['ShiftLeft','Equal'],thrDn:['ControlLeft','Minus'],brake:['KeyB'],flaps:['KeyO'],gear:['KeyL'],auto:['KeyU'],gun:['Space'],aim9:['KeyF'],aim120:['KeyR'],agRel:['KeyH'],agNext:['KeyN'],lock:['KeyT'],nextTgt:['KeyY'],radar:['KeyX'],radarMode:['KeyM'],acm:['KeyG'],rangeUp:['BracketRight'],rangeDn:['BracketLeft'],flare:['KeyZ'],chaff:['KeyC'],ecm:['KeyJ'],decoy:['KeyK'],view:['KeyV'],map:['Tab'],pause:['KeyP']};
 const KB_DEF={kb:Object.assign({},KB_COMMON,{pitchPull:['KeyS'],pitchPush:['KeyW'],rollL:['KeyA'],rollR:['KeyD'],yawL:['KeyQ'],yawR:['KeyE']}),
   kbm:Object.assign({},KB_COMMON,{pitchPull:[],pitchPush:[],rollL:[],rollR:[],yawL:['KeyA','KeyQ'],yawR:['KeyD','KeyE'],thrUp:['KeyW','ShiftLeft'],thrDn:['KeyS','ControlLeft']})};
-const KB_MOUSE_ACTS=['','gun','aim9','aim120','flare','chaff','lock','nextTgt','brake','view','gear','agRel','ecm','decoy'];
+const KB_MOUSE_ACTS=['','gun','aim9','aim120','flare','chaff','lock','nextTgt','brake','flaps','view','gear','agRel','ecm','decoy'];
 const KB={map:{kb:{},kbm:{}},rev:{kb:{},kbm:{}},mouse:{0:'gun',1:'aim120',2:'aim9',3:'',4:''},wheel:'throttle',msens:1,minv:false};
 function kbReset(mode){for(const m of mode?[mode]:['kb','kbm'])for(const [a] of KB_ACTS)KB.map[m][a]=(KB_DEF[m][a]||[]).slice();if(!mode){KB.mouse={0:'gun',1:'aim120',2:'aim9',3:'',4:''};KB.wheel='throttle';KB.msens=1;KB.minv=false}kbRebuild()}
 function kbRebuild(){for(const m of ['kb','kbm']){const r=KB.rev[m]={};for(const [a] of KB_ACTS)for(const c of KB.map[m][a])if(c)r[c]=a}}
@@ -5201,7 +5228,7 @@ const kbHeld=a=>{const m=KB.map[KBM.on?'kbm':'kb'][a];for(const c of m)if(keys[c
 function actDown(a){
   switch(a){
     case 'gun':gunHeld=true;break;case 'aim9':fire9=true;break;case 'aim120':fire120=true;break;case 'brake':brake=true;break;
-    case 'view':cycleView();break;case 'gear':$('bGear').click();break;case 'lock':quickLock();break;case 'nextTgt':stepTarget();break;
+    case 'flaps':if(!P.gear&&!(P.sys&&P.sys.flapOff)){P.flaps=((P.flaps||0)+1)%2;message(P.flaps?'COMBAT FLAPS':'FLAPS UP',1)}break;case 'view':cycleView();break;case 'gear':$('bGear').click();break;case 'lock':quickLock();break;case 'nextTgt':stepTarget();break;
     case 'acm':$('rAcm').click();break;case 'radarMode':$('rMode').click();break;case 'rangeUp':$('rUp').click();break;case 'rangeDn':$('rDn').click();break;
     case 'radar':$('bRdr').click();break;case 'map':mapStep();break;case 'flare':if(!CM.flrHeld){CM.flrHeld=true;CM.flrT=0}break;case 'chaff':if(!CM.chfHeld){CM.chfHeld=true;CM.chfT=0}break;
     case 'ecm':toggleECM();break;case 'decoy':deployDecoy();break;case 'agRel':agRelease();break;case 'agNext':agNext();break;case 'auto':$('cAuto').click();break;case 'pause':pause();break;
@@ -5372,7 +5399,7 @@ const qTmp=new THREE.Quaternion();
 
 /* ---------------- fuel and system damage ---------------- */
 // fuel: thrust × specific fuel consumption; jet gets lighter as it burns. Starts at 75 % of internal.
-function resetSystems(){P.sys={eng:Array(AC.engines).fill(0),fireT:Array(AC.engines).fill(0),hyd:false,radar:false,leak:false,wL:0,wR:0,ctl:1,gun:false,pilot:0,torn:0,burn:0};P.thrK=1;P.rollK=1;P.gLim=AC.gmax;P.bingo=false;P.lowFuel=false}
+function resetSystems(){P.sys={eng:Array(AC.engines).fill(0),fireT:Array(AC.engines).fill(0),hyd:false,flapOff:false,radar:false,leak:false,wL:0,wR:0,ctl:1,gun:false,pilot:0,torn:0,burn:0};P.thrK=1;P.rollK=1;P.gLim=AC.gmax;P.bingo=false;P.lowFuel=false}
 function refuel(){P.fuel=Math.max(P.fuel||0,.75*AC.fuelCap);resetSystems();P.bingo=false;P.lowFuel=false}
 const fuelStr=kg=>AC.fuelUnit==='LB'?Math.round(kg*2.2046/10)*10+' LB':Math.round(kg/10)*10+' KG';
 const ENG_NAME=i=>AC.engines>1?(i===0?'LEFT ':'RIGHT '):'';
@@ -5958,14 +5985,18 @@ function updateWeapons(dt){
   // gun: real rate of fire for the selected jet
   if(gunHeld&&P.rounds>0&&state==='play'&&!(P.sys&&P.sys.gun)){
     gunAcc+=dt*AC.gunRate; gunSndT-=dt; if(gunSndT<=0){sndGun();gunSndT=.05;buzz(12)}
+    gunHeat=Math.min(3,gunHeat+dt);
     while(gunAcc>=1&&P.rounds>0){gunAcc--;P.rounds--;gunShots++;
-      _d.copy(P.fwd);_d.x+=rand(-.004,.004);_d.y+=rand(-.004,.004);_d.z+=rand(-.004,.004);_d.normalize();
-      const b=take(pBullets);b.on=true;b.life=2;b.m.visible=true;
-      b.m.position.copy(P.pos).addScaledVector(P.fwd,5).addScaledVector(P.right,-.9).addScaledVector(P.up,.4).addScaledVector(_d,rand(0,15));
+      // the barrel sits off the centreline and is harmonised on a point ahead; the pattern opens up as the burst goes on
+      _s2.copy(P.pos).addScaledVector(P.fwd,5).addScaledVector(P.right,-.9).addScaledVector(P.up,.4);
+      _d.copy(P.pos).addScaledVector(P.fwd,AC.gunConv||650).sub(_s2).normalize();
+      const sp=(AC.gunDisp||.0035)*(1+gunHeat*.28);_d.x+=rand(-sp,sp);_d.y+=rand(-sp,sp);_d.z+=rand(-sp,sp);_d.normalize();
+      const b=take(pBullets);b.on=true;b.life=2;b.m.visible=(gunShots%4===0);   // one round in four is a tracer
+      b.m.position.copy(_s2).addScaledVector(_d,rand(0,15));
       b.prev.copy(b.m.position); b.vel.copy(P.vel).addScaledVector(_d,AC.muzzle); b.m.quaternion.setFromUnitVectors(ZF,_d);
     }
     if(P.rounds===0)message('WINCHESTER · GUN EMPTY',1.4);
-  } else gunAcc=0;
+  } else {gunAcc=0;gunHeat=Math.max(0,gunHeat-dt*1.5)}
   for(const b of pBullets){ if(!b.on)continue;
     if(ground.length)for(const g of ground)if(g.alive&&distSeg(_s1.copy(g.pos).setY(g.pos.y+2),b.prev,b.m.position)<9){kill(b);gunHits++;g.hp-=AC.gunDmg*BELT().gnd;if(g.hp>0)scEvent('HIT',2,'','ghit');puff(b.m.position.x,b.m.position.y,b.m.position.z,0,0,0,1,.8,.3,1,5,16,.25);if(g.hp<=0)killGround(g);break}
     if(!b.on)continue;
@@ -7284,7 +7315,8 @@ function drawHUD(){
   // fuel + damage readouts
   if(!pit){txt(c,'FUEL '+fuelStr(P.fuel||0),INS.l+16,tapeY()+78,'left',P.bingo?WARN:HUDD,11,700)}
   {const sy=P.sys,w=[];if(sy){sy.eng.forEach((v,i)=>{if(v===1)w.push(ENG_NAME(i)+'ENG FIRE');if(v===2)w.push(ENG_NAME(i)+'ENG OUT')});
-    if(sy.hyd)w.push('HYD');if(sy.radar)w.push('RDR FAIL');if(sy.leak)w.push('FUEL LEAK');if(sy.wL)w.push(sy.wL>=1?'L WING OFF':'L WING');if(sy.wR)w.push(sy.wR>=1?'R WING OFF':'R WING');if(sy.ctl<1)w.push('ELEV');if(sy.gun)w.push('GUN JAM');if(sy.pilot)w.push('WOUNDED')}
+    if(sy.hyd)w.push('HYD');if(sy.radar)w.push('RDR FAIL');if(sy.leak)w.push('FUEL LEAK');if(sy.wL)w.push(sy.wL>=1?'L WING OFF':'L WING');if(sy.wR)w.push(sy.wR>=1?'R WING OFF':'R WING');if(sy.ctl<1)w.push('ELEV');if(sy.flapOff)w.push('FLAPS OFF');if(sy.gun)w.push('GUN JAM');if(sy.pilot)w.push('WOUNDED')}
+    if(P.spin)w.push('SPIN');else if(P.nAero<1.02&&!P.onGround)w.push('STALL');if(P.flaps&&!P.onGround)w.push(P.flaps===2?'FLAPS LDG':'FLAPS CBT');
     if(P.flamedOut)w.push('FLAMEOUT'); else if(P.lowFuel)w.push('FUEL LOW'); else if(P.bingo)w.push('BINGO');
     if(w.length)txt(c,w.join(' · '),W/2,H*.74,'center',(clock*2%1)<.7?WARN:'rgba(255,179,71,.5)',12,700)}
   // warnings

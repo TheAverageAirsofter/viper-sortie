@@ -64,6 +64,9 @@ Settings > Controls > Input (`vsKbm`, `KBM` in state.js): the mouse is a relativ
 ## Air battle
 `src/battle.js` (slice after groundwar): the `BATTLE` mission (Air domination). `BT` holds points, three capture zones (`BT_ZONES`, radius `BT_R`), the lineup and respawn state; `btTick` (from the main loop, runs while dead too) captures zones, drains points, spawns replacements and ends the battle through `endMission`. AI jets get `e.wp` (the zone to fly to) which `updateAI` follows when they have no target. `die()` calls `btDied` (the sortie continues, `deadT` is held open), the `#btPick` panel lists the lineup, `btRespawn` swaps `AC` via `applyAC` + `resetPlayer`, and `updateCamera` spectates a team-mate meanwhile. The tactical map draws the zones. `tools/battle-test.js` covers it.
 
+## Guns, flaps, stall
+Player gun rounds start at the off-centre barrel and are harmonised on `AC.gunConv` (default 650 m); the pattern opens up with the burst (`gunHeat`, `AC.gunDisp`), one round in four is a visible tracer, and the tracer colour follows the belt (`TRACER_COL`). `fly()` in flight.js handles the player's flaps (`P.flaps` 0/1/2, gear forces landing flaps, `FLAP_CL` / `FLAP_CD` / `FLAP_VMAX`) and stall and spin: jets not matching `SPIN_SAFE` depart below stall speed with the nose high and roll or rudder held (`P.spin`), and recover once the controls are centred and speed returns. `tools/stall-test.js` covers it.
+
 ## Performance notes
 `mergeStatic` (render.js, called from `buildJet`) merges unnamed static meshes that share a material into one mesh per group, cutting a jet from about 70 draw calls to about 25; named parts (`cs`, `gear`, `canopyG`, `nozG`, `flame`, `wingM`, decals) are never merged. Far ground-war vehicles are hidden beyond 7 / 12 / 20 km (Low / Medium / High). Bloom is off on Medium by default. `__vs.rinfoReset()` / `__vs.rinfo()` read draw calls and triangles (see the perf snippets in the transcript: reset, wait N frames, divide).
 
