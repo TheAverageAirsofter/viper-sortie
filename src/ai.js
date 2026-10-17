@@ -75,6 +75,7 @@ const dummy=new THREE.Object3D();
 function updateAI(e,dt){
   axes(e); e.flareCd-=dt; e.chaffCd-=dt; e.mslCd-=dt; e.retgtT-=dt;
   if(e.kind!=='fighter'){updateHeavy(e,dt);return}
+  if(e.sys){aiSystems(e,dt);if(!e.alive)return}
   if(e.drone){steer(e,dt,_s4.copy(e.fwd).setY(0).normalize(),1,.8);return}
   if(e.retgtT<=0||!e.tgt||!e.tgt.alive){e.retgtT=1.5;e.tgt=pickTarget(e)}
   const tg=e.tgt, live=state==='play';

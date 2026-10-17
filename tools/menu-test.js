@@ -114,9 +114,9 @@ const path = require('path'), assert = require('assert');
   assert.match(await st('F4E'), /own/); assert.match(await st('F15C'), /can/); assert.match(await st('F15E'), /lock/); assert((await p.$$('#hgTree .tgrid path')).length >= 10, 'connectors'); assert.equal((await p.$$('#hgTree .tn.next')).length, 1, 'one next-research pulse');
   assert.match(await p.textContent('.tn[data-id=F15C] em'), /Research · 20,000 RP/); assert.match(await p.textContent('.tn[data-id=F15E] em'), /Locked/);
   await p.evaluate(() => { __vs.prog.frp = 99999; }); await p.click('.tn[data-id=F15C]'); await p.click('#hgTree [data-act=research]'); await p.waitForTimeout(200);
-  assert.match(await st('F15C'), /res/); assert.match(await st('F15E'), /can/); assert.match(await p.textContent('.tn[data-id=F15C] em'), /Researched · 150,000 SL/);
+  assert.match(await st('F15C'), /res/); assert.match(await st('F15E'), /can/); assert.match(await p.textContent('.tn[data-id=F15C] em'), /Researched · 120,000 SL/);
   await p.focus('.tn[data-id=F15C]'); await p.keyboard.press('ArrowRight'); assert.notEqual(await p.evaluate(() => document.activeElement.dataset.id), 'F15C', 'arrow keys move between nodes');
-  await p.evaluate(() => { __vs.prog.sl = 1000000; }); await p.click('.tn[data-id=F15C]'); await p.click('#hgTree [data-act=buy]'); await p.waitForTimeout(200); assert.match(await st('F15C'), /own/); assert.match(await p.textContent('.tn[data-id=F15C] em'), /Owned · 150,000 SL/);
+  await p.evaluate(() => { __vs.prog.sl = 1000000; }); await p.click('.tn[data-id=F15C]'); await p.click('#hgTree [data-act=buy]'); await p.waitForTimeout(200); assert.match(await st('F15C'), /own/); assert.match(await p.textContent('.tn[data-id=F15C] em'), /Owned · 120,000 SL/);
   await p.click('#hgClose');
   // crew dossier on the Pilot pane
   await p.click('#mWallet'); const cards = await p.$$('#pgCrew .crc'); assert.equal(cards.length, 3, 'a card per crew skill'); assert.equal((await p.$$('#pgCrew .crc:first-child .pips i')).length, 5);

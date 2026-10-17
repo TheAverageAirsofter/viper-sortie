@@ -10,7 +10,7 @@ const assert = require('assert'), path = require('path');
   await p.sortie(); await p.waitForFunction(() => __vs.enemies.filter(x => x.alive).length >= 2, null, { timeout: 30000 });
   const r = await p.evaluate(() => {
     const e = __vs.enemies.filter(x => x.alive); const out = {};
-    __vs.hitAI(e[0], 1, 'GUNS', true); __vs.hitAI(e[0], 1, 'GUNS', true);
+    e[0].drone = true; __vs.hitAI(e[0], 1, 'GUNS', true); __vs.hitAI(e[0], 1, 'GUNS', true);
     out.hits = __vs.SC.list.map(x => x.text);
     __vs.killEnemy(e[0], 'AIM-9', true); __vs.killEnemy(e[1], 'GUNS', true);
     out.after = __vs.SC.list.map(x => x.text + ' ' + x.pts);

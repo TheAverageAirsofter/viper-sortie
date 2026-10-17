@@ -665,3 +665,21 @@ button:disabled{opacity:.4;cursor:not-allowed}
 #btPick{position:fixed;left:50%;bottom:calc(14px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:30;background:var(--panel);border:1px solid var(--hud-dim);border-radius:var(--r-md);padding:10px 14px;max-width:min(96vw,640px);text-align:center;backdrop-filter:blur(6px)}
 #btPick .btRow{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin:8px 0}
 #btPick button:disabled{opacity:.4}
+#kbEdit{position:fixed;inset:0;z-index:60;background:rgba(6,10,8,.94);display:flex;flex-direction:column;padding:calc(10px + env(safe-area-inset-top,0px)) 16px calc(10px + env(safe-area-inset-bottom,0px));color:var(--text,#e8f0ea)}
+#kbEdit[hidden]{display:none}
+#kbEdit .kbHead{display:flex;flex-wrap:wrap;align-items:center;gap:10px 16px}
+#kbEdit .kbHead h2{margin:0;font-size:20px;letter-spacing:.06em;text-transform:uppercase}
+#kbEdit .kbNote{flex-basis:100%;margin:0;font-size:12px;opacity:.7}
+#kbEdit .kbSw{display:flex;gap:6px}
+#kbEdit .kbSw .on{outline:1.5px solid var(--hud,#7dff9a)}
+#kbEdit .kbList{flex:1;overflow:auto;margin:8px 0;padding-right:4px}
+#kbEdit .grp{margin:10px 0 4px;font-size:11px;letter-spacing:.12em;text-transform:uppercase;opacity:.6}
+#kbEdit .kbRow{display:flex;align-items:center;gap:8px;padding:3px 0;border-bottom:1px solid rgba(255,255,255,.06)}
+#kbEdit .kbRow .lab{flex:1;font-size:13px}
+#kbEdit .kbKey{min-width:84px;padding:5px 8px;border-radius:6px;border:1px solid var(--hud-dim,#3a5a44);background:rgba(255,255,255,.05);color:inherit;font:600 12px 'Barlow Condensed',sans-serif;letter-spacing:.04em}
+#kbEdit .kbKey.wait{outline:1.5px solid #ffd24a;color:#ffd24a}
+#kbEdit .kbKey.on{background:rgba(125,255,154,.2)}
+#kbEdit select{min-width:170px;padding:4px;background:rgba(255,255,255,.06);color:inherit;border:1px solid var(--hud-dim,#3a5a44);border-radius:6px}
+#kbEdit input[type=range]{width:170px}
+#kbEdit .kbVal{width:48px;text-align:right;font-size:12px}
+#kbEdit .kbFoot{display:flex;gap:8px;justify-content:flex-end}

@@ -120,7 +120,7 @@ const qr=$('qRows');
     mRow('Team',()=>[{v:'A',t:'Auto'},{v:'B',t:'Blue'},{v:'R',t:'Red'}],()=>NET.teamPref,v=>drive($('bTeam'),()=>NET.teamPref,v,3),{hidden:()=>NET.mode!=='TEAMS'}))}
 
 /* ---- SETTINGS: tabs, rows and a description area ---- */
-const SDESC={'Mouse':'Aim: the cursor is a point in the world and the flight computer rolls and pulls onto it. Stick: the mouse deflects the stick directly.','Input':'Keyboard + mouse: the mouse flies (click to capture, Esc to release), left button guns, right button AIM-9, middle button AIM-120, wheel or W/S throttle, A/D rudder.','Stick':'Fly with the on-screen stick, or tilt the phone.','Pull back':'Whether pulling the stick back raises the nose (flight-sim) or lowers it.','Sensitivity':'How far the jet turns for a given stick movement.','Dead zone':'Ignore small stick movements near the centre.',
+const SDESC={'Key bindings':'Rebind every keyboard key and mouse button, set mouse sensitivity and invert, and choose what the wheel does.','Mouse':'Aim: the cursor is a point in the world and the flight computer rolls and pulls onto it. Stick: the mouse deflects the stick directly.','Input':'Keyboard + mouse: the mouse flies (click to capture, Esc to release), left button guns, right button AIM-9, middle button AIM-120, wheel or W/S throttle, A/D rudder.','Stick':'Fly with the on-screen stick, or tilt the phone.','Pull back':'Whether pulling the stick back raises the nose (flight-sim) or lowers it.','Sensitivity':'How far the jet turns for a given stick movement.','Dead zone':'Ignore small stick movements near the centre.',
   'Vibration':'Haptic feedback for guns, hits and warnings.','Move buttons':'Drag the on-screen buttons where you want them, then save.','Controls guide':'Launch a sortie and show the controls guide on top.',
   'Graphics':'Lower this if the frame rate drops. Auto-adjusts when the game is struggling.','Cinematic menu':'Film grain, letterbox bars, light flare and the slow camera drift behind the menu.','Kill cam':'A short replay when you shoot something down.',
   'Sound':'All game sound.','Voice warnings':'Spoken cockpit warnings: pull up, missile, bingo fuel.','UI sounds':'Quiet clicks as you move through the menu.',
@@ -139,7 +139,7 @@ let sTab='ctl';
     mSlide('Sensitivity',Object.keys(SENS).length,()=>Object.keys(SENS).indexOf(sens),i=>drive($('bSens'),()=>sens,Object.keys(SENS)[i],4),i=>Object.keys(SENS)[i]),
     mSlide('Dead zone',DZS.length,()=>dz,i=>drive($('bDz'),()=>dz,i,6),i=>Math.round(DZS[i]*100)+' %'),
     onoff('Vibration',()=>hapticsOn,()=>$('bHaptic').click()),
-    mAct('Move buttons','Edit',()=>$('bLayout').click()),mAct('Controls guide','Show',()=>$('bTips').click()));
+    mAct('Key bindings','Edit',()=>kbOpen()),mAct('Move buttons','Edit',()=>$('bLayout').click()),mAct('Controls guide','Show',()=>$('bTips').click()));
   pane.dsp.append(
     mRow('Graphics',()=>Object.keys(QUALS).map(k=>({v:k,t:({LOW:'Low',MED:'Medium',HIGH:'High'})[k]})),()=>quality,v=>drive($('bQual'),()=>quality,v,4)),
     onoff('Cinematic menu',()=>FX.on,()=>{FX.on=!FX.on;lsSet('vsFx',FX.on?'1':'0');ovEl.dataset.fx=FX.on?'on':'off';camGoal(ovEl.dataset.pane)}),
@@ -210,7 +210,7 @@ $('pressAny').closest('.pane').addEventListener('pointerdown',()=>dismissTitle()
 /* ---- title screen ---- */
 let titleDone=false;
 function dismissTitle(){if(ovEl.dataset.pane!=='title')return;titleDone=true;audioInit();uiSnd('sel');goPane('main')}
-addEventListener('keydown',e=>{if(ovEl.dataset.pane==='title'&&!ovEl.hidden&&!e.metaKey&&!e.ctrlKey&&!e.altKey&&['Shift','Control','Alt','Meta','Tab'].indexOf(e.key)<0){e.preventDefault();e.stopPropagation();dismissTitle()}},true);
+addEventListener('keydown',e=>{if(KBE.open)return;if(ovEl.dataset.pane==='title'&&!ovEl.hidden&&!e.metaKey&&!e.ctrlKey&&!e.altKey&&['Shift','Control','Alt','Meta','Tab'].indexOf(e.key)<0){e.preventDefault();e.stopPropagation();dismissTitle()}},true);
 
 /* ---- input prompts that follow the last device used ---- */
 let inputMode=matchMedia('(pointer:coarse)').matches?'touch':'kb';ovEl.dataset.input=inputMode;
@@ -373,7 +373,7 @@ startGame=function(){if(loading)return;const args=arguments,self=this;
 function moveFocus(d){const f=focusables(),i=f.indexOf(document.activeElement);if(!f.length)return;f[i<0?(d>0?0:f.length-1):clamp(i+d,0,f.length-1)].focus();uiSnd('move')}
 function tabStep(d){const g=ovEl.dataset.pane==='set'?$('sTabs'):ovEl.dataset.pane==='over'?$('oTabs'):HG.on?$('hangar').querySelector('.hgTabs'):null;if(!g)return false;
   const bs=[...g.querySelectorAll('button')],i=bs.findIndex(b=>b.getAttribute('aria-selected')==='true'||b.classList.contains('on')||b.getAttribute('aria-pressed')==='true');bs[clamp((i<0?0:i)+d,0,bs.length-1)].click();uiSnd('move');return true}
-addEventListener('keydown',e=>{if(ovEl.hidden||HG.on||loading||ovEl.dataset.pane==='title')return;if(state!=='menu'&&state!=='over'&&state!=='paused')return;
+addEventListener('keydown',e=>{if(KBE.open||ovEl.hidden||HG.on||loading||ovEl.dataset.pane==='title')return;if(state!=='menu'&&state!=='over'&&state!=='paused')return;
   const t=e.target;if(t&&t.tagName==='INPUT'&&t.type!=='range')return;
   if(e.key==='ArrowDown'){e.preventDefault();e.stopPropagation();moveFocus(1)}
   else if(e.key==='ArrowUp'){e.preventDefault();e.stopPropagation();moveFocus(-1)}
@@ -412,3 +412,53 @@ ovEl.dataset.kind='menu';setSTab('ctl');
 {const skip=/[?&]notitle\b/.test(location.search)||lsGet('vsTitle','1')==='0';goPane(skip?'main':'title',{quiet:true});if(skip)titleDone=true}
 bgSync();uiSync();
 if(/[?&]test\b/.test(location.search))Object.assign(window.__vs||{},{setPane:goPane,uiSync,dismissTitle});
+
+/* ---- keyboard + mouse bindings editor ---- */
+const kbEl=document.createElement('div');kbEl.id='kbEdit';kbEl.hidden=true;kbEl.setAttribute('role','dialog');kbEl.setAttribute('aria-label','Key bindings');document.body.appendChild(kbEl);
+let kbStyle='kbm',kbWait=null;
+const KCN={Space:'Space',ShiftLeft:'L-Shift',ShiftRight:'R-Shift',ControlLeft:'L-Ctrl',ControlRight:'R-Ctrl',AltLeft:'L-Alt',AltRight:'R-Alt',BracketLeft:'[',BracketRight:']',Equal:'=',Minus:'-',Tab:'Tab',Enter:'Enter',Backquote:'`',Comma:',',Period:'.',Slash:'/',Semicolon:';',Quote:"'",Backslash:'\\',ArrowUp:'↑',ArrowDown:'↓',ArrowLeft:'←',ArrowRight:'→',CapsLock:'Caps'};
+const kcName=c=>!c?'—':KCN[c]||c.replace(/^Key|^Digit|^Numpad/,m=>m==='Numpad'?'Num ':'');
+const KB_ACT_NAME=Object.fromEntries(KB_ACTS.map(a=>[a[0],a[1]]));
+function kbOpen(){KBE.open=true;kbWait=null;kbStyle=KBM.on?'kbm':'kb';kbEl.hidden=false;kbRender()}
+function kbClose(){KBE.open=false;kbWait=null;kbEl.hidden=true;kbSave();uiSnd('back')}
+function kbRender(){
+  const m=KB.map[kbStyle];kbEl.innerHTML='';
+  const head=mk('div','kbHead','<h2>Key bindings</h2>');
+  const sw=mk('div','kbSw');for(const [k,t] of [['kb','Classic keys'],['kbm','Mouse mode']]){const b=mk('button','ghost'+(kbStyle===k?' on':''),t);b.type='button';b.addEventListener('click',()=>{kbWait=null;kbStyle=k;kbRender()});sw.appendChild(b)}
+  head.appendChild(sw);head.appendChild(mk('p','kbNote',kbStyle==='kbm'?'Mouse mode: the mouse flies; these keys do everything else. Arrow keys still roll and pitch.':'Classic keys: fly with the keyboard. Arrow keys also roll and pitch; Right-Shift / = and Right-Ctrl / - also move the throttle.'));
+  kbEl.appendChild(head);
+  const list=mk('div','kbList');let grp='';
+  for(const [a,label,g] of KB_ACTS){
+    if(g!==grp){grp=g;list.appendChild(mk('h3','grp',g))}
+    const row=mk('div','kbRow','<span class="lab">'+label+'</span>');
+    for(let i=0;i<2;i++){const waiting=kbWait&&kbWait.a===a&&kbWait.i===i;const b=mk('button','kbKey'+(waiting?' wait':''),waiting?'press a key…':kcName(m[a][i]));b.type='button';b.dataset.act=a;b.dataset.slot=i;
+      b.addEventListener('click',()=>{uiSnd('sel');kbWait={a,i};kbRender()});row.appendChild(b)}
+    list.appendChild(row)}
+  list.appendChild(mk('h3','grp','Mouse (mouse mode)'));
+  for(const [b,label] of [[0,'Left button'],[2,'Right button'],[1,'Middle button'],[3,'Side button (back)'],[4,'Side button (forward)']]){
+    const row=mk('div','kbRow','<span class="lab">'+label+'</span>');const sel=document.createElement('select');sel.dataset.btn=b;
+    for(const a of KB_MOUSE_ACTS){const o=document.createElement('option');o.value=a;o.textContent=a?KB_ACT_NAME[a]:'—';sel.appendChild(o)}
+    sel.value=KB.mouse[b]||'';sel.addEventListener('change',()=>{KB.mouse[b]=sel.value;kbSave()});row.appendChild(sel);list.appendChild(row)}
+  {const row=mk('div','kbRow','<span class="lab">Wheel</span>');const sel=document.createElement('select');sel.dataset.btn='wheel';
+    for(const [v,t] of [['throttle','Throttle'],['view','Cycle camera'],['none','Nothing']]){const o=document.createElement('option');o.value=v;o.textContent=t;sel.appendChild(o)}
+    sel.value=KB.wheel;sel.addEventListener('change',()=>{KB.wheel=sel.value;kbSave()});row.appendChild(sel);list.appendChild(row)}
+  {const row=mk('div','kbRow','<span class="lab">Mouse sensitivity</span>');const r=document.createElement('input');r.type='range';r.min=.3;r.max=3;r.step=.05;r.value=KB.msens;r.dataset.btn='msens';
+    const v=mk('span','kbVal',KB.msens.toFixed(2)+'×');r.addEventListener('input',()=>{KB.msens=+r.value;v.textContent=KB.msens.toFixed(2)+'×';kbSave()});row.appendChild(r);row.appendChild(v);list.appendChild(row)}
+  {const row=mk('div','kbRow','<span class="lab">Invert mouse up/down</span>');const b=mk('button','kbKey'+(KB.minv?' on':''),KB.minv?'On':'Off');b.type='button';b.dataset.btn='minv';b.addEventListener('click',()=>{KB.minv=!KB.minv;kbSave();kbRender()});row.appendChild(b);list.appendChild(row)}
+  kbEl.appendChild(list);
+  const foot=mk('div','kbFoot');
+  const rs=mk('button','ghost','Reset this style');rs.type='button';rs.addEventListener('click',()=>{kbReset(kbStyle);kbWait=null;kbSave();kbRender()});
+  const ra=mk('button','ghost','Reset everything');ra.type='button';ra.addEventListener('click',()=>{kbReset();kbWait=null;kbSave();kbRender()});
+  const dn=mk('button','','Done');dn.type='button';dn.id='kbDone';dn.addEventListener('click',kbClose);
+  foot.append(rs,ra,dn);kbEl.appendChild(foot);
+}
+addEventListener('keydown',e=>{
+  if(!KBE.open)return;e.preventDefault();e.stopPropagation();
+  if(!kbWait){if(e.code==='Escape')kbClose();return}
+  if(e.code==='Escape'){kbWait=null;kbRender();return}
+  const {a,i}=kbWait,m=KB.map[kbStyle];
+  if(e.code==='Backspace'||e.code==='Delete'){m[a][i]='';m[a]=m[a].filter((x,j)=>x||j<i);}
+  else{for(const [o] of KB_ACTS)if(o!==a)m[o]=m[o].filter(c=>c!==e.code);   // a key belongs to one action: taking it frees it elsewhere
+    const cur=m[a].slice();cur[i]=e.code;m[a]=cur.filter((x,j,arr)=>x&&arr.indexOf(x)===j)}
+  kbWait=null;kbRebuild();kbSave();kbRender();
+},true);

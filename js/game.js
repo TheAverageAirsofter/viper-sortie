@@ -3996,12 +3996,45 @@ function nextWave(){
   if(wave>=3&&ground.filter(g=>g.alive).length<wave-1){const a=heading+rand(-1,1),d=rand(12000,18000);spawnGround('sam',P.pos.x+Math.sin(a)*d,P.pos.z+Math.cos(a)*d);spawnGround('aaa',P.pos.x+Math.sin(a)*d+600,P.pos.z+Math.cos(a)*d)}
   message('WAVE '+wave+' · '+n+' BANDITS',2.4);
 }
+/* AI fighters take module damage like the player: wings, engine fire, controls, pilot. Missiles, rams and bombs (amt >= 5) usually destroy the jet outright. */
+const aiKill=(t,how,by)=>{if(t.team==='red')killEnemy(t,how,by);else killFriend(t,how)};
+function aiGunHit(t,amt,by){
+  const s=t.sys||(t.sys={wL:0,wR:0,eng:0,fireT:0,fatal:false,pilot:0,ctl:1,spin:0,by:false});s.by=by||s.by;let label='';
+  if(Math.random()<.03*amt*(1+3*s.pilot))return 'PILOT KILLED';
+  const r=Math.random();
+  if(r<.3){const side=Math.random()<.5?'wL':'wR';if(s[side]<1){s[side]=Math.min(1,s[side]+.12*amt+.05);if(s[side]>=1){s.spin=1;label='WING TORN OFF'}else label='WING DAMAGE'}}
+  else if(r<.42&&!s.eng){s.eng=1;s.fireT=9;s.fatal=Math.random()<.4;label='ENGINE FIRE'}
+  else if(r<.5&&s.ctl>.6){s.ctl=.55;label='CONTROLS DAMAGED'}
+  else if(r<.55&&s.pilot<1){s.pilot=Math.min(1,s.pilot+.5);label='PILOT WOUNDED'}
+  t.hp=Math.max(.3,3*(1-(.35*(s.wL+s.wR)+.3*(s.eng>0)+.2*s.pilot)));
+  return label;
+}
+function aiSystems(e,dt){   // per frame: fires burn out or spread, wings and controls limit the jet
+  const s=e.sys;if(!s||!e.alive)return;
+  if(e.gLim0==null)e.gLim0=e.gLim;
+  const wd=Math.max(s.wL,s.wR);
+  e.gLim=Math.max(3,e.gLim0*(1-.5*wd)*(s.ctl<1?.8:1));e.rollK=(1-.3*wd)*(s.ctl<1?.8:1);e.thrK=s.eng===2?.35:s.eng===1?.8:1;
+  if(s.eng===1){s.fireT-=dt;if(Math.random()<dt*10)puff(e.pos.x,e.pos.y,e.pos.z,e.vel.x*.2,e.vel.y*.2,e.vel.z*.2,.15,.15,.15,.7,4,10,2.5);
+    if(s.fireT<=0){if(s.fatal){aiKill(e,'FIRE',s.by);return}s.eng=2}}
+  if(wd>.25&&Math.random()<dt*8*wd)puff(e.pos.x,e.pos.y,e.pos.z,e.vel.x*.3,e.vel.y*.3,e.vel.z*.3,.2,.2,.2,.7,3,10,2);
+  if(s.spin){s.spin+=dt;e.obj.rotateZ(dt*3);if(s.spin>4.5)aiKill(e,'WING',s.by)}   // a wing off: the jet tumbles for a few seconds then breaks up
+}
 function hitAI(t,amt,how,byPlayer){
   if(!t.alive)return;
-  if(byPlayer&&!t.remote){t.hitBy=clock;if(t.hp-amt>0&&t.hp-amt<=35&&t.hp>35)scEvent('CRITICAL DAMAGE',30,'crit');else if(how==='GUNS')scEvent('HIT',3,'','hit');else scEvent('DIRECT HIT',20,'crit','dh')}
-  if(t.remote){if(byPlayer)netClaimHit(t,how==='GUNS'?4*amt:75,how);puff(t.pos.x,t.pos.y,t.pos.z,0,0,0,.3,.3,.3,.8,14,20,2);return} t.hp-=amt;
-  if(t.hp>0){addHole(t.obj,amt>3?4:1);puff(t.pos.x,t.pos.y,t.pos.z,0,0,0,.3,.3,.3,.8,14,20,2);if(t.kind==='fighter'){t.gLim=Math.max(4,(t.gLim||7)*.8);t.rollK=(t.rollK??1)*.85}if(byPlayer&&t.kind==='bomber')message('BOMBER HIT',.8);if(byPlayer&&clock-(t.fdT||-9)>1.5){t.fdT=clock;feed((t.hp<=1?'Critical hit: ':'Hit: ')+(AC_DEFS[t.type]?AC_DEFS[t.type].name:t.kind==='bomber'?'bomber':'target')+' ('+how.replace(' (WINGMAN)','').toLowerCase()+')','hit')}return}
-  if(t.team==='red')killEnemy(t,how,byPlayer); else killFriend(t,how);
+  if(t.remote){if(byPlayer){t.hitBy=clock;scEvent(how==='GUNS'?'HIT':'DIRECT HIT',how==='GUNS'?3:20,how==='GUNS'?'':'crit',how==='GUNS'?'hit':'dh');netClaimHit(t,how==='GUNS'?4*amt:75,how)}puff(t.pos.x,t.pos.y,t.pos.z,0,0,0,.3,.3,.3,.8,14,20,2);return}
+  if(t.kind==='fighter'&&!t.drone){   // (test drones keep the simple hit-point pool)
+    if(amt>=5&&(amt>=50||Math.random()<.85)){if(byPlayer){t.hitBy=clock;scEvent('DIRECT HIT',20,'crit','dh')}aiKill(t,how,byPlayer);return}
+    let label;
+    if(amt>=5){const s=t.sys||(t.sys={wL:0,wR:0,eng:0,fireT:0,fatal:false,pilot:0,ctl:1,spin:0,by:false});s.by=byPlayer||s.by;s[Math.random()<.5?'wL':'wR']=Math.min(1,.6+Math.random()*.4);if(!s.eng){s.eng=1;s.fireT=9;s.fatal=Math.random()<.4}if(s.wL>=1||s.wR>=1)s.spin=1;label='CRITICAL DAMAGE';t.hp=.6}
+    else{label=aiGunHit(t,amt,byPlayer);if(label==='PILOT KILLED'){if(byPlayer){t.hitBy=clock;scEvent('PILOT KILLED',30,'crit')}aiKill(t,how,byPlayer);return}}
+    addHole(t.obj,amt>3?4:1);puff(t.pos.x,t.pos.y,t.pos.z,0,0,0,.3,.3,.3,.8,14,20,2);
+    if(byPlayer){t.hitBy=clock;if(label)scEvent(label,25,'crit');else if(how==='GUNS')scEvent('HIT',3,'','hit');else scEvent('DIRECT HIT',20,'crit','dh')}
+    if(byPlayer&&clock-(t.fdT||-9)>1.5){t.fdT=clock;feed((label?'Critical hit: ':'Hit: ')+(AC_DEFS[t.type]?AC_DEFS[t.type].name:'target')+(label?' · '+label.toLowerCase():'')+' ('+how.replace(' (WINGMAN)','').toLowerCase()+')','hit')}
+    return}
+  if(byPlayer){t.hitBy=clock;if(how==='GUNS')scEvent('HIT',3,'','hit');else scEvent('DIRECT HIT',20,'crit','dh')}
+  t.hp-=amt;
+  if(t.hp>0){addHole(t.obj,amt>3?4:1);puff(t.pos.x,t.pos.y,t.pos.z,0,0,0,.3,.3,.3,.8,14,20,2);if(byPlayer&&t.kind==='bomber')message('BOMBER HIT',.8);if(byPlayer&&clock-(t.fdT||-9)>1.5){t.fdT=clock;feed((t.hp<=1?'Critical hit: ':'Hit: ')+(t.kind==='bomber'?'bomber':'target')+' ('+how.replace(' (WINGMAN)','').toLowerCase()+')','hit')}return}
+  aiKill(t,how,byPlayer);
 }
 function killEnemy(e,how,byPlayer=true){
   if(!e.alive)return; e.alive=false; scene.remove(e.obj); explode(e.pos,true); spawnWreck(e);
@@ -4091,14 +4124,14 @@ function kbmAim(v){KBM.aim=!!v;KBM.last=0;KBM.x=KBM.y=0;try{localStorage.setItem
 function kbmSet(v){KBM.on=!!v;KBM.x=KBM.y=0;try{localStorage.setItem('vsKbm',v?'1':'0')}catch(e){}if(!v&&document.pointerLockElement)document.exitPointerLock()}
 const kbmLock=()=>{if(KBM.on&&document.pointerLockElement!==glCanvas)try{const r=glCanvas.requestPointerLock();if(r&&r.catch)r.catch(()=>{})}catch(e){}};
 glCanvas.addEventListener('contextmenu',e=>{if(KBM.on)e.preventDefault()});
-glCanvas.addEventListener('wheel',e=>{if(KBM.on&&state==='play'){e.preventDefault();setThr(thrSet-Math.sign(e.deltaY)*.05)}},{passive:false});
-document.addEventListener('mousemove',e=>{if(KBM.on&&state==='play'&&document.pointerLockElement===glCanvas){const k=.0032*(SENS[sens]||1);if(KBM.aim){KBM.az-=e.movementX*k*1.1;KBM.el=clamp(KBM.el-e.movementY*k*1.1,-1.2,1.2);KBM.idle=0;return}KBM.x=clamp(KBM.x+e.movementX*k,-1,1);KBM.y=clamp(KBM.y+e.movementY*k,-1,1);KBM.idle=0}});
+glCanvas.addEventListener('wheel',e=>{if(KBM.on&&state==='play'&&KB.wheel!=='none'){e.preventDefault();if(KB.wheel==='throttle')setThr(thrSet-Math.sign(e.deltaY)*.05);else if(KB.wheel==='view'&&(performance.now()-(KB.wt||0))>250){KB.wt=performance.now();cycleView()}}},{passive:false});
+document.addEventListener('mousemove',e=>{if(KBM.on&&state==='play'&&document.pointerLockElement===glCanvas){const k=.0032*(SENS[sens]||1)*KB.msens, my=e.movementY*(KB.minv?-1:1);if(KBM.aim){KBM.az-=e.movementX*k*1.1;KBM.el=clamp(KBM.el-my*k*1.1,-1.2,1.2);KBM.idle=0;return}KBM.x=clamp(KBM.x+e.movementX*k,-1,1);KBM.y=clamp(KBM.y+my*k,-1,1);KBM.idle=0}});
 document.addEventListener('pointerlockchange',()=>{if(KBM.on&&!document.pointerLockElement&&state==='play')pause()});
 const stickBase=$('stickBase'),stickKnob=$('stickKnob'),stickHint=$('stickHint');
 function resetStick(){stick.id=null;stick.x=0;stick.y=0;stickBase.hidden=true;stickKnob.style.transform=''}
 glCanvas.addEventListener('pointerdown',e=>{
   if(state!=='play')return;
-  if(KBM.on&&e.pointerType==='mouse'){e.preventDefault();audioInit();kbmLock();if(e.button===0)gunHeld=true;else if(e.button===2)fire9=true;else if(e.button===1)fire120=true;return}
+  if(KBM.on&&e.pointerType==='mouse'){e.preventDefault();audioInit();kbmLock();const a=KB.mouse[e.button];if(a)actDown(a);return}
   if(e.clientX>W*.62){ // right side of the screen: look around (cockpit head / chase orbit)
     if(look.id!==null)return; e.preventDefault();
     look.id=e.pointerId;look.ox=e.clientX;look.oy=e.clientY;look.y0=look.yaw;look.p0=look.pitch;
@@ -4122,7 +4155,7 @@ glCanvas.addEventListener('pointermove',e=>{
   if(l>R){dx*=R/l;dy*=R/l}
   stick.x=dx/R;stick.y=dy/R; stickKnob.style.transform=`translate(${dx}px,${dy}px)`;
 });
-['pointerup','pointercancel'].forEach(t=>glCanvas.addEventListener(t,e=>{if(KBM.on&&e.pointerType==='mouse'&&e.button===0)gunHeld=false;if(e.pointerId===stick.id)resetStick();if(e.pointerId===look.id)look.id=null}));
+['pointerup','pointercancel'].forEach(t=>glCanvas.addEventListener(t,e=>{if(KBM.on&&e.pointerType==='mouse'){const a=KB.mouse[e.button];if(a)actUp(a)}if(e.pointerId===stick.id)resetStick();if(e.pointerId===look.id)look.id=null}));
 function holdBtn(el,on,off){
   el.addEventListener('pointerdown',e=>{e.preventDefault();audioInit();try{el.setPointerCapture(e.pointerId)}catch(_){};el.classList.add('on');on()});
   ['pointerup','pointercancel','lostpointercapture'].forEach(t=>el.addEventListener(t,()=>{el.classList.remove('on');off&&off()}));
@@ -4152,39 +4185,51 @@ holdBtn($('bBrake'),()=>brake=true,()=>brake=false);
 holdBtn($('b9'),()=>fire9=true);
 holdBtn($('b120'),()=>fire120=true);
 $('bPause').addEventListener('click',()=>pause());
+/* ---------------- rebindable keyboard + mouse controls (Settings > Controls > Bindings) ----------------
+   Every action has up to two keys per control style ('kb' = classic keys, 'kbm' = mouse mode); the mouse buttons and wheel are bound separately.
+   Arrow keys always roll and pitch, Right Shift / = and Right Ctrl / - always move the throttle, Esc always pauses. */
+const KB_ACTS=[['pitchPull','Pitch up (pull)','Flight'],['pitchPush','Pitch down (push)','Flight'],['rollL','Roll left','Flight'],['rollR','Roll right','Flight'],['yawL','Rudder left','Flight'],['yawR','Rudder right','Flight'],
+  ['thrUp','Throttle up','Flight'],['thrDn','Throttle down','Flight'],['brake','Speed brake','Flight'],['gear','Landing gear','Flight'],['auto','Autopilot','Flight'],
+  ['gun','Guns','Weapons'],['aim9','Short-range missile','Weapons'],['aim120','Long-range missile','Weapons'],['agRel','Air-to-ground release','Weapons'],['agNext','Next air-to-ground weapon','Weapons'],
+  ['lock','Lock nearest target','Sensors'],['nextTgt','Next target','Sensors'],['radar','Radar panel','Sensors'],['radarMode','Radar mode','Sensors'],['acm','ACM mode','Sensors'],['rangeUp','Radar range up','Sensors'],['rangeDn','Radar range down','Sensors'],
+  ['flare','Flares','Defence'],['chaff','Chaff','Defence'],['ecm','Jammer','Defence'],['decoy','Towed decoy','Defence'],
+  ['view','Cycle camera','Other'],['map','Tactical map','Other'],['pause','Pause','Other']];
+const KB_COMMON={thrUp:['ShiftLeft','Equal'],thrDn:['ControlLeft','Minus'],brake:['KeyB'],gear:['KeyL'],auto:['KeyU'],gun:['Space'],aim9:['KeyF'],aim120:['KeyR'],agRel:['KeyH'],agNext:['KeyN'],lock:['KeyT'],nextTgt:['KeyY'],radar:['KeyX'],radarMode:['KeyM'],acm:['KeyG'],rangeUp:['BracketRight'],rangeDn:['BracketLeft'],flare:['KeyZ'],chaff:['KeyC'],ecm:['KeyJ'],decoy:['KeyK'],view:['KeyV'],map:['Tab'],pause:['KeyP']};
+const KB_DEF={kb:Object.assign({},KB_COMMON,{pitchPull:['KeyS'],pitchPush:['KeyW'],rollL:['KeyA'],rollR:['KeyD'],yawL:['KeyQ'],yawR:['KeyE']}),
+  kbm:Object.assign({},KB_COMMON,{pitchPull:[],pitchPush:[],rollL:[],rollR:[],yawL:['KeyA','KeyQ'],yawR:['KeyD','KeyE'],thrUp:['KeyW','ShiftLeft'],thrDn:['KeyS','ControlLeft']})};
+const KB_MOUSE_ACTS=['','gun','aim9','aim120','flare','chaff','lock','nextTgt','brake','view','gear','agRel','ecm','decoy'];
+const KB={map:{kb:{},kbm:{}},rev:{kb:{},kbm:{}},mouse:{0:'gun',1:'aim120',2:'aim9',3:'',4:''},wheel:'throttle',msens:1,minv:false};
+function kbReset(mode){for(const m of mode?[mode]:['kb','kbm'])for(const [a] of KB_ACTS)KB.map[m][a]=(KB_DEF[m][a]||[]).slice();if(!mode){KB.mouse={0:'gun',1:'aim120',2:'aim9',3:'',4:''};KB.wheel='throttle';KB.msens=1;KB.minv=false}kbRebuild()}
+function kbRebuild(){for(const m of ['kb','kbm']){const r=KB.rev[m]={};for(const [a] of KB_ACTS)for(const c of KB.map[m][a])if(c)r[c]=a}}
+function kbSave(){try{localStorage.setItem('vsKeys',JSON.stringify({map:KB.map,mouse:KB.mouse,wheel:KB.wheel,msens:KB.msens,minv:KB.minv}))}catch(e){}}
+kbReset();
+try{const v=JSON.parse(localStorage.getItem('vsKeys')||'null');if(v){for(const m of ['kb','kbm'])if(v.map&&v.map[m])for(const [a] of KB_ACTS)if(Array.isArray(v.map[m][a]))KB.map[m][a]=v.map[m][a].filter(x=>typeof x==='string').slice(0,2);
+  if(v.mouse)Object.assign(KB.mouse,v.mouse);if(v.wheel)KB.wheel=v.wheel;if(+v.msens>0)KB.msens=+v.msens;KB.minv=!!v.minv;kbRebuild()}}catch(e){}
+const KB_ALIAS={rollL:['ArrowLeft'],rollR:['ArrowRight'],pitchPush:['ArrowUp'],pitchPull:['ArrowDown'],thrUp:['ShiftRight','Equal'],thrDn:['ControlRight','Minus']};
+const kbHeld=a=>{const m=KB.map[KBM.on?'kbm':'kb'][a];for(const c of m)if(keys[c])return true;const al=KB_ALIAS[a];if(al)for(const c of al)if(keys[c])return true;return false};
+function actDown(a){
+  switch(a){
+    case 'gun':gunHeld=true;break;case 'aim9':fire9=true;break;case 'aim120':fire120=true;break;case 'brake':brake=true;break;
+    case 'view':cycleView();break;case 'gear':$('bGear').click();break;case 'lock':quickLock();break;case 'nextTgt':stepTarget();break;
+    case 'acm':$('rAcm').click();break;case 'radarMode':$('rMode').click();break;case 'rangeUp':$('rUp').click();break;case 'rangeDn':$('rDn').click();break;
+    case 'radar':$('bRdr').click();break;case 'map':mapStep();break;case 'flare':if(!CM.flrHeld){CM.flrHeld=true;CM.flrT=0}break;case 'chaff':if(!CM.chfHeld){CM.chfHeld=true;CM.chfT=0}break;
+    case 'ecm':toggleECM();break;case 'decoy':deployDecoy();break;case 'agRel':agRelease();break;case 'agNext':agNext();break;case 'auto':$('cAuto').click();break;case 'pause':pause();break;
+  }
+}
+function actUp(a){if(a==='gun')gunHeld=false;else if(a==='brake')brake=false;else if(a==='flare')CM.flrHeld=false;else if(a==='chaff')CM.chfHeld=false}
+const KBE={open:false};   // the bindings editor (menu.js) captures keys while it is open
 addEventListener('keydown',e=>{
+  if(KBE.open)return;
   keys[e.code]=true; audioInit();
+  const a=KB.rev[KBM.on?'kbm':'kb'][e.code];
   if(state==='play'){
-    if(e.code==='Space'){gunHeld=true;e.preventDefault()}
-    if(e.code==='KeyF')fire9=true;
-    if(e.code==='KeyR')fire120=true;
-    if(e.code==='KeyB')brake=true;
-    if(e.code==='KeyV')cycleView();
-    if(e.code==='KeyL'&&!e.repeat)$('bGear').click();
-    if(e.code==='KeyT')quickLock();
-    if(e.code==='KeyY')stepTarget();
-    if(e.code==='KeyG')$('rAcm').click();
-    if(e.code==='KeyM')$('rMode').click();
-    if(e.code==='BracketRight')$('rUp').click();
-    if(e.code==='BracketLeft')$('rDn').click();
-    if(e.code==='KeyX')$('bRdr').click();
-    if(e.code==='Tab'){e.preventDefault();mapStep()}
-    if(e.code==='KeyZ'&&!CM.flrHeld){CM.flrHeld=true;CM.flrT=0}
-    if(e.code==='KeyC'&&!CM.chfHeld){CM.chfHeld=true;CM.chfT=0}
-    if(e.code==='KeyJ')toggleECM();
-    if(e.code==='KeyK')deployDecoy();
-    if(e.code==='KeyH')agRelease();
-    if(e.code==='KeyN')agNext();
-    if(e.code==='KeyU')$('cAuto').click();
-    if(e.code==='KeyP'||e.code==='Escape')pause();
-  } else if(state==='paused'&&(e.code==='KeyP'||e.code==='Escape')) resume();
+    if(a&&!e.repeat){if(a==='gun'||a==='map')e.preventDefault();actDown(a)}
+    if(e.code==='Escape')pause();
+  } else if(state==='paused'&&(a==='pause'||e.code==='Escape')) resume();
 });
 addEventListener('keyup',e=>{
   keys[e.code]=false;
-  if(e.code==='Space')gunHeld=false;
-  if(e.code==='KeyB')brake=false;
-  if(e.code==='KeyZ')CM.flrHeld=false;
-  if(e.code==='KeyC')CM.chfHeld=false;
+  const a=KB.rev[KBM.on?'kbm':'kb'][e.code];if(a)actUp(a);
 });
 addEventListener('blur',()=>{for(const k in keys)keys[k]=false;gunHeld=false;brake=false});
 document.addEventListener('visibilitychange',()=>{if(document.hidden&&state==='play')pause()});
@@ -4413,8 +4458,8 @@ function updatePlayer(dt,auto){
     throttle=.8;
   } else {
     const km=KBM.on;
-    const kx=km?(keys.ArrowRight?1:0)-(keys.ArrowLeft?1:0):(keys.KeyD||keys.ArrowRight?1:0)-(keys.KeyA||keys.ArrowLeft?1:0);
-    const ky=km?(keys.ArrowDown?1:0)-(keys.ArrowUp?1:0):(keys.KeyS||keys.ArrowDown?1:0)-(keys.KeyW||keys.ArrowUp?1:0);
+    const kx=(kbHeld('rollR')?1:0)-(kbHeld('rollL')?1:0);
+    const ky=(kbHeld('pitchPull')?1:0)-(kbHeld('pitchPush')?1:0);
     if(km&&KBM.aim){   // mouse aim: the cursor is a point in the world and the flight computer rolls and pulls the nose onto it (War Thunder's mouse-aim mode)
       const now=performance.now();if(now-KBM.last>500){KBM.az=Math.atan2(P.fwd.x,P.fwd.z);KBM.el=Math.asin(clamp(P.fwd.y,-1,1))}KBM.last=now;
       KBM.ad.set(Math.sin(KBM.az)*Math.cos(KBM.el),Math.sin(KBM.el),Math.cos(KBM.az)*Math.cos(KBM.el));
@@ -4425,15 +4470,14 @@ function updatePlayer(dt,auto){
       KBM.ap=clamp(up*3,-1,1)*(1-s2)+clamp(a*2.5,0,1)*clamp(Math.cos(rc)*1.5,0,1)*s2;
     } else KBM.ar=KBM.ap=0;
     if(km){KBM.idle+=dt;if(KBM.idle>.4){const d=.5*dt;KBM.x=Math.abs(KBM.x)<d?0:KBM.x-Math.sign(KBM.x)*d;KBM.y=Math.abs(KBM.y)<d?0:KBM.y-Math.sign(KBM.y)*d}   // the virtual stick drifts home once the mouse rests
-      if(keys.KeyW)setThr(thrSet+.5*dt);if(keys.KeyS)setThr(thrSet-.5*dt)}
+    }
     const tx=tilt.on&&stick.id===null?tilt.x:0, ty=tilt.on&&stick.id===null?tilt.y:0;
     rollIn=clamp(shape(stick.x)+kx+tx+shape(GP.x)+(km&&!KBM.aim?KBM.x:0),-1,1);
     const sy=clamp(shape(stick.y)+ky+ty-shape(GP.y)*-1+(km&&!KBM.aim?KBM.y:0),-1,1); pitchIn=invert?-sy:sy;
     if(km&&KBM.aim){rollIn=clamp(rollIn+KBM.ar,-1,1);pitchIn=clamp(pitchIn+KBM.ap,-1,1)}
-    yawIn=clamp((keys.KeyE?1:0)-(keys.KeyQ?1:0)+(km?(keys.KeyD?1:0)-(keys.KeyA?1:0):0),-1,1);
-    // keyboard throttle: Shift/= up, Ctrl/- down
-    if(keys.ShiftLeft||keys.ShiftRight||keys.Equal)setThr(thrSet+.5*dt);
-    if(keys.ControlLeft||keys.ControlRight||keys.Minus)setThr(thrSet-.5*dt);
+    yawIn=(kbHeld('yawR')?1:0)-(kbHeld('yawL')?1:0);
+    if(kbHeld('thrUp'))setThr(thrSet+.5*dt);
+    if(kbHeld('thrDn'))setThr(thrSet-.5*dt);
     // engine spool: ~3 s idle→MIL, afterburner lights faster
     let cmd=thrSet;
     // G-LOC: pilot is out, hands off the stick
@@ -4561,6 +4605,7 @@ const dummy=new THREE.Object3D();
 function updateAI(e,dt){
   axes(e); e.flareCd-=dt; e.chaffCd-=dt; e.mslCd-=dt; e.retgtT-=dt;
   if(e.kind!=='fighter'){updateHeavy(e,dt);return}
+  if(e.sys){aiSystems(e,dt);if(!e.alive)return}
   if(e.drone){steer(e,dt,_s4.copy(e.fwd).setY(0).normalize(),1,.8);return}
   if(e.retgtT<=0||!e.tgt||!e.tgt.alive){e.retgtT=1.5;e.tgt=pickTarget(e)}
   const tg=e.tgt, live=state==='play';
@@ -6505,7 +6550,7 @@ function tipsHide(){$('tips').hidden=true;try{localStorage.setItem('vsTips','1')
 $('tips').addEventListener('pointerdown',e=>{e.stopPropagation();e.preventDefault();tipsHide()});
 $('bTips').addEventListener('click',()=>{try{localStorage.removeItem('vsTips')}catch(e){};$('bStart').click()});   // launch, then the guide shows
 $('bStart').addEventListener('click',()=>{let seen=false;try{seen=!!localStorage.getItem('vsTips')}catch(e){}
-  if(!seen)setTimeout(()=>{if(state==='play'&&$('tips').hidden)tipsShow()},700)});
+  if(!seen){let n=0;const t=setInterval(()=>{if(++n>60||!$('tips').hidden){clearInterval(t);return}if(state==='play'){clearInterval(t);setTimeout(()=>{if(state==='play'&&$('tips').hidden)tipsShow()},700)}},250)}});   // the briefing and loading screen come first, so wait for the sortie to begin
 
 /* ---------- local leaderboard (per mission, top 10) and share ---------- */
 function lbGet(m){try{const a=JSON.parse(localStorage.getItem('vsLb_'+m)||'[]');return Array.isArray(a)?a.filter(x=>x&&+x.s>0):[]}catch(e){return[]}}
@@ -6526,10 +6571,10 @@ const _careerAward=careerAward;
 careerAward=function(){lbAdd();return _careerAward.apply(this,arguments)};
 
 /* ---------- test hook (only with ?test in the URL) ---------- */
-if(/[?&]test\b/.test(location.search))window.__vs={playerGunHit,wingHit,BT,die,btRespawn,TMAP,mapStep,KBM,SC,damageSystem,hitAI,killEnemy,setThr,HEAT,explode,puff,camera,LT,townLights,flashLt,P,fly,dlz,flyout,AC_DEFS,feed,WAR,WAR_V,warBuild,warSpawn,warModules,warDie,warFlags,updateWar,warAlive,buildJet,PLAYER_COLORS,M2,V3,atm,clamp,lbAdd,showOverlay:k=>showOverlay(k),setScore:(n,k)=>{score=n;kills=k},get state(){return state},get enemies(){return enemies},missiles:()=>missiles.filter(m=>m.on),setAC:id=>{AC=AC_DEFS[id];applyAC()},wt:{   // weapon-test hooks: a clean sky, one drone, scripted launches
+if(/[?&]test\b/.test(location.search))window.__vs={KB,kbRebuild,playerGunHit,wingHit,BT,die,btRespawn,TMAP,mapStep,KBM,SC,damageSystem,hitAI,killEnemy,setThr,HEAT,explode,puff,camera,LT,townLights,flashLt,P,fly,dlz,flyout,AC_DEFS,feed,WAR,WAR_V,warBuild,warSpawn,warModules,warDie,warFlags,updateWar,warAlive,buildJet,PLAYER_COLORS,M2,V3,atm,clamp,lbAdd,showOverlay:k=>showOverlay(k),setScore:(n,k)=>{score=n;kills=k},get state(){return state},get enemies(){return enemies},missiles:()=>missiles.filter(m=>m.on),setAC:id=>{AC=AC_DEFS[id];applyAC()},wt:{   // weapon-test hooks: a clean sky, one drone, scripted launches
   begin:id=>{AC=AC_DEFS[id];applyAC();startGame();return AC.id},
   clear:()=>{waveClearT=1e9;for(const e of enemies){e.alive=false;scene.remove(e.obj)}enemies.length=0;P.pos.set(0,6000,0);P.vel.set(0,0,250);throttle=.7;return state},
-  target:(type,dz,away,speed)=>{const e=spawnFighter('red',type,new V3(0,6000,dz),new V3(0,6000,dz+(away?9999:-9999)),{ir:0,rdr:0,speed:speed||220});e.drone=true;return e.id},
+  target:(type,dz,away,speed)=>{const e=spawnFighter('red',type,new V3(0,P.pos.y,dz),new V3(0,P.pos.y,dz+(away?9999:-9999)),{ir:0,rdr:0,speed:speed||220});e.drone=true;return e.id},
   lock:()=>{if(enemies[0])lockOn(enemies[0])},fire:w=>{if(w==='9X')fire9=true;else fire120=true},gun:on=>{gunHeld=on},
   missiles:()=>missiles.filter(m=>m.on),
   st:()=>{const e=enemies[0];return{can9,can120,aim9:P.aim9,aim120:P.aim120,rounds:P.rounds,alive:!!(e&&e.alive),hp:e?e.hp:0,msl:missiles.filter(m=>m.on).length,stt:!!R.stt,sttAcq:R.acqT,d:e?e.pos.distanceTo(P.pos):0,msg:$('msg')?$('msg').textContent:''}}},M2dims:()=>{const o={};for(const id in M2){const S=M2[id],zs=S.fus.map(f=>f[0]).concat(S.noz.map(n=>n[2]-n[4]/2)),L=Math.max(...zs)-Math.min(...zs),sp=2*Math.max(...S.wings.flatMap(w=>w.st.map(q=>q.x)));const k=M2K[id]||[1,1,1];o[id]=[+(L*k[2]).toFixed(2),+(sp*k[0]).toFixed(2)]}return o},ROSTER_IDS,restart:()=>startGame(),spawnAll:()=>{let n=0;for(const id of FIGHTERS){spawnFighter('red',id,P.pos.clone().add(new V3(rand(-4000,4000),rand(-300,300),rand(8000,14000))),P.pos);n++}return n},tableRows:id=>({gear:!!GEAR_SPEC[id],snd:!!ENG_SND[id],hp:!!JET_HP[id],rcs:RCS[id]!=null,paint:!!PAINT[id]||!!(AC_DEFS[id].model),band:!!BANDITS[id],fighter:FIGHTERS.indexOf(id)>=0}),get preset(){return preset},PRESETS,get daily(){return daily},dailyAdd,endTest:o=>{deathCause=o.cause||'win';score=o.score||0;kills=o.kills||0;missionT=o.t||90;P.alive=o.alive!==false;P.rescued=!!o.rescued;state='over';careerAward();showOverlay('over')},get AC(){return AC}};
@@ -6909,7 +6954,7 @@ const qr=$('qRows');
     mRow('Team',()=>[{v:'A',t:'Auto'},{v:'B',t:'Blue'},{v:'R',t:'Red'}],()=>NET.teamPref,v=>drive($('bTeam'),()=>NET.teamPref,v,3),{hidden:()=>NET.mode!=='TEAMS'}))}
 
 /* ---- SETTINGS: tabs, rows and a description area ---- */
-const SDESC={'Mouse':'Aim: the cursor is a point in the world and the flight computer rolls and pulls onto it. Stick: the mouse deflects the stick directly.','Input':'Keyboard + mouse: the mouse flies (click to capture, Esc to release), left button guns, right button AIM-9, middle button AIM-120, wheel or W/S throttle, A/D rudder.','Stick':'Fly with the on-screen stick, or tilt the phone.','Pull back':'Whether pulling the stick back raises the nose (flight-sim) or lowers it.','Sensitivity':'How far the jet turns for a given stick movement.','Dead zone':'Ignore small stick movements near the centre.',
+const SDESC={'Key bindings':'Rebind every keyboard key and mouse button, set mouse sensitivity and invert, and choose what the wheel does.','Mouse':'Aim: the cursor is a point in the world and the flight computer rolls and pulls onto it. Stick: the mouse deflects the stick directly.','Input':'Keyboard + mouse: the mouse flies (click to capture, Esc to release), left button guns, right button AIM-9, middle button AIM-120, wheel or W/S throttle, A/D rudder.','Stick':'Fly with the on-screen stick, or tilt the phone.','Pull back':'Whether pulling the stick back raises the nose (flight-sim) or lowers it.','Sensitivity':'How far the jet turns for a given stick movement.','Dead zone':'Ignore small stick movements near the centre.',
   'Vibration':'Haptic feedback for guns, hits and warnings.','Move buttons':'Drag the on-screen buttons where you want them, then save.','Controls guide':'Launch a sortie and show the controls guide on top.',
   'Graphics':'Lower this if the frame rate drops. Auto-adjusts when the game is struggling.','Cinematic menu':'Film grain, letterbox bars, light flare and the slow camera drift behind the menu.','Kill cam':'A short replay when you shoot something down.',
   'Sound':'All game sound.','Voice warnings':'Spoken cockpit warnings: pull up, missile, bingo fuel.','UI sounds':'Quiet clicks as you move through the menu.',
@@ -6928,7 +6973,7 @@ let sTab='ctl';
     mSlide('Sensitivity',Object.keys(SENS).length,()=>Object.keys(SENS).indexOf(sens),i=>drive($('bSens'),()=>sens,Object.keys(SENS)[i],4),i=>Object.keys(SENS)[i]),
     mSlide('Dead zone',DZS.length,()=>dz,i=>drive($('bDz'),()=>dz,i,6),i=>Math.round(DZS[i]*100)+' %'),
     onoff('Vibration',()=>hapticsOn,()=>$('bHaptic').click()),
-    mAct('Move buttons','Edit',()=>$('bLayout').click()),mAct('Controls guide','Show',()=>$('bTips').click()));
+    mAct('Key bindings','Edit',()=>kbOpen()),mAct('Move buttons','Edit',()=>$('bLayout').click()),mAct('Controls guide','Show',()=>$('bTips').click()));
   pane.dsp.append(
     mRow('Graphics',()=>Object.keys(QUALS).map(k=>({v:k,t:({LOW:'Low',MED:'Medium',HIGH:'High'})[k]})),()=>quality,v=>drive($('bQual'),()=>quality,v,4)),
     onoff('Cinematic menu',()=>FX.on,()=>{FX.on=!FX.on;lsSet('vsFx',FX.on?'1':'0');ovEl.dataset.fx=FX.on?'on':'off';camGoal(ovEl.dataset.pane)}),
@@ -6999,7 +7044,7 @@ $('pressAny').closest('.pane').addEventListener('pointerdown',()=>dismissTitle()
 /* ---- title screen ---- */
 let titleDone=false;
 function dismissTitle(){if(ovEl.dataset.pane!=='title')return;titleDone=true;audioInit();uiSnd('sel');goPane('main')}
-addEventListener('keydown',e=>{if(ovEl.dataset.pane==='title'&&!ovEl.hidden&&!e.metaKey&&!e.ctrlKey&&!e.altKey&&['Shift','Control','Alt','Meta','Tab'].indexOf(e.key)<0){e.preventDefault();e.stopPropagation();dismissTitle()}},true);
+addEventListener('keydown',e=>{if(KBE.open)return;if(ovEl.dataset.pane==='title'&&!ovEl.hidden&&!e.metaKey&&!e.ctrlKey&&!e.altKey&&['Shift','Control','Alt','Meta','Tab'].indexOf(e.key)<0){e.preventDefault();e.stopPropagation();dismissTitle()}},true);
 
 /* ---- input prompts that follow the last device used ---- */
 let inputMode=matchMedia('(pointer:coarse)').matches?'touch':'kb';ovEl.dataset.input=inputMode;
@@ -7162,7 +7207,7 @@ startGame=function(){if(loading)return;const args=arguments,self=this;
 function moveFocus(d){const f=focusables(),i=f.indexOf(document.activeElement);if(!f.length)return;f[i<0?(d>0?0:f.length-1):clamp(i+d,0,f.length-1)].focus();uiSnd('move')}
 function tabStep(d){const g=ovEl.dataset.pane==='set'?$('sTabs'):ovEl.dataset.pane==='over'?$('oTabs'):HG.on?$('hangar').querySelector('.hgTabs'):null;if(!g)return false;
   const bs=[...g.querySelectorAll('button')],i=bs.findIndex(b=>b.getAttribute('aria-selected')==='true'||b.classList.contains('on')||b.getAttribute('aria-pressed')==='true');bs[clamp((i<0?0:i)+d,0,bs.length-1)].click();uiSnd('move');return true}
-addEventListener('keydown',e=>{if(ovEl.hidden||HG.on||loading||ovEl.dataset.pane==='title')return;if(state!=='menu'&&state!=='over'&&state!=='paused')return;
+addEventListener('keydown',e=>{if(KBE.open||ovEl.hidden||HG.on||loading||ovEl.dataset.pane==='title')return;if(state!=='menu'&&state!=='over'&&state!=='paused')return;
   const t=e.target;if(t&&t.tagName==='INPUT'&&t.type!=='range')return;
   if(e.key==='ArrowDown'){e.preventDefault();e.stopPropagation();moveFocus(1)}
   else if(e.key==='ArrowUp'){e.preventDefault();e.stopPropagation();moveFocus(-1)}
@@ -7201,4 +7246,54 @@ ovEl.dataset.kind='menu';setSTab('ctl');
 {const skip=/[?&]notitle\b/.test(location.search)||lsGet('vsTitle','1')==='0';goPane(skip?'main':'title',{quiet:true});if(skip)titleDone=true}
 bgSync();uiSync();
 if(/[?&]test\b/.test(location.search))Object.assign(window.__vs||{},{setPane:goPane,uiSync,dismissTitle});
+
+/* ---- keyboard + mouse bindings editor ---- */
+const kbEl=document.createElement('div');kbEl.id='kbEdit';kbEl.hidden=true;kbEl.setAttribute('role','dialog');kbEl.setAttribute('aria-label','Key bindings');document.body.appendChild(kbEl);
+let kbStyle='kbm',kbWait=null;
+const KCN={Space:'Space',ShiftLeft:'L-Shift',ShiftRight:'R-Shift',ControlLeft:'L-Ctrl',ControlRight:'R-Ctrl',AltLeft:'L-Alt',AltRight:'R-Alt',BracketLeft:'[',BracketRight:']',Equal:'=',Minus:'-',Tab:'Tab',Enter:'Enter',Backquote:'`',Comma:',',Period:'.',Slash:'/',Semicolon:';',Quote:"'",Backslash:'\\',ArrowUp:'↑',ArrowDown:'↓',ArrowLeft:'←',ArrowRight:'→',CapsLock:'Caps'};
+const kcName=c=>!c?'—':KCN[c]||c.replace(/^Key|^Digit|^Numpad/,m=>m==='Numpad'?'Num ':'');
+const KB_ACT_NAME=Object.fromEntries(KB_ACTS.map(a=>[a[0],a[1]]));
+function kbOpen(){KBE.open=true;kbWait=null;kbStyle=KBM.on?'kbm':'kb';kbEl.hidden=false;kbRender()}
+function kbClose(){KBE.open=false;kbWait=null;kbEl.hidden=true;kbSave();uiSnd('back')}
+function kbRender(){
+  const m=KB.map[kbStyle];kbEl.innerHTML='';
+  const head=mk('div','kbHead','<h2>Key bindings</h2>');
+  const sw=mk('div','kbSw');for(const [k,t] of [['kb','Classic keys'],['kbm','Mouse mode']]){const b=mk('button','ghost'+(kbStyle===k?' on':''),t);b.type='button';b.addEventListener('click',()=>{kbWait=null;kbStyle=k;kbRender()});sw.appendChild(b)}
+  head.appendChild(sw);head.appendChild(mk('p','kbNote',kbStyle==='kbm'?'Mouse mode: the mouse flies; these keys do everything else. Arrow keys still roll and pitch.':'Classic keys: fly with the keyboard. Arrow keys also roll and pitch; Right-Shift / = and Right-Ctrl / - also move the throttle.'));
+  kbEl.appendChild(head);
+  const list=mk('div','kbList');let grp='';
+  for(const [a,label,g] of KB_ACTS){
+    if(g!==grp){grp=g;list.appendChild(mk('h3','grp',g))}
+    const row=mk('div','kbRow','<span class="lab">'+label+'</span>');
+    for(let i=0;i<2;i++){const waiting=kbWait&&kbWait.a===a&&kbWait.i===i;const b=mk('button','kbKey'+(waiting?' wait':''),waiting?'press a key…':kcName(m[a][i]));b.type='button';b.dataset.act=a;b.dataset.slot=i;
+      b.addEventListener('click',()=>{uiSnd('sel');kbWait={a,i};kbRender()});row.appendChild(b)}
+    list.appendChild(row)}
+  list.appendChild(mk('h3','grp','Mouse (mouse mode)'));
+  for(const [b,label] of [[0,'Left button'],[2,'Right button'],[1,'Middle button'],[3,'Side button (back)'],[4,'Side button (forward)']]){
+    const row=mk('div','kbRow','<span class="lab">'+label+'</span>');const sel=document.createElement('select');sel.dataset.btn=b;
+    for(const a of KB_MOUSE_ACTS){const o=document.createElement('option');o.value=a;o.textContent=a?KB_ACT_NAME[a]:'—';sel.appendChild(o)}
+    sel.value=KB.mouse[b]||'';sel.addEventListener('change',()=>{KB.mouse[b]=sel.value;kbSave()});row.appendChild(sel);list.appendChild(row)}
+  {const row=mk('div','kbRow','<span class="lab">Wheel</span>');const sel=document.createElement('select');sel.dataset.btn='wheel';
+    for(const [v,t] of [['throttle','Throttle'],['view','Cycle camera'],['none','Nothing']]){const o=document.createElement('option');o.value=v;o.textContent=t;sel.appendChild(o)}
+    sel.value=KB.wheel;sel.addEventListener('change',()=>{KB.wheel=sel.value;kbSave()});row.appendChild(sel);list.appendChild(row)}
+  {const row=mk('div','kbRow','<span class="lab">Mouse sensitivity</span>');const r=document.createElement('input');r.type='range';r.min=.3;r.max=3;r.step=.05;r.value=KB.msens;r.dataset.btn='msens';
+    const v=mk('span','kbVal',KB.msens.toFixed(2)+'×');r.addEventListener('input',()=>{KB.msens=+r.value;v.textContent=KB.msens.toFixed(2)+'×';kbSave()});row.appendChild(r);row.appendChild(v);list.appendChild(row)}
+  {const row=mk('div','kbRow','<span class="lab">Invert mouse up/down</span>');const b=mk('button','kbKey'+(KB.minv?' on':''),KB.minv?'On':'Off');b.type='button';b.dataset.btn='minv';b.addEventListener('click',()=>{KB.minv=!KB.minv;kbSave();kbRender()});row.appendChild(b);list.appendChild(row)}
+  kbEl.appendChild(list);
+  const foot=mk('div','kbFoot');
+  const rs=mk('button','ghost','Reset this style');rs.type='button';rs.addEventListener('click',()=>{kbReset(kbStyle);kbWait=null;kbSave();kbRender()});
+  const ra=mk('button','ghost','Reset everything');ra.type='button';ra.addEventListener('click',()=>{kbReset();kbWait=null;kbSave();kbRender()});
+  const dn=mk('button','','Done');dn.type='button';dn.id='kbDone';dn.addEventListener('click',kbClose);
+  foot.append(rs,ra,dn);kbEl.appendChild(foot);
+}
+addEventListener('keydown',e=>{
+  if(!KBE.open)return;e.preventDefault();e.stopPropagation();
+  if(!kbWait){if(e.code==='Escape')kbClose();return}
+  if(e.code==='Escape'){kbWait=null;kbRender();return}
+  const {a,i}=kbWait,m=KB.map[kbStyle];
+  if(e.code==='Backspace'||e.code==='Delete'){m[a][i]='';m[a]=m[a].filter((x,j)=>x||j<i);}
+  else{for(const [o] of KB_ACTS)if(o!==a)m[o]=m[o].filter(c=>c!==e.code);   // a key belongs to one action: taking it frees it elsewhere
+    const cur=m[a].slice();cur[i]=e.code;m[a]=cur.filter((x,j,arr)=>x&&arr.indexOf(x)===j)}
+  kbWait=null;kbRebuild();kbSave();kbRender();
+},true);
 })();

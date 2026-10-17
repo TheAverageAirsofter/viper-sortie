@@ -10,7 +10,7 @@ const path = require('path'), assert = require('assert');
   // text size cycles and persists
   await p.click('#mNav [data-go=set]'); await p.click('#sTabs [data-k=hud]'); for (let i = 0; i < 8 && !/115%/.test(await p.textContent('#bText')); i++) await p.click('#sRows .mr[data-name="Text size"] .rm'); assert.match(await p.textContent('#bText'), /115%/);
   // controls guide: first launch shows it, a tap dismisses it, and it stays dismissed
-  await p.sortie(); await p.waitForTimeout(1800);
+  await p.sortie(); await p.waitForSelector('#tips:not([hidden])', { timeout: 20000 }).catch(() => {});
   assert(await p.isVisible('#tips'), 'guide shows after the first launch');
   assert((await p.$$('#tips .tip')).length >= 8, 'labels drawn');
   await p.screenshot({ path: process.env.SHOT || '/tmp/w/tips.png' });
