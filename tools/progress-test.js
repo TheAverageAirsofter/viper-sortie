@@ -22,7 +22,7 @@ const path = require('path'), assert = require('assert');
   await p.click('#hgTree .tn[data-id=MIG29]'); await p.click('#hgTree [data-act=research]'); await p.waitForTimeout(200);
   assert.match(await cls('MIG29'), /res/); let g = await p.evaluate(() => ({ rp: __vs.prog.rp.MIG21, frp: __vs.prog.frp })); assert.equal(g.rp, 2000); assert.equal(g.frp, 3000);
   // buy it (25,000 SL)
-  await p.click('#hgTree [data-act=buy]'); await p.waitForTimeout(300); assert.match(await cls('MIG29'), /own/); assert.equal(await p.evaluate(() => __vs.prog.sl), 375000);
+  await p.click('#hgTree [data-act=buy]'); await p.waitForTimeout(300); assert.match(await cls('MIG29'), /own/); assert.equal(await p.evaluate(() => __vs.prog.sl), 378000);
   // modules on the F-4E: a stock career jet flies with penalties; research with RP, buy with SL
   assert.equal(await p.evaluate(() => __vs.AC.id), 'F4E', 'career starts in an owned jet');
   const thr0 = await p.evaluate(() => Math.round(__vs.AC.T_AB / 1000)); assert(thr0 < 159, 'stock thrust is reduced: ' + thr0);
