@@ -2,7 +2,7 @@
 const REC={t:0,acc:0,frames:[],events:[],msl:new Map()}; let mslSeq=0;
 function recReset(){REC.t=0;REC.acc=0;REC.frames=[];REC.events=[];REC.msl=new Map();mslSeq=0}
 function fmtT(t){t=Math.max(0,t|0);return Math.floor(t/60)+':'+String(t%60).padStart(2,'0')}
-function recEvent(text){REC.events.push({t:REC.t,text})}
+function recEvent(text){REC.events.push({t:REC.t,text});feed(text)}
 function tgtLabel(t){if(!t)return 'nothing (no lock)';if(t.kind==='sam')return 'a SAM site';if(t===P)return 'you';if(t.kind==='bomber')return 'a bomber';if(t.kind==='transport')return 'the C-130';if(t.team==='blue')return 'your wingman';return 'bandit '+t.id+' ('+(AC_DEFS[t.type]?AC_DEFS[t.type].name:'?')+')'}
 function recLaunch(m,who,target){m.rid=++mslSeq;
   REC.msl.set(m.rid,{id:m.rid,t:REC.t,who,name:m.name,target:tgtLabel(target),res:null,why:''});
@@ -36,7 +36,8 @@ const TEAMN={B:'Blue',R:'Red'};
 // auto team: join whichever side has fewer pilots
 function pickTeam(){if(NET.teamPref!=='A')return NET.teamPref;let b=0,r=0;for(const [pe,x] of NET.roster)if(pe!==NET.me&&x.md==='TEAMS'){if(x.tm==='B')b++;else if(x.tm==='R')r++}return b<=r?'B':'R'}
 const isMate=pr=>NET.mode==='TEAMS'&&pr.md==='TEAMS'&&pr.tm===NET.team;
-function myPresence(extra){return Object.assign({ac:AC.id,md:NET.mode,tm:NET.mode==='TEAMS'?NET.team:null,sk:NET.kills,sd:NET.deaths,a:0},extra||{})}
+const sqTag=()=>(typeof squadron==='string'&&squadron?squadron.replace(/[^A-Za-z0-9]/g,'').slice(0,4).toUpperCase():'');   // squadron tag shown before your name online
+function myPresence(extra){return Object.assign({ac:AC.id,sq:sqTag(),md:NET.mode,tm:NET.mode==='TEAMS'?NET.team:null,sk:NET.kills,sd:NET.deaths,a:0},extra||{})}
 // lobby: join the room from the menu so you can see who's there before launching
 async function netLobby(){
   if(mission!=='ONLINE'||state!=='menu'&&state!=='over')return; await capsReady; if(!roomApi){$('lobNote').textContent='Online play only works inside the Claude app.';renderRoster();return}
@@ -44,12 +45,12 @@ async function netLobby(){
     if(NET.room&&NET.room.name!=='vs-'+code){await NET.room.leave().catch(()=>{});NET.room=null;NET.roster.clear()}
     if(!NET.room){NET.room=await roomApi.join('vs-'+code);NET.room.onPeers(netPeers,()=>{NET.room=null})}
     NET.team=pickTeam(); await NET.room.presence(myPresence()); netPeers({peers:NET.room.peers(),joined:[],left:[],updated:[]})}catch(e){$('lobNote').textContent='Could not join the room.'}}
-function rosterRows(){const rows=[];for(const [peer,x] of NET.roster){rows.push({peer,me:peer===NET.me,name:peer===NET.me?(NET.myName||'You')+' (you)':(NET.names.get(x.by)||'Pilot'),ac:x.ac,tm:x.md==='TEAMS'?x.tm:null,k:x.sk||0,d:x.sd||0,st:x.a?'flying':'lobby'})}
+function rosterRows(){const rows=[];for(const [peer,x] of NET.roster){rows.push({peer,me:peer===NET.me,name:peer===NET.me?(NET.myName||'You')+' (you)':(NET.names.get(x.by)||'Pilot'),ac:x.ac,tm:x.md==='TEAMS'?x.tm:null,k:x.sk||0,d:x.sd||0,st:x.a?'flying':'lobby',sq:typeof x.sq==='string'?x.sq.replace(/[^A-Za-z0-9]/g,'').slice(0,4):''})}
   rows.sort((a,b)=>(a.tm||'Z').localeCompare(b.tm||'Z')||b.k-a.k);return rows}
 function sbHtml(){const rows=rosterRows();let tb=0,tr=0;for(const r of rows){if(r.tm==='B')tb+=r.k;if(r.tm==='R')tr+=r.k}
   const esc=t=>String(t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c]);
   let h='<tr><th>Pilot</th><th>Jet</th><th>Team</th><th>K</th><th>D</th><th></th></tr>';
-  for(const r of rows)h+=`<tr class="${r.me?'me':''}"><td>${esc(r.name)}</td><td>${esc(AC_DEFS[r.ac]?AC_DEFS[r.ac].name:'—')}</td><td class="${r.tm==='B'?'tB':r.tm==='R'?'tR':''}">${r.tm?TEAMN[r.tm]:'FFA'}</td><td>${r.k}</td><td>${r.d}</td><td>${r.st}</td></tr>`;
+  for(const r of rows)h+=`<tr class="${r.me?'me':''}"><td>${esc((r.sq?'['+r.sq+'] ':'')+r.name)}</td><td>${esc(AC_DEFS[r.ac]?AC_DEFS[r.ac].name:'—')}</td><td class="${r.tm==='B'?'tB':r.tm==='R'?'tR':''}">${r.tm?TEAMN[r.tm]:'FFA'}</td><td>${r.k}</td><td>${r.d}</td><td>${r.st}</td></tr>`;
   if(rows.some(r=>r.tm))h+=`<tr><td colspan="6"><span class="tB">Blue ${tb}</span> · <span class="tR">Red ${tr}</span></td></tr>`;
   return h}
 function renderRoster(){const h=sbHtml();$('lobTbl').innerHTML=h;if(!$('sbBox').hidden)$('sbTbl').innerHTML=h;$('lobRoom').textContent=NET.code||roomName()}
@@ -67,10 +68,11 @@ function roomName(){const v=(($('roomCode').value||'arena').toLowerCase().replac
 function netStop(){NET.active=false;if(NET.room)NET.room.presence({a:0,m:[],h:[]}).catch(()=>{});
   for(const r of NET.remotes.values())if(r.obj)scene.remove(r.obj);NET.remotes.clear();for(const g of ghostMsl.values())kill(g);ghostMsl.clear()}
 async function netStart(){
-  netStop(); NET.code=roomName(); NET.active=true; NET.hits=[]; NET.pend.clear(); NET.lastHitBy=null;
+  netStop(); NET.code=roomName(); NET.active=true; NET.won=null; NET.kills=0; NET.deaths=0; NET.hits=[]; NET.pend.clear(); NET.lastHitBy=null;
   // spawn somewhere on a 9 km ring around the arena centre, facing in
   NET.team=pickTeam(); const a=NET.mode==='TEAMS'?(NET.team==='B'?Math.PI:0)+rand(-.5,.5):Math.random()*Math.PI*2; P.pos.set(Math.sin(a)*9000,rand(4500,6500),Math.cos(a)*9000);
   playerJet.lookAt(0,P.pos.y,0); axes(P); P.vel.copy(P.fwd).multiplyScalar(240); qPrev.copy(playerJet.quaternion); camSnap=true;
+  if(NET.mode==='TEAMS')btInitOnline();   // team matches are zone battles with a lineup
   await capsReady;
   if(!roomApi){message('ONLINE ONLY WORKS INSIDE THE CLAUDE APP · FLYING SOLO',3.5);return}
   try{
@@ -100,7 +102,7 @@ function netRemote(p){
   if(!NET.active||!(state==='play'||state==='dead'||state==='paused'))return;
   let r=NET.remotes.get(p.peer);
   if(!pr.ac||!AC_DEFS[pr.ac]||!pr.a){
-    if(r&&r.alive){if(pr.k===NET.me&&!r.mate){kills++;NET.kills++;score+=300;message('SPLASH · '+(r.name||'PILOT').toUpperCase(),1.8);recEvent('You shot down '+(r.name||'another pilot')+' ('+AC_DEFS[r.type].name+')')}
+    if(r&&r.alive){if(pr.k===NET.me&&!r.mate){kills++;NET.kills++;if(BT.online)BT.sp+=2;score+=300;message('SPLASH · '+(r.name||'PILOT').toUpperCase(),1.8);recEvent('You shot down '+(r.name||'another pilot')+' ('+AC_DEFS[r.type].name+')')}
       else recEvent((r.name||'A pilot')+' went down');netRemove(p.peer,true)}
     return;
   }
@@ -121,10 +123,9 @@ function netRemote(p){
   r.fl=pr.fl||0; r.ch=pr.ch||0;
   // hits other pilots claim on me
   for(const h of (pr.h||[])){const key=p.peer+':'+h[0]; if(NET.seenHits.has(key))continue; NET.seenHits.add(key);
-    if(h[1]===NET.me&&state==='play'&&P.alive&&!(r&&r.mate)){const dmg=clamp(+h[2]||0,0,120);P.hp-=dmg;   // claims are client-reported, so bound what one claim can do
+    if(h[1]===NET.me&&state==='play'&&P.alive&&!(r&&r.mate)){const dmg=clamp(+h[2]||0,0,120);   // claims are client-reported, so bound what one claim can do
     hurtT=dmg>40?.8:.35;shake=dmg>40?1.2:.4;sndHit();buzz(dmg>40?[120,60,200]:40);
-      NET.lastHitBy=p.peer; if(dmg>40){message('MISSILE HIT',1.2);damageSystem(2)}else if(Math.random()<.1)damageSystem(1);
-      if(P.hp<=0)die(dmg>40?'missile':'shot')}}
+      NET.lastHitBy=p.peer; if(dmg>40)playerMissileHit();else playerGunHit(dmg/4)}}
   // their missiles in flight
   const live=new Set();
   for(const mm of (pr.m||[])){const key=p.peer+':'+mm[0]; live.add(key); let g=ghostMsl.get(key);
@@ -134,8 +135,13 @@ function netRemote(p){
   for(const [k,g] of ghostMsl)if(k.startsWith(p.peer+':')&&!live.has(k)){explode(g.m.position,false);kill(g);ghostMsl.delete(k)}
 }
 function netClaimHit(t,dmg,how){NET.pend.set(t.peer,(NET.pend.get(t.peer)||0)+dmg); if(how!=='GUNS')message('HIT · '+(t.name||'PILOT').toUpperCase(),1)}
+const NET_WIN=20;   // first team to this many kills takes the match
+function netTeamScore(){let b=0,r=0;for(const x of rosterRows()){if(x.tm==='B')b+=x.k;else if(x.tm==='R')r+=x.k}return {B:b,R:r}}
+function netScoreCheck(){if(NET.mode!=='TEAMS'||NET.won)return;const s=netTeamScore(),t=s.B>=NET_WIN?'B':s.R>=NET_WIN?'R':null;
+  if(t){NET.won=t;message(TEAMN[t].toUpperCase()+' TEAM WINS · '+s.B+' - '+s.R,5);recEvent(TEAMN[t]+' team won '+s.B+' - '+s.R)}}
 function updateNet(dt){
   if(!NET.active)return;
+  netScoreCheck();
   const now=performance.now();
   for(const r of NET.remotes.values()){ if(!r.alive)continue;
     const age=Math.min(.6,(now-r.netT)/1000); _s1.copy(r.netP).addScaledVector(r.netV,age);
@@ -153,7 +159,7 @@ function updateNet(dt){
   const msl=[]; for(const m of missiles)if(m.on&&msl.length<8){const pp=m.m.position;
     msl.push([m.rid,m.type,r1(pp.x),r1(pp.y),r1(pp.z),r1(m.vel.x),r1(m.vel.y),r1(m.vel.z),m.target&&m.target.remote?m.target.peer:null,m.t<SPEC[m.type].burn?1:0])}
   const alive=state==='play'&&P.alive;
-  NET.room.presence({ac:AC.id,md:NET.mode,tm:NET.mode==='TEAMS'?NET.team:null,sk:NET.kills,sd:NET.deaths,a:alive?1:0,p:[r1(P.pos.x),r1(P.pos.y),r1(P.pos.z)],q:[+q.x.toFixed(4),+q.y.toFixed(4),+q.z.toFixed(4),+q.w.toFixed(4)],
+  NET.room.presence({ac:AC.id,sq:sqTag(),md:NET.mode,tm:NET.mode==='TEAMS'?NET.team:null,sk:NET.kills,sd:NET.deaths,a:alive?1:0,p:[r1(P.pos.x),r1(P.pos.y),r1(P.pos.z)],q:[+q.x.toFixed(4),+q.y.toFixed(4),+q.z.toFixed(4),+q.w.toFixed(4)],
     v:[r1(P.vel.x),r1(P.vel.y),r1(P.vel.z)],n:+P.n.toFixed(1),g:alive&&gunHeld&&P.rounds>0?1:0,
     l:R.stt&&R.stt.remote&&R.sttSrc==='RDR'?R.stt.peer:null,e:CM.ecm?1:0,fl:CM.flDisp||0,ch:CM.chDisp||0,m:msl,h:NET.hits,k:alive?null:NET.lastHitBy}).catch(()=>{});
 }
@@ -271,7 +277,7 @@ function careerAward(){
   career.xp+=xp;career.sorties++;career.kills+=kills;if(!P.alive&&!P.rescued)career.deaths++;if(win)career.wins++;
   const after=rankIdx(career.xp), newJets=Object.keys(UNLOCK).filter(k=>UNLOCK[k]>before&&UNLOCK[k]<=after).map(k=>AC_DEFS[k].name);
   const pg=progAward(xp,win,kills,P.alive||!!P.rescued,!!P.rescued,lines.filter(l=>l[1]));
-  const dt=[dailyAdd('k',kills),dailyAdd('m',missionT/60)].filter(Boolean);
+  const dt=[dailyAdd('k',kills),dailyAdd('m',missionT/60),weeklyAdd('k',kills),win?weeklyAdd('w',1):null,weeklyAdd('g',sortieGround)].filter(Boolean);passAdd(20+kills*5+(win?30:0));
   lastAward={xp,promoted:after>before?RANKS[after][1]:null,newJets:[],prog:pg,daily:dt};
   saveCareer(); syncCareerUI();
 }
@@ -282,7 +288,7 @@ function buzz(p){try{if(hapticsOn&&navigator.vibrate)navigator.vibrate(p)}catch(
 let hapticsOn=true;
 function updateCombat(dt){
   for(const e of enemies) if(e.alive&&!e.remote) updateAI(e,dt);
-  updateNet(dt); updateGround(dt); updateTanker(dt); updateAG(dt); updateGCI(dt);
+  updateNet(dt); updateGround(dt); updateWar(dt); updateTanker(dt); updateAG(dt); updateGCI(dt);
   for(const f of friends) if(f.alive&&!f.remote) updateAI(f,dt);
   updateWeapons(dt);
   updateCM(dt);

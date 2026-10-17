@@ -94,7 +94,7 @@ function heatPass(){
   const rad=clamp(ppm*20,.04,.5*S)/S*2*.5;                                                     // shimmer radius as a fraction of the patch (patch = S px)
   if(ppm*20<14)return;                                                                        // too far away to see
   const cx=pa.x*DPR, cy=(H-pa.y)*DPR, bw=W*DPR, bh=H*DPR, x0=clamp(Math.round(cx-S/2),0,Math.max(0,bw-S)), y0=clamp(Math.round(cy-S/2),0,Math.max(0,bh-S));
-  HEAT.v2.set(x0,y0); renderer.copyFramebufferToTexture(HEAT.v2,HEAT.tex);
+  HEAT.v2.set(x0,y0); renderer.copyFramebufferToTexture(HEAT.tex,HEAT.v2);
   let dx=(pb.x-pa.x),dy=-(pb.y-pa.y),l=Math.hypot(dx,dy); if(l<2){dx=0;dy=1}else{dx/=l;dy/=l}
   const u=HEAT.mat.uniforms; u.t.value=clock; u.k.value=HEAT.k; u.rad.value=Math.min(.45,rad); u.dir.value.set(dx,dy);
   HEAT.cam.right=bw; HEAT.cam.top=bh; HEAT.cam.updateProjectionMatrix(); HEAT.quad.scale.set(S,S,1); HEAT.quad.position.set(x0+S/2,y0+S/2,0);
@@ -125,3 +125,58 @@ const eBullets=makePool(160,tracerGeo,new THREE.MeshBasicMaterial({color:0xff6a4
 const mslGeo=new THREE.CylinderGeometry(.13,.13,3,6).rotateX(Math.PI/2);
 const missiles=makePool(8,mslGeo,new THREE.MeshStandardMaterial({color:0xf2f2ee,flatShading:true}));
 
+
+/* ---------- post-processing (Medium and High): HDR scene target, bloom, filmic highlight roll-off, grade and vignette ----------
+   The scene is drawn into a half-float target so additive glows (sun, afterburners, explosions, flares) can exceed 1 and bloom; a few dual-Kawase mips
+   build the glow and one composite pass adds it with a gentle S-curve, split-tone grade, a touch of edge fringing and a vignette. Needs WebGL2 and float targets;
+   anything else (and Low quality) keeps the plain direct render. Tests skip it unless the page has &post. */
+const POST={ok:false,fail:false,w:0,h:0,rt:null,mips:[],scene:null,cam:null,quad:null,on:true};
+POST.pref=null;try{POST.pref=localStorage.getItem('vsPost')}catch(e){}
+POST.on=POST.pref!=='0';   // unset: only High quality runs it (the full-screen passes cost a lot on phones); '1' forces it on Medium too
+const POST_TEST=/[?&]test\b/.test(location.search)&&!/[?&]post\b/.test(location.search);
+const postActive=()=>POST.on&&!POST_TEST&&!POST.fail&&QUALS[quality].fx>0&&(QUALS[quality].fx>1||POST.pref==='1');
+function postInit(){
+  if(POST.scene)return true;
+  try{
+    const ext=renderer.extensions;
+    if(!renderer.capabilities.isWebGL2||!(ext.has('EXT_color_buffer_float')||ext.has('EXT_color_buffer_half_float'))){POST.fail=true;return false}
+    POST.scene=new THREE.Scene();POST.cam=new THREE.OrthographicCamera(-1,1,1,-1,0,1);
+    const tri=new THREE.BufferGeometry();tri.setAttribute('position',new THREE.Float32BufferAttribute([-1,-1,0,3,-1,0,-1,3,0],3));tri.setAttribute('uv',new THREE.Float32BufferAttribute([0,0,2,0,0,2],2));
+    const VS='varying vec2 vUv;void main(){vUv=uv;gl_Position=vec4(position.xy,0.,1.);}';
+    const mk=(fs,uniforms,extra)=>new THREE.ShaderMaterial(Object.assign({vertexShader:VS,fragmentShader:fs,uniforms,depthTest:false,depthWrite:false},extra||{}));
+    const HEAD='uniform sampler2D tex;uniform vec2 px;varying vec2 vUv;vec3 s(vec2 o){return texture2D(tex,vUv+o*px).rgb;}';
+    POST.mBright=mk(HEAD+'uniform float thr,knee;void main(){vec3 c=(s(vec2(-1.,-1.))+s(vec2(1.,-1.))+s(vec2(-1.,1.))+s(vec2(1.,1.)))*.25;float l=max(max(c.r,c.g),c.b);float q=clamp(l-thr+knee,0.,2.*knee);q=q*q/(4.*knee+1e-4);gl_FragColor=vec4(c*(max(q,l-thr)/max(l,1e-4)),1.);}',
+      {tex:{value:null},px:{value:new THREE.Vector2()},thr:{value:.96},knee:{value:.3}});
+    POST.mDown=mk(HEAD+'void main(){vec3 c=texture2D(tex,vUv).rgb*4.+s(vec2(-1.,-1.))+s(vec2(1.,-1.))+s(vec2(-1.,1.))+s(vec2(1.,1.));gl_FragColor=vec4(c/8.,1.);}',{tex:{value:null},px:{value:new THREE.Vector2()}});
+    POST.mUp=mk(HEAD+'uniform float w;void main(){vec3 c=(s(vec2(-1.,-1.))+s(vec2(1.,-1.))+s(vec2(-1.,1.))+s(vec2(1.,1.))+s(vec2(0.,-1.5))+s(vec2(0.,1.5))+s(vec2(-1.5,0.))+s(vec2(1.5,0.)))*.125;gl_FragColor=vec4(c*w,1.);}',
+      {tex:{value:null},px:{value:new THREE.Vector2()},w:{value:1}},{blending:THREE.AdditiveBlending,transparent:true});
+    POST.mComp=mk('uniform sampler2D tex,bloom;uniform float bk,vig,sat;uniform vec2 px;varying vec2 vUv;'+
+      'void main(){vec2 d=vUv-.5;float r2=dot(d,d);vec3 c=texture2D(tex,vUv).rgb;c.r=texture2D(tex,vUv+d*r2*.012).r;c.b=texture2D(tex,vUv-d*r2*.012).b;'+   // edge fringing
+      'c+=texture2D(bloom,vUv).rgb*bk;'+
+      'vec3 over=max(c-1.,0.);c=min(c,vec3(1.))+over/(1.+over);'+                                                                                          // highlight roll-off: hot cores keep a bright shoulder
+      'c=clamp(c,0.,1.);c=mix(c,c*c*(3.-2.*c),.22);'+                                                                                                      // gentle S-curve
+      'float l=dot(c,vec3(.299,.587,.114));c=mix(vec3(l),c,sat);c+=vec3(-.012,.004,.016)*(1.-l)+vec3(.016,.007,-.012)*l*l;'+                                  // split tone: cool shadows, warm highlights
+      'c*=1.-vig*smoothstep(.28,.95,length(d)*1.55);gl_FragColor=vec4(c,1.);}',
+      {tex:{value:null},bloom:{value:null},px:{value:new THREE.Vector2()},bk:{value:.4},vig:{value:.24},sat:{value:1.07}});
+    POST.quad=new THREE.Mesh(tri,POST.mComp);POST.quad.frustumCulled=false;POST.scene.add(POST.quad);POST.ok=true;return true
+  }catch(e){POST.fail=true;return false}}
+function postSize(){
+  const sz=renderer.getDrawingBufferSize(new THREE.Vector2()),w=Math.max(2,sz.x|0),h=Math.max(2,sz.y|0);
+  if(POST.rt&&w===POST.w&&h===POST.h)return;
+  POST.w=w;POST.h=h;if(POST.rt)POST.rt.dispose();POST.mips.forEach(m=>m.dispose());POST.mips=[];
+  POST.rt=new THREE.WebGLRenderTarget(w,h,{type:THREE.HalfFloatType,samples:QUALS[quality].fx>1?4:0,depthBuffer:true,minFilter:THREE.LinearFilter,magFilter:THREE.LinearFilter});
+  const n=QUALS[quality].fx>1?5:4;let mw=w>>1,mh=h>>1;
+  for(let i=0;i<n;i++){POST.mips.push(new THREE.WebGLRenderTarget(Math.max(2,mw),Math.max(2,mh),{type:THREE.HalfFloatType,depthBuffer:false,minFilter:THREE.LinearFilter,magFilter:THREE.LinearFilter}));mw>>=1;mh>>=1}}
+const postPass=(mat,src,dst)=>{mat.uniforms.tex.value=src.texture;if(mat.uniforms.px)mat.uniforms.px.value.set(1/src.width,1/src.height);POST.quad.material=mat;renderer.setRenderTarget(dst);renderer.render(POST.scene,POST.cam)};
+// draw `scn` (and the cockpit when asked) through the pipeline to the screen; returns false when post is off so the caller renders directly
+function postRender(scn,cam,cockpit){
+  if(!postActive()||!postInit())return false;
+  postSize();const R=renderer;
+  R.setRenderTarget(POST.rt);R.clear();R.render(scn,cam);
+  if(cockpit){R.clearDepth();R.render(cockScene,cockCam)}
+  const M=POST.mips;postPass(POST.mBright,POST.rt,M[0]);
+  for(let i=1;i<M.length;i++)postPass(POST.mDown,M[i-1],M[i]);
+  for(let i=M.length-1;i>0;i--){POST.mUp.uniforms.w.value=i===1?1:.9;postPass(POST.mUp,M[i],M[i-1])}
+  const u=POST.mComp.uniforms;u.bloom.value=M[0].texture;u.bk.value=state==='menu'||HG.on?.5:.34;
+  POST.quad.material=POST.mComp;u.tex.value=POST.rt.texture;R.setRenderTarget(null);R.render(POST.scene,POST.cam);
+  return true}

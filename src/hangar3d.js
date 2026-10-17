@@ -90,7 +90,8 @@ function hgEnter(){if(hgSaved)return;if(!hgScene)hgScene=hgBuild();
 function hgRefresh(){if(!hgSaved)return;
   const sp=(typeof M2!=='undefined'&&M2[AC.id]&&M2[AC.id].L)||16, span=(S=>S?Math.max(...S.wings.map(w=>w.st[w.st.length-1].x))*2:12)(typeof M2!=='undefined'&&M2[AC.id]);
   hgBuild.blob.scale.set(span*1.25,1,sp*1.2);hgBuild.blob.position.z=HG_JZ;
-  const lad=hgBuild.ladder;lad.position.set(-1.45,GEAR_H-.1,HG_JZ+AC.eye[2]);lad.rotation.set(0,0,-.32);
+  const lad=hgBuild.ladder,SC=typeof M2!=='undefined'&&M2[AC.id]&&M2[AC.id].canopy,th=.3,topY=GEAR_H+(SC?SC[1]:.7)-.12,len=topY/Math.cos(th),topX=-((SC?SC[2]:.5)+.1);   // base on the floor, top on the canopy rail
+  lad.scale.set(1,len/3.2,1);lad.rotation.set(0,0,-th);lad.position.set(topX-len*Math.sin(th),0,HG_JZ+(SC?SC[0]-.3:AC.eye[2]));
   if(pFlame)pFlame.scale.set(.01,.01,.01);setAB(playerJet,false);P.gearT=1;hgSign()}
 function hgLeave(){if(!hgSaved)return;const s=hgSaved;hgSaved=null;hgScene.remove(playerJet);scene.add(playerJet);
   P.pos.copy(s.pos);playerJet.quaternion.copy(s.q);P.vel.copy(s.vel);P.onGround=s.og;P.ci=s.ci;throttle=s.thr;setGear(s.gear);P.gearT=s.gearT;axes(P);camSnap=true}

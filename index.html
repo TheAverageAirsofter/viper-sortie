@@ -22,6 +22,7 @@
   <div id="stickHint">DRAG<br>TO FLY</div>
   <div id="stickBase" hidden><div id="stickKnob"></div></div>
   <button class="btn" id="bGear" aria-label="Landing gear">GEAR<small id="nGear">UP</small></button>
+  <button class="btn" id="bFlaps" aria-label="Flaps">FLAPS<small id="nFlaps">UP</small></button>
   <button class="btn" id="bBrake" aria-label="Speed brake">BRK</button>
   <button class="btn" id="bRdr" aria-label="Radar panel">RDR</button>
   <button class="btn" id="bLock" aria-label="Radar lock">LOCK</button>
@@ -38,7 +39,7 @@
     <button class="cmb" id="cWing" type="button" aria-label="Wingman command" hidden>WING<small id="nWing">ENG</small></button>
   </div>
   <div id="rdr" hidden>
-    <div class="rTop"><button id="rMode" type="button">RWS</button><button id="rAz" type="button">A6</button><button id="rAcm" type="button">ACM</button></div>
+    <div class="rTop"><button id="rMap" type="button" aria-label="Tactical map">MAP</button><button id="rMode" type="button">RWS</button><button id="rSub" type="button" aria-label="Radar search sub-mode: pulse-Doppler, moving target indication, basic search">PD</button><button id="rAz" type="button">A6</button><button id="rAcm" type="button">ACM</button></div>
     <div class="rBody">
       <div class="rSide"><button id="rUp" type="button" aria-label="Increase range">▲</button><span id="rRng">20</span><button id="rDn" type="button" aria-label="Decrease range">▼</button><button id="rStep" type="button" aria-label="Next target">STEP</button></div>
       <canvas id="rScope" aria-label="Radar scope, tap a contact to lock"></canvas>
@@ -54,6 +55,8 @@
   <button class="btn" id="b9" aria-label="Fire AIM-9X">9X<small id="c9">2</small></button>
   <button class="btn" id="bAg" aria-label="Release air-to-ground weapon" hidden>AG<small id="cAg">0</small></button>
   <button class="btn" id="bAgN" aria-label="Next ground target" hidden>TGT</button>
+  <button class="btn" id="bSight" aria-label="Sight mode: standard, ballistic computer, CCRP" hidden>STD</button>
+  <button class="btn" id="bWpn" aria-label="Next air-to-ground weapon" hidden>WPN</button>
   <button class="btn" id="bGun" aria-label="Fire gun">GUN<small id="cGun">500</small></button>
   <button class="btn" id="bPause" aria-label="Pause">II</button>
   <button class="btn" id="bEject" aria-label="Eject" hidden>EJECT</button>
@@ -73,6 +76,9 @@
         <div class="row">
       <button class="ghost" id="bAC" type="button">Aircraft: F-16C Block 50</button>
       <button class="ghost" id="b120D" type="button" hidden>Missiles: AIM-120C</button>
+      <button class="ghost" id="bLineup" type="button">Battle lineup: add this jet</button>
+      <button class="ghost" id="bBelt" type="button">Gun belt: universal</button>
+      <button class="ghost" id="bFuse" type="button">Bomb fuse: instant</button>
       <button class="ghost" id="bTVC" type="button" hidden>Thrust vectoring: off</button>
       <button class="ghost" id="bR37" type="button" hidden>Missiles: 8× R-77-1</button>
         </div>
@@ -114,7 +120,7 @@
     </header>
     <main class="body" id="mBody">
       <section class="pane" data-pane="title" id="mpTitle" aria-label="Title">
-        <div class="logo"><p class="eyebrow">A VALIDAIRSOFT game</p><h1>VIPER<br>SORTIE</h1><p class="sub">Multirole combat flight</p></div>
+        <div class="logo"><p class="eyebrow">A ValidAirsoft Productions game</p><h1>VIPER<br>SORTIE</h1><p class="sub">Multirole combat flight</p></div>
         <p class="press" id="pressAny">Tap or press any button</p>
       </section>
       <section class="pane" data-pane="main" id="mpMain" aria-label="Main menu">
@@ -163,6 +169,8 @@
           <div class="pBox"><p class="cap">Campaign</p><div id="pgCamp"></div></div>
           <div class="pBox"><p class="cap">Best scores</p><div id="pBest"></div></div>
           <div class="pBox"><p class="cap">Daily tasks</p><div id="pgDaily"></div></div>
+          <div class="pBox"><p class="cap">Weekly tasks</p><div id="pgWeekly"></div></div>
+          <div class="pBox"><p class="cap">Season pass</p><div id="pgPass"></div></div>
           <div class="pBox"><p class="cap">Crew training</p><div id="pgCrew"></div></div>
           <div class="pBox how"><p class="cap">How to fly</p>
             <p class="txt" id="howLede">Real energy fighting. Thrust, drag and air density set your speed, hard turns bleed it, and holding 9&nbsp;g too long will black you out. Corner speed is about <span id="ovCorner">350</span>&nbsp;knots.</p>

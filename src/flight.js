@@ -2,15 +2,46 @@
 const _f=new V3(),_u=new V3(),_r=new V3(),_vd=new V3(),qa=new THREE.Quaternion();
 function newJet(obj,gLim,ac){return {ac:ac||AC_DEFS.F16,obj,pos:obj.position,vel:new V3(),n:1,gLim,qd:0,mach:0,kcas:0,fwd:new V3(0,0,1),up:new V3(0,1,0),right:new V3(-1,0,0)}}
 function axes(j){const q=j.obj.quaternion;j.fwd.set(0,0,1).applyQuaternion(q);j.up.set(0,1,0).applyQuaternion(q);j.right.set(-1,0,0).applyQuaternion(q)}
+/* flaps (player): 0 up, 1 combat, 2 landing. More lift and drag; the gear forces landing flaps; over the speed limit they are torn off.
+   Stall and spin (player, jets without stall protection): below stall speed with the nose high and rudder or full roll in, the jet departs into a spin until you centre the stick and build speed. */
+const spinE=new THREE.Euler(), _qf=new THREE.Quaternion();
+const FLAP_CL=[0,.1,.3], FLAP_CD=[0,.008,.035], FLAP_VMAX=[999,380,270];
+const SPIN_SAFE=/^(F16|F35|F22|FA18|F18|GRIPEN|TYPHOON|EF2|RAFALE|SU27|SU3|SU35|SU57|MIG29|MIG35|J10|J11|J16|J20|F15)/;
 function fly(j,dt,rollIn,pitchIn,yawIn,thr,brake){
-  const q=j.obj.quaternion, A=j.ac; j.ci=[rollIn,pitchIn,yawIn||0,thr];
+  const q=j.obj.quaternion, A=j.ac;
+  let fl=0,CLM=A.CLMAX;
+  if(j===P){
+    if(P.gear)P.flaps=2;else if(P.flaps===2&&!P.flapManual)P.flaps=1;   // gear up retracts landing flaps unless you chose them
+    if(P.sys&&P.sys.flapOff)P.flaps=0;
+    if(P.flaps===1&&P.kcas>330)P.flaps=0;   // combat flaps retract by themselves
+    fl=P.flaps||0;if(fl===2&&P.kcas>FLAP_VMAX[fl]&&P.sys&&state==='play'){P.flaps=0;fl=0;P.sys.flapOff=true;message('FLAPS TORN OFF · OVERSPEED',2);recEvent('Flaps torn off by overspeed');sndTear&&sndTear()}
+    CLM=A.CLMAX*(1+FLAP_CL[fl]);
+    if(!j.onGround&&state==='play'&&!SPIN_SAFE.test(A.id||'')){
+      const stallC=Math.sqrt(2*(j.mass||A.MASS)*G/(1.225*A.S*CLM))*1.944, cen=Math.abs(rollIn)<.25&&Math.abs(yawIn||0)<.25;
+      if(!j.spin){
+        const dep=(j.kcas<stallC*.92||(j.fwd.y>.5&&j.kcas<stallC*1.1))&&(Math.abs(yawIn||0)>.4||Math.abs(rollIn)>.6)&&pitchIn>.2;
+        j.dep=dep?(j.dep||0)+dt:Math.max(0,(j.dep||0)-dt*2);
+        if(j.dep>.6){j.spin=(rollIn||yawIn||1)>0?1:-1;j.dep=0;j.spinT=0;j.spinYaw=Math.atan2(j.fwd.x,j.fwd.z);j.camYaw=j.spinYaw;message('DEPARTED · SPIN · CENTRE THE CONTROLS AND DIVE',2.6);recEvent('Departed controlled flight')}
+      } else {
+        j.spinT+=dt;
+        if(j.kcas>stallC*1.45&&cen||j.spinT>40){j.spin=0;j.recT=1;message('RECOVERED',1.4)}
+        else{   // the nose drops and the jet turns about its own vertical axis while it falls: attitude is set directly, not taken from the flight path
+          j.spinYaw+=j.spin*2.0*dt;j.camYaw+=j.spin*.18*dt;
+          q.setFromEuler(spinE.set(.95+Math.sin(j.spinT*1.7)*.14,j.spinYaw,j.spin*(.28+Math.sin(j.spinT*2.3)*.22),'YXZ'));
+          axes(j);j.vel.x*=1-1.1*dt;j.vel.z*=1-1.1*dt;j.vel.y=Math.max(-160,j.vel.y-G*.85*dt);
+          rollIn=0;pitchIn=0;yawIn=0;thr=Math.min(thr,.25);shake=Math.max(shake,.15)}
+      }
+    } else if(j.spin)j.spin=0;
+  }
+  j.ci=[rollIn,pitchIn,yawIn||0,thr];
   j.obj.rotateZ(rollIn*A.roll*(j.rollK??1)*clamp(j.qd/9000,A.tvc?.45:.15,1)*dt);
   axes(j);
   if(yawIn){qa.setFromAxisAngle(j.up,-yawIn*.12*dt);q.premultiply(qa);j.vel.applyQuaternion(qa);axes(j)}
   const at=atm(j.pos.y); let v=j.vel.length();
   if(v<5){j.vel.copy(j.fwd).multiplyScalar(5);v=5}
   const qd=.5*at.rho*v*v; j.qd=qd; j.mach=v/at.a; j.kcas=v*Math.sqrt(at.sig)*1.944;
-  const MS=j.mass||A.MASS; const nAero=qd*A.S*A.CLMAX/(MS*G); j.nAero=nAero;
+  const MS=j.mass||A.MASS; const nAero=qd*A.S*CLM/(MS*G); j.nAero=nAero;
+  if(j===P&&state==='play'&&!j.onGround){const stalled=nAero<1.02;if(stalled||(j.n*MS*G/(qd*A.S+1))>.9*CLM){shake=Math.max(shake,stalled?.12:.05);if(stalled&&(clock*2.5%1)<.5&&!P.stallBeep){P.stallBeep=true;sndBeep(760,.12,.05,'square')}else if((clock*2.5%1)>=.5)P.stallBeep=false}}
   // thrust vectoring (MiG-35 option): the nozzles keep pulling the nose round below ~260 kt, past what the wing alone gives
   const tv=A.tvc&&thr>.3?1+.7*clamp((260-j.kcas)/120,0,1):1;
   const nHi=Math.min(j.gLim,nAero*tv), nLo=Math.max(G_MIN,-nAero*.55*tv);
@@ -18,9 +49,9 @@ function fly(j,dt,rollIn,pitchIn,yawIn,thr,brake){
   j.n+=(clamp(nCmd,nLo,nHi)-j.n)*Math.min(1,dt*7);   // FLCS g-onset
   j.n=clamp(j.n,nLo,nHi);
   const CL=j.n*MS*G/(qd*A.S+1);
-  j.alpha=clamp(26*CL/A.CLMAX,-20,45);   // degrees: linear lift curve reaching CLmax at ~26 deg (the F-16 FLCS limits alpha to about 25)
+  j.alpha=clamp(26*CL/CLM,-20,45);   // degrees: linear lift curve reaching CLmax at ~26 deg (the F-16 FLCS limits alpha to about 25)
   const over=A.vne?Math.max(0,j.kcas-A.vne)/50:0;   // past the low-level airspeed limit drag climbs steeply
-  const D=qd*A.S*(cd0(j.mach,A)*A.cdK*(1+over*over*4)+A.KIND*CL*CL*(CL>A.CLMAX?1+(CL-A.CLMAX)*1.5:1)+(brake?.06:0)+(j.xcd||0));
+  const D=qd*A.S*(cd0(j.mach,A)*A.cdK*(1+over*over*4)+A.KIND*CL*CL*(CL>CLM?1+(CL-CLM)*1.5:1)+FLAP_CD[fl]+(brake?.06:0)+(j.xcd||0));
   const T=thrust(A,thr,at.sig,j.mach,j.pos.y)*(j.thrK??1); j.lastT=T;
   _f.copy(j.fwd).multiplyScalar((T-D)/MS).addScaledVector(j.up,j.n*G); _f.y-=G;
   j.vel.addScaledVector(_f,dt); j.pos.addScaledVector(j.vel,dt); j.pos.addScaledVector(WIND,gust*dt);
@@ -28,7 +59,9 @@ function fly(j,dt,rollIn,pitchIn,yawIn,thr,brake){
       k=turbK*(clamp(1-(agl-1500)/3500,.25,1)+nearDeck)*clamp(v/120,.3,1.2), t=clock;
     const bp=Math.sin(t*2.7)*.6+Math.sin(t*4.9+1.3)*.3+Math.sin(t*9.1+.7)*.15, br=Math.sin(t*3.3+2.1)*.6+Math.sin(t*6.1+.4)*.3+Math.sin(t*11.3)*.12;
     j.obj.rotateX(bp*.035*k*dt*6); j.obj.rotateZ(br*.05*k*dt*6); axes(j); j.vel.y+=bp*k*2.2*dt*6*.4}
-  _vd.copy(j.vel).normalize(); qa.setFromUnitVectors(j.fwd,_vd); q.premultiply(qa); q.normalize();
+  if(j.spin){axes(j);return}   // in a spin the attitude is not slaved to the velocity
+  _vd.copy(j.vel).normalize(); qa.setFromUnitVectors(j.fwd,_vd); if(j.recT>0){j.recT-=dt;qa.identity().slerp(_qf.setFromUnitVectors(j.fwd,_vd),.1)}   // ease out of a spin
+  q.premultiply(qa); q.normalize();
   axes(j);
 }
 const bankOf=j=>Math.atan2(-j.right.y,j.up.y);
@@ -316,7 +349,7 @@ function whoosh(v,sp){const c=A.ctx,t=c.currentTime,s=c.createBufferSource();s.b
 function sonicBoom(v){sndNoise(.35,160,1.1*v);setTimeout(()=>sndNoise(.4,150,1.0*v),110);buzz([60,40,80])}
 
 const GEAR_H=1.95;
-function setGear(down){P.gear=down; P.xcd=(down?.022:0)+(AC.scd||0)-(P.tanksGone?(AC.tanks||0)*.0025:0); if(!P.alive||state!=='play'||P.onGround)P.gearT=down?1:0; $('nGear').textContent=down?'DOWN':'UP'; $('bGear').classList.toggle('down',down)}
+function setGear(down){P.gear=down;P.flapManual=false; P.xcd=(down?.022:0)+(AC.scd||0)-(P.tanksGone?(AC.tanks||0)*.0025:0); if(!P.alive||state!=='play'||P.onGround)P.gearT=down?1:0; $('nGear').textContent=down?'DOWN':'UP'; $('bGear').classList.toggle('down',down)}
 // rolling on the runway: thrust, drag, rolling friction, wheel brakes, nosewheel steering; lift-off once the wing can hold the jet
 function groundRoll(dt,rollIn,pitchIn){
   const A=AC, at=atm(P.pos.y); let v=Math.hypot(P.vel.x,P.vel.z);
@@ -324,13 +357,13 @@ function groundRoll(dt,rollIn,pitchIn){
   const MS=P.mass||A.MASS, qd=.5*at.rho*v*v, nAero=qd*A.S*A.CLMAX/(MS*G);
   const T=thrust(A,throttle,at.sig,v/at.a,P.pos.y)*(P.thrK??1); P.lastT=T;
   const D=qd*A.S*(cd0(v/at.a,A)*A.cdK+(P.xcd||0)+(brake?.06:0));
-  const fr=(brake&&v>.5?.42:.025)*G;   // wheel brakes when BRK is held (wings roll level, so nearly all weight is on the wheels)
+  const off=!onRunway(P.pos.x,P.pos.z), fr=(brake&&v>.5?.42:off?.2:.025)*G;   // grass drags the wheels   // wheel brakes when BRK is held (wings roll level, so nearly all weight is on the wheels)
   v=Math.max(0,v+((T-D)/MS-fr)*dt);
   P.vel.set(Math.sin(hdg)*v,0,Math.cos(hdg)*v); P.pos.addScaledVector(P.vel,dt); P.pos.y=BASE_Y+GEAR_H;
   playerJet.quaternion.setFromAxisAngle(UP,hdg); axes(P);
   P.n=1; P.qd=qd; P.mach=v/at.a; P.kcas=v*Math.sqrt(at.sig)*1.944; P.nAero=nAero;
   if(pitchIn>.25&&nAero>1.05){P.onGround=false;P.vel.y=2.5+pitchIn*3;P.pos.y+=.4;P.airT=0;message('ROTATE · GEAR UP WHEN CLIMBING',1.6)}
-  if(!onRunway(P.pos.x,P.pos.z)){if(v>18){die('landing')}}
+  if(off&&Math.abs(groundH(P.pos.x,P.pos.z)-BASE_Y)>.5){message('CRASH · ROUGH TERRAIN',2);die('landing')}   // rolled off the flat airfield
   // rearm, refuel and repair after 4 s stopped on the runway
   if(v<1.5){P.stopT=(P.stopT||0)+dt; if(P.stopT>4&&!P.serviced){P.serviced=true;P.fuel=AC.fuelCap;P.hp=100;resetSystems();rearm();CM.flares=cmFlares();CM.chaff=cmChaff();syncCM();
       message('REARMED · REFUELED · REPAIRED',2.2);recEvent('Landed and turned around at the base');if(trainHook)trainHook('stopped')}}
@@ -339,10 +372,18 @@ function groundRoll(dt,rollIn,pitchIn){
 function checkTouchdown(){
   const g=groundH(P.pos.x,P.pos.z);
   if(P.pos.y>g+GEAR_H||P.onGround||P.vel.y>0)return false;
-  const ok=P.gear&&onRunway(P.pos.x,P.pos.z)&&P.vel.y>-4.2&&Math.abs(bankOf(P))<.22&&P.kcas<230&&P.fwd.y>-.12;
-  if(!ok){die(P.gear?'landing':'gearup');return true}
-  P.onGround=true; const sink=-P.vel.y; P.vel.y=0; P.pos.y=BASE_Y+GEAR_H;
-  message(sink<1.5?'GREASED IT':sink<2.8?'TOUCHDOWN':'FIRM TOUCHDOWN',1.6); recEvent('Touched down at '+Math.round(P.kcas)+' kt, sink '+sink.toFixed(1)+' m/s');
+  const sink=-P.vel.y, bank=Math.abs(bankOf(P));
+  // only a clearly wrong arrival destroys the jet (and the screen says why); a firm one costs gear damage instead, as in War Thunder
+  const rwy=onRunway(P.pos.x,P.pos.z), flat=Math.abs(g-BASE_Y)<.5;   // the airfield is flat grass all around the strip, so landing beside it is survivable
+  const bad=!P.gear?'GEAR UP':!flat?'ROUGH TERRAIN':P.kcas>=280?'TOO FAST':sink>9?'SINK RATE TOO HIGH':bank>.35?'WINGS NOT LEVEL':P.fwd.y<-.2?'NOSE TOO LOW':null;
+  if(bad){message('CRASH · '+bad,2.4);recEvent('Crashed on landing: '+bad.toLowerCase());die(P.gear?'landing':'gearup');return true}
+  P.onGround=true; P.vel.y=0; P.pos.y=BASE_Y+GEAR_H;
+  const hard=sink>5.5||bank>.22||P.kcas>=240||P.fwd.y<-.12||!rwy;
+  if(hard){const dmg=Math.round(clamp(15+Math.max(0,sink-5.5)*12+Math.max(0,P.kcas-240)*.4+(rwy?0:20),15,70));damageSystem(dmg>45?2:1);hurtT=.5;shake=.6;sndHit();
+    message(rwy?'HARD LANDING · GEAR DAMAGED':'OFF-RUNWAY LANDING · GEAR DAMAGED',2);recEvent('Hard landing at '+Math.round(P.kcas)+' kt, sink '+sink.toFixed(1)+' m/s (severity '+dmg+')');
+    if(dmg>=60){die('landing');return true}}
+  else message(sink<1.5?'GREASED IT':sink<2.8?'TOUCHDOWN':'FIRM TOUCHDOWN',1.6);
+  recEvent('Touched down at '+Math.round(P.kcas)+' kt, sink '+sink.toFixed(1)+' m/s');
   {const dt=dailyAdd('l',1);if(dt)message('DAILY TASK · '+dt,2.6)}
   if(trainHook)trainHook('touchdown'); return true;
 }

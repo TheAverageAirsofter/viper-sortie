@@ -69,10 +69,13 @@ function hgSpecs(){
   h+=T('Performance (flight model)',[['Load factor limit','+'+e.gmax+' g / −3 g'],['Roll rate','≈ '+fx(e.roll*57.3)+' °/s at full control authority'],['Corner speed',fx(e.corner)+' kt'],
     ['Thrust / weight','AB '+fx(tw(e.T_AB),2)+' · MIL '+fx(tw(e.T_MIL),2),'at take-off weight'],['Wing loading',fx(m/e.S)+' kg/m²'],['1 g stall speed',fx(stall*1.944)+' kt','sea level, clean'],
     ['Top speed, sea level','Mach '+fx(sl.M,2),fx(sl.v*1.944)+' kt'],['Top speed, 10 km','Mach '+fx(hi.M,2),fx(hi.v*1.944)+' kt'],['Never-exceed (low level)',fx(e.vne)+' kt']]);
+  const wt=WTREF[e.id];
+  if(wt)h+=T('War Thunder reference (Realistic, wiki)',[['Battle rating','RB '+wt[3].toFixed(1)+(NODES[e.id]?' · rank '+ROMAN[NODES[e.id].r]:'')],['Max speed (reference)',fx(wt[0])+' km/h','game flight model: '+fx(hi.v*3.6)+' km/h at 10 km'],
+    ['Rate of climb',fx(wt[1],1)+' m/s'],['Turn time',fx(wt[2],1)+' s','full circle, sea level']]);
   h+=T('Weapons',[['Gun',e.ammo+' · '+fx(e.gunRate*60)+' rpm · '+fx(e.gunRounds)+' rounds','muzzle '+fx(e.muzzle)+' m/s, effective range about 1 km'],
     [e.srFull+' × '+v.sr,'to '+km(sr.maxR)+' (min '+fx(sr.minR)+' m)',seekerText(sr,false)+' · '+fx(sr.gmax)+' g · peak Mach '+fx(pk(sr,5000)/340,1)],
     c.hp?[e.mrFull+' × '+v.mr,'to '+km(mr.maxR)+' (min '+fx(mr.minR)+' m)',seekerText(mr,true)+' · '+fx(mr.gmax)+' g · peak Mach '+fx(pk(mr,8000)/295,1)]:null,
-    ...ag.map(([k,n])=>[AGW[k].name+' × '+n,AGW[k].kind==='arm'?'Anti-radiation missile':AGW[k].kind==='dumb'?'Unguided bomb, CCIP aiming':'Guided bomb']),
+    ...ag.map(([k,n])=>[AGW[k].name+' × '+n,AGW[k].kind==='arm'?'Anti-radiation missile':AGW[k].kind==='rocket'?'Unguided rockets, ripple of '+AGW[k].per+', CCIP aiming':AGW[k].kind==='dumb'?'Unguided bomb, CCIP or CCRP aiming':'Guided bomb']),
     v.tk?['Drop tanks × '+v.tk,'+'+fx(v.tk*(JET_HP[e.id]||{tankKg:0}).tankKg)+' kg fuel','drag until jettisoned']:null,
     ['Stations',fx(ldUsed(v))+' of '+fx(c.hp+c.extra)+' used · '+c.sr+' wingtip/short-range rails']]);
   h+=T('Sensors',[['Radar',((e.radar&&e.radar.name)||'Fire-control radar')+' · '+(((e.radar&&e.radar.modes)||['RWS','TWS']).join(' / '))],['Detection range',both((e.radar&&e.radar.range)||74000),'against a typical fighter; smaller radar cross-section is seen later'],

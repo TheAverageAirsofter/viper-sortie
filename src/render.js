@@ -1,10 +1,10 @@
 /* ---------------- renderer / scene ---------------- */
 const glCanvas=$('gl'), hud=$('hud'), hctx=hud.getContext('2d');
-const QUALS={LOW:{dpr:1,seg:110,clouds:16,fx:0,trees:0},MED:{dpr:1.5,seg:150,clouds:30,fx:1,trees:2200},HIGH:{dpr:2,seg:190,clouds:44,fx:2,trees:4500}};
+const QUALS={LOW:{dpr:1,seg:110,clouds:16,fx:0,trees:0},MED:{dpr:1.25,seg:150,clouds:30,fx:1,trees:2200},HIGH:{dpr:2,seg:190,clouds:44,fx:2,trees:4500}};
 let quality='MED'; try{const q=localStorage.getItem('viperQuality');if(QUALS[q])quality=q}catch(e){}
 let DPR=Math.min(window.devicePixelRatio||1,QUALS[quality].dpr);
 const renderer=new THREE.WebGLRenderer({canvas:glCanvas,antialias:true,powerPreference:'high-performance'});
-renderer.setPixelRatio(DPR); renderer.autoClear=false;
+renderer.setPixelRatio(DPR); renderer.autoClear=false; renderer.localClippingEnabled=true;
 // keep the r128 look on newer three.js: linear output, no colour management, legacy light units
 if(THREE.ColorManagement)THREE.ColorManagement.enabled=false; if('outputColorSpace' in renderer)renderer.outputColorSpace=THREE.LinearSRGBColorSpace; if('useLegacyLights' in renderer)renderer.useLegacyLights=true;
 // r165+ removed legacy lights: light intensities are pi times lower, so scale ours back up to keep the same look (LK is 1 on older builds)
@@ -251,7 +251,34 @@ const NAVM=[new THREE.MeshBasicMaterial({color:0xff2a2a}),new THREE.MeshBasicMat
 function withNav(root,type){const D=AC_DEFS[type];if(D&&D.fx&&D.fx.nav){const [sp,tl,tp]=D.fx.nav;[[sp,0,D.fx.navZ!=null?D.fx.navZ:-3.5,0],[-sp,0,D.fx.navZ!=null?D.fx.navZ:-3.5,1],[0,tp,tl,2]].forEach(([x,y,z,i])=>{const m=new THREE.Mesh(NAVG,NAVM[i]);m.position.set(x,y,z);m.name='nav';root.children[0].add(m)});return root}
   const f=type.startsWith('F16'), span=type.startsWith('MIG')||type.startsWith('SU')?5.7:type.startsWith('GRIPEN')?4.3:6.7,tail=type.startsWith('MIG')||type.startsWith('SU')?-8.6:type.startsWith('GRIPEN')?-6:-7.4;   // F-16 model is built in 0.75-scale units
   [[span,0,f?-2.2:-1.5,0],[-span,0,f?-2.2:-1.5,1],[0,f?3.6:2.6,tail,2]].forEach(([x,y,z,i])=>{const m=new THREE.Mesh(NAVG,NAVM[i]);m.position.set(x,y,z);m.name='nav';root.children[0].add(m)});return root}
-function buildJet(c,type){type=type||'F16';const r=withNav(buildJetBase(c,type),type);
+/* draw-call diet: unnamed static meshes that share a material inside one group (fuselage panels, strips, missile parts) become one mesh. Named parts
+   (control surfaces, gear, canopy, nozzles, flame, wingM, decals...) stay separate so animation, damage and level of detail still find them. */
+const MERGE_SKIP=new Set(['cs','gear','flame','nozG','canopyG','pilot']);
+function mergeGeos(ms){
+  const names=Object.keys(ms[0].geometry.attributes);let nv=0,ni=0;
+  for(const m of ms){const a=m.geometry.attributes.position.count;nv+=a;ni+=m.geometry.index?m.geometry.index.count:a}
+  const out={};for(const n of names)out[n]=new Float32Array(nv*ms[0].geometry.attributes[n].itemSize);
+  const idx=new Uint32Array(ni);let vo=0,io=0;
+  for(const m of ms){const g=m.geometry.clone();m.updateMatrix();g.applyMatrix4(m.matrix);const c=g.attributes.position.count;
+    for(const n of names)out[n].set(g.attributes[n].array,vo*g.attributes[n].itemSize);
+    if(g.index){for(let i=0;i<g.index.count;i++)idx[io+i]=g.index.array[i]+vo;io+=g.index.count}else{for(let i=0;i<c;i++)idx[io+i]=vo+i;io+=c}
+    vo+=c;g.dispose()}
+  const geo=new THREE.BufferGeometry();for(const n of names)geo.setAttribute(n,new THREE.BufferAttribute(out[n],ms[0].geometry.attributes[n].itemSize));
+  geo.setIndex(new THREE.BufferAttribute(idx,1));geo.computeBoundingSphere();geo.computeBoundingBox();return geo}
+function mergeStatic(root){
+  const groups=[];root.traverse(o=>{if(o.isGroup)groups.push(o)});
+  for(const g of groups){
+    let q=g,skip=false;while(q){if(MERGE_SKIP.has(q.name)){skip=true;break}q=q.parent}
+    if(skip)continue;
+    const by=new Map();
+    for(const m of g.children){
+      if(!m.isMesh||m.name||!m.geometry||!m.material||m.children.length||Array.isArray(m.material))continue;
+      const a=Object.keys(m.geometry.attributes);if(a.some(k=>k!=='position'&&k!=='normal'&&k!=='uv'))continue;
+      const key=m.material.uuid+'|'+a.join(',');let l=by.get(key);if(!l)by.set(key,l=[]);l.push(m)}
+    for(const l of by.values()){if(l.length<2)continue;const nm=new THREE.Mesh(mergeGeos(l),l[0].material);nm.castShadow=l[0].castShadow;nm.receiveShadow=l[0].receiveShadow;g.add(nm);for(const m of l)g.remove(m)}
+  }
+}
+function buildJet(c,type){type=type||'F16';const r=withNav(buildJetBase(c,type),type);mergeStatic(r);
   r.traverse(o=>{const m=o.material;if(m&&m.isMeshStandardMaterial&&!m.__ibl){m.__ibl=true;m.envMapIntensity=.75;if(m.roughness>.55){m.roughness=.48;m.metalness=Math.max(m.metalness,.22)}}});
   return dressFlames(r)}
 // per-aircraft size correction [across, up, along] so the lofted shapes match the real length and span; filled in the roster slice
@@ -506,7 +533,7 @@ function wingGeo(st,mirror){
     st.forEach(s=>sec(s,sg).forEach(p=>pos.push(...p)));
     for(let i=0;i<st.length-1;i++)for(let j=0;j<4;j++){const a=b0+i*4+j,b=b0+i*4+(j+1)%4,c=b0+(i+1)*4+j,d=b0+(i+1)*4+(j+1)%4;if(sg>0)idx.push(a,b,c,b,d,c);else idx.push(a,c,b,b,c,d)}
     const L=b0+(st.length-1)*4;if(sg>0)idx.push(L,L+1,L+2,L,L+2,L+3);else idx.push(L,L+2,L+1,L,L+3,L+2)}
-  const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));g.setIndex(idx);g.computeVertexNormals();return g}
+  const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));g.setIndex(idx);g.computeVertexNormals();g.userData.secN=4;return g}   // secN: four vertices per section, used to orient the paint normals
 // fin: sections {h, zle, zte, t} stacked upward from y=0, thickness along x
 function finGeo(st){const ws=st.map(s=>({x:s.h,zle:s.zle,zte:s.zte,t:s.t||.05,y:0}));const g=wingGeo(ws,false);
   const p=g.attributes.position;for(let i=0;i<p.count;i++){const x=p.getX(i),y=p.getY(i);p.setXYZ(i,y,x,p.getZ(i))}g.computeVertexNormals();return g}
@@ -577,7 +604,9 @@ function bakePaint(g,mat){g.updateMatrixWorld(true);const iv=new THREE.Matrix4()
   g.traverse(o=>{if(!o.isMesh||o.material!==mat||o.geometry.attributes.jp)return;const ge=o.geometry,p=ge.attributes.position,nn=ge.attributes.normal;M.multiplyMatrices(iv,o.matrixWorld);N.getNormalMatrix(M);
     const jp=new Float32Array(p.count*3),jn=new Float32Array(p.count*3),c=new THREE.Vector3(),w=new THREE.Vector3();
     for(let i=0;i<p.count;i++){v.fromBufferAttribute(p,i).applyMatrix4(M);jp[i*3]=v.x;jp[i*3+1]=v.y;jp[i*3+2]=v.z;c.add(v)}c.divideScalar(Math.max(1,p.count));
-    for(let i=0;i<p.count;i++){v.fromBufferAttribute(nn,i).applyMatrix3(N).normalize();w.set(jp[i*3]-c.x,(jp[i*3+1]-c.y)*3,jp[i*3+2]-c.z);if(v.dot(w)<0)v.negate();jn[i*3]=v.x;jn[i*3+1]=v.y;jn[i*3+2]=v.z}
+    const sN=ge.userData&&ge.userData.secN;   // wings, fins and control surfaces: face outward from their own section, so dihedral and anhedral don't flip the paint
+    for(let i=0;i<p.count;i++){let cx=c.x,cy=c.y,cz=c.z;if(sN){const k=i-i%sN;cx=cy=cz=0;for(let q=0;q<sN;q++){cx+=jp[(k+q)*3];cy+=jp[(k+q)*3+1];cz+=jp[(k+q)*3+2]}cx/=sN;cy/=sN;cz/=sN}
+      v.fromBufferAttribute(nn,i).applyMatrix3(N).normalize();w.set(jp[i*3]-cx,(jp[i*3+1]-cy)*3,jp[i*3+2]-cz);if(v.dot(w)<0)v.negate();jn[i*3]=v.x;jn[i*3+1]=v.y;jn[i*3+2]=v.z}
     ge.setAttribute('jp',new THREE.BufferAttribute(jp,3));ge.setAttribute('jn',new THREE.BufferAttribute(jn,3))})}
 // national markings and numbers, drawn once per design on a canvas
 const DECAL_TEX={};
@@ -592,6 +621,7 @@ function decalTex(kind,txt,lowvis){const key=kind+'|'+(txt?txt.s+(txt.red?'r':''
     cr(cx-40,cy-30,22);cr(cx+40,cy-30,22);cr(cx,cy+42,22)}
   else if(kind==='raf'){disc(118,lv?'#7d8fa8':'#1d3f8a');disc(50,lv?'#c98f8f':'#c8102e')}
   else if(kind==='fra'){disc(118,lv?'#a35f62':'#c8102e');disc(82,lv?'#c9cdd1':'#ffffff');disc(46,lv?'#56698a':'#0b3d91')}
+  else if(kind==='ita'){disc(118,lv?'#8fa08f':'#009246');disc(80,lv?'#c9ccd0':'#ffffff');disc(44,lv?'#a35f62':'#ce2b37')}
   else if(kind==='ind'){disc(118,'#ff9933');disc(80,'#ffffff');disc(42,'#138808')}
   else if(kind==='ger'){c.fillStyle=lv?'#c9ccd0':'#ffffff';c.fillRect(cx-100,cy-36,200,72);c.fillRect(cx-36,cy-100,72,200);c.fillStyle=lv?'#3b4046':'#0a0a0a';c.fillRect(cx-92,cy-28,184,56);c.fillRect(cx-28,cy-92,56,184)}   // Balkenkreuz
   else if(kind==='jp'){disc(112,lv?'#9aa0a6':'#ffffff');disc(78,lv?'#8f4f56':'#bc002d')}   // hinomaru
@@ -625,7 +655,8 @@ function buildLoftJet(c,S,type){
   const body0=new THREE.MeshStandardMaterial({color:c.body,roughness:.5,metalness:.18,side:THREE.DoubleSide}), body=paintMat(type,body0);
   const dark=new THREE.MeshStandardMaterial({color:new THREE.Color(PS.c[1]).multiplyScalar(.62),roughness:.5,metalness:.3,side:THREE.DoubleSide});
   const metal=new THREE.MeshStandardMaterial({color:0x6b6a68,roughness:.35,metalness:.85,side:THREE.DoubleSide});
-  const glass=new THREE.MeshStandardMaterial({color:c.glass,roughness:.04,metalness:.75,emissive:c.glassE,transparent:true,opacity:.9,envMapIntensity:1.6});glass.__ibl=true;
+  const glass=new THREE.MeshPhysicalMaterial({color:new THREE.Color(c.glass).multiplyScalar(.5),roughness:.03,metalness:.3,emissive:c.glassE,transparent:true,opacity:.5,envMapIntensity:2.4,clearcoat:1,clearcoatRoughness:.02,side:THREE.DoubleSide,depthWrite:false});glass.__ibl=true;
+  glass.onBeforeCompile=sh=>{sh.fragmentShader=sh.fragmentShader.replace('#include <dithering_fragment>','#include <dithering_fragment>\n float fr=pow(1.-abs(dot(normalize(normal),normalize(vViewPosition))),2.4);gl_FragColor.a=mix(.2,.93,fr);gl_FragColor.rgb+=vec3(.2,.16,.08)*fr;')};   // clear when you look straight through, a bright gold coating at grazing angles
   const white=new THREE.MeshStandardMaterial({color:0xe6e6e0,roughness:.5});
   const black=new THREE.MeshStandardMaterial({color:0x0b0c0d,roughness:.8,side:THREE.DoubleSide});
   const add=(geo,mat,name,par)=>{const m=new THREE.Mesh(geo,mat);if(name)m.name=name;(par||g).add(m);return m};
@@ -637,16 +668,19 @@ function buildLoftJet(c,S,type){
   const cz=S.canopy[0],cut=add(loftGeo(rz!=null?g.getObjectByName('fuse').userData.st:fst,{skipTop:[cz-1.3,cz+1.4]}),body,'fuseCut');cut.visible=false;
   for(const p of S.parts||[]){const xs=p.x?[p.x,-p.x]:[0];for(const x of xs){const m=add(loftGeo(p.st,{n:p.n||12}),p.dark?dark:body);m.position.x=x;
       if(p.mouth){const [z,w,ht,hb,yc]=p.st[p.st.length-1];const mo=add(new THREE.PlaneGeometry(w*1.8,(ht+hb)*.9),black);mo.position.set(x,yc+(ht-hb)/2,z-.02)}}}
+  // control surfaces follow every station of a multi-section wing (one strip per segment) so they stay inside the planform
+  const segStrips=(st,lo,hi,frac,sd,mat,kind)=>{const x0=st[0].x,span=st[st.length-1].x-x0;if(!(span>0))return;
+    for(let i=0;i<st.length-1;i++){const a=st[i],b=st[i+1],fa=(a.x-x0)/span,fb=(b.x-x0)/span,l=Math.max(lo,fa),h=Math.min(hi,fb);if(h-l<.03)continue;g.add(hingeStrip(a,b,(l-fa)/(fb-fa),(h-fa)/(fb-fa),frac,sd,mat,kind))}};
   // flying surfaces: the biggest is the wing; stubby ones are strakes/LERX; the rest move (tailplanes behind, canards ahead)
   const ws=S.wings.map(w=>{const r=w.st[0],t=w.st[w.st.length-1];return{w,r,t,span:t.x-r.x,ch:r.zle-r.zte}});
   const main=ws.reduce((a,b)=>b.t.x>a.t.x?b:a);
   ws.forEach(o=>{o.kind=o===main?'main':o.span/o.ch<.5?'fix':o.r.zle<main.r.zte?'stab':'can'});
   const hasStab=ws.some(o=>o.kind==='stab');
   for(const o of ws){const mat=o.w.dark?dark:body;
-    if(o.kind==='main'||o.kind==='fix'){add(wingGeo(o.w.st),mat);
+    if(o.kind==='main'||o.kind==='fix'){const wm=add(wingGeo(o.w.st),mat);if(o.kind==='main')wm.name='wingM';
       if(o.kind==='main')for(const s of [1,-1]){
-        if(hasStab){g.add(hingeStrip(o.r,o.t,.52,.94,.24,s,mat,'ail'));g.add(hingeStrip(o.r,o.t,.1,.5,.26,s,mat,'flap'))}
-        else{g.add(hingeStrip(o.r,o.t,.12,.5,.2,s,mat,'elv'));g.add(hingeStrip(o.r,o.t,.52,.95,.2,s,mat,'elv'))}}}
+        if(hasStab){segStrips(o.w.st,.52,.94,.24,s,mat,'ail');segStrips(o.w.st,.1,.5,.26,s,mat,'flap')}
+        else{segStrips(o.w.st,.12,.5,.2,s,mat,'elv');segStrips(o.w.st,.52,.95,.2,s,mat,'elv')}}}
     else for(const s of [1,-1]){const st=o.w.st.map(q=>Object.assign({},q,{x:q.x*s})),geo=wingGeo(st,false),pz=o.r.zle-o.ch*.42,piv=new THREE.Vector3(o.r.x*s,o.r.y||0,pz);
       geo.translate(-piv.x,-piv.y,-piv.z);const grp=new THREE.Group();grp.position.copy(piv);grp.name='cs';grp.userData={cs:o.kind,s,ax:[1,0,0]};add(geo,mat,null,grp);g.add(grp)}}
   // fins: rudders on the trailing edge; the J-20's fins are all-moving
@@ -660,7 +694,7 @@ function buildLoftJet(c,S,type){
         rg.userData={cs:'rud',s:i?-1:1,ax:new THREE.Vector3(0,B.h-A.h,B.zle-A.zle).normalize().toArray()};add(geo,body,null,rg);gr.add(rg)}
       // fin markings
       if(!ventral){const m=finAt(f.st,top*.55),ch=m.zle-m.zte,hw=(m.t||.05)*ch/2*.9+.015;
-        const fk=PS.nat==='rus'||PS.nat==='prc'?PS.nat:PS.nat==='fra'||PS.nat==='raf'||PS.nat==='swe'||PS.nat==='ind'?PS.nat:null;
+        const fk=PS.nat==='rus'||PS.nat==='prc'?PS.nat:PS.nat==='fra'||PS.nat==='raf'||PS.nat==='swe'||PS.nat==='ind'||PS.nat==='ita'?PS.nat:null;
         for(const sd of [1,-1]){
           if(fk){const sz=Math.min(ch*.5,1.05),d=add(new THREE.PlaneGeometry(sz,sz*(fk==='prc'?.62:1)),decalMat(fk,null,PS.lowvis),'decal',gr);d.position.set(sd*hw,m.h,m.zle-ch*.5);d.rotation.y=sd*Math.PI/2}
           if(PS.num){const t2=finAt(f.st,top*(fk?.24:.5)),c2=t2.zle-t2.zte,w2=Math.min(c2*.75,1.6),d=add(new THREE.PlaneGeometry(w2,w2*.5),decalMat('text',{s:PS.num},PS.lowvis),'decal',gr);
@@ -753,14 +787,14 @@ const M2={};
 const mir=a=>a.flatMap(p=>p[0]?[p,[-p[0],...p.slice(1)]]:[p]);
 M2.F16={L:15.06,nz:3.0,radome:6.2,
   fus:[[-7.0,.5,.52,.5,.05,2.4],[-6.0,.62,.62,.56,.05,2.5],[-4.5,.78,.66,.62,0,2.6],[-2.5,.9,.66,.66,0,2.8],[-.5,.92,.64,.66,0,2.8],[1.5,.82,.62,.6,0,2.6],[3.0,.7,.6,.5,0,2.4],[4.2,.62,.58,.45,0,2.2],[5.4,.52,.46,.42,0,2.1],[6.2,.42,.36,.36,-.02,2],[7.0,.22,.2,.2,-.05,2],[7.6,0,0,0,-.08,2]],
-  parts:[{x:0,mouth:1,st:[[-2.0,.38,.15,.22,-.62,2.2],[0,.5,.2,.32,-.72,2.4],[2.0,.56,.2,.42,-.82,2.6],[3.3,.56,.2,.44,-.86,3]]},
+  parts:[{x:0,mouth:1,st:[[-2.0,.38,.15,.22,-.62,2.2],[0,.5,.2,.32,-.72,2.4],[2.0,.56,.26,.4,-.76,2.6],[3.3,.56,.28,.4,-.76,3]]},
     {x:0,st:[[2.2,.2,.1,.1,.6,2],[1.0,.3,.2,.1,.6,2],[-1.5,.34,.24,.1,.58,2],[-4,.3,.2,.1,.54,2],[-5.6,.2,.1,.1,.5,2],[-6.5,0,0,0,.5,2]]}],
   wings:[{st:[{x:.85,zle:1.3,zte:-3.95,y:-.08,t:.04},{x:4.6,zle:-1.95,zte:-3.05,y:-.08,t:.03}]},{st:[{x:.55,zle:4.4,zte:.6,y:0,t:.02},{x:1.05,zle:1.35,zte:.6,y:-.05,t:.02}]},
     {st:[{x:.7,zle:-5.0,zte:-7.0,y:-.1,t:.035},{x:2.79,zle:-6.55,zte:-7.35,y:-.25,t:.03}]}],
   fins:[{x:0,y:.5,st:[{h:0,zle:-3.4,zte:-6.45,t:.05},{h:.6,zle:-3.9,zte:-6.5},{h:2.9,zle:-5.75,zte:-6.85,t:.04}]},{x:.62,y:-.42,cant:-2.6,mirror:1,st:[{h:0,zle:-3.9,zte:-4.9},{h:.5,zle:-4.3,zte:-4.95}]}],
   canopy:[3.6,.62,.42,.42,1.45],frame:-1.2,noz:[[0,.05,-7.25,.5,1.2]],
   r9:mir([[4.78,-.08,-2.4,null]]),r120:mir([[3.55,-.55,-1.7,-.12],[2.35,-.6,-1.3,-.1]])};
-M2.F16B70=Object.assign({},M2.F16,{parts:[...M2.F16.parts,{x:.95,st:[[-3.4,.3,.22,.15,.48,2],[-1,.38,.28,.15,.5,2],[1.6,.3,.2,.12,.48,2]]}]});
+M2.F16B70=Object.assign({},M2.F16,{parts:[...M2.F16.parts,{x:.8,st:[[-3.4,.3,.22,.2,.4,2],[-1,.38,.26,.2,.42,2],[1.6,.3,.2,.18,.38,2]]}]});
 M2.F15C={L:19.43,nz:5.6,radome:7.0,
   fus:[[-8.5,.55,.5,.45,.15,2.4],[-6.5,.75,.55,.5,.15,2.6],[-4,.85,.6,.5,.15,2.8],[-1,.85,.62,.5,.2,2.8],[2,.75,.62,.5,.25,2.6],[4,.68,.62,.48,.2,2.4],[5.5,.6,.55,.45,.15,2.2],[7.0,.5,.45,.4,.1,2],[8.3,.36,.32,.3,.05,2],[9.2,.18,.16,.16,0,2],[9.7,0,0,0,0,2]],
   parts:[{x:1.1,mouth:1,st:[[-8.6,.55,.55,.6,-.1,2.6],[-5,.66,.6,.62,-.1,3],[-1,.64,.62,.62,-.1,3.4],[2.5,.56,.65,.6,-.05,4],[3.6,.55,.68,.6,0,5]]}],

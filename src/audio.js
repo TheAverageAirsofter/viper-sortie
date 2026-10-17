@@ -54,6 +54,13 @@ const sndGun=()=>sndNoise(.07,AC.gunSnd,.3,'bandpass');
 const sndBoom=v=>sndNoise(1.4,520,.9*v);
 const sndMsl=()=>sndNoise(1.1,1400,.4,'bandpass');
 const sndHit=()=>sndNoise(.12,900,.5,'highpass');
+const sndSeq=(notes,dur,gain,type)=>notes.forEach((f,i)=>setTimeout(()=>sndBeep(f,dur,gain,type||'sine'),i*(dur*1000+30)));
+const sndTear=()=>{sndNoise(.7,1900,.8,'bandpass');sndNoise(.9,220,.9)};      // a wing ripping off
+const sndFire=()=>sndSeq([880,660,880,660],.12,.06,'square');                  // fire warning
+const sndKill=()=>sndSeq([880,1320],.09,.07);                                  // kill confirmed
+const sndCrit=()=>sndBeep(1600,.05,.05,'sine');
+const sndZone=up=>sndSeq(up?[660,880,1100]:[880,660,440],.1,.07);
+const sndSpawn=()=>sndSeq([520,780],.1,.06);
 function sndEngine(){
   if(!A.ctx)return; const t=A.ctx.currentTime;
   const live=(state==='play'||state==='menu')&&(P.thrK??1)>0;

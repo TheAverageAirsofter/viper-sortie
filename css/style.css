@@ -34,11 +34,16 @@ body{margin:0;background:var(--ink);color:var(--paper);font-family:var(--f-hud);
 #b9{width:64px;height:64px;right:calc(124px + env(safe-area-inset-right,0px));bottom:calc(18px + env(safe-area-inset-bottom,0px))}
 #bAg{width:64px;height:64px;font-size:10px;right:calc(196px + env(safe-area-inset-right,0px));bottom:calc(18px + env(safe-area-inset-bottom,0px))}
 #bAgN{width:50px;height:50px;font-size:10px;right:calc(203px + env(safe-area-inset-right,0px));bottom:calc(92px + env(safe-area-inset-bottom,0px))}
+#bSight,#bWpn{width:50px;height:44px;font-size:10px;right:calc(203px + env(safe-area-inset-right,0px))}
+#bSight{bottom:calc(150px + env(safe-area-inset-bottom,0px))}
+#bWpn{bottom:calc(200px + env(safe-area-inset-bottom,0px))}
 #b120{width:64px;height:64px;right:calc(124px + env(safe-area-inset-right,0px));bottom:calc(92px + env(safe-area-inset-bottom,0px))}
 #bBrake,#bRdr{width:52px;height:42px;border-radius:8px;font-size:11px;letter-spacing:.06em;top:calc(10px + env(safe-area-inset-top,0px))}
 #bBrake{right:calc(186px + env(safe-area-inset-right,0px))}
 #bGear{width:52px;height:42px;border-radius:8px;font-size:10px;letter-spacing:.04em;top:calc(10px + env(safe-area-inset-top,0px));right:calc(248px + env(safe-area-inset-right,0px))}
-#bGear small{margin-top:1px;font-size:9px}
+#bGear small,#bFlaps small{margin-top:1px;font-size:9px}
+#bFlaps{width:52px;height:42px;border-radius:8px;font-size:10px;letter-spacing:.04em;top:calc(10px + env(safe-area-inset-top,0px));right:calc(310px + env(safe-area-inset-right,0px))}
+#bFlaps.down{background:var(--warn);color:var(--ink);border-color:var(--warn)}
 #bGear.down{background:var(--warn);color:var(--ink);border-color:var(--warn)}
 #bRdr{right:calc(124px + env(safe-area-inset-right,0px))}
 #bLock{width:58px;height:58px;font-size:11px;right:calc(127px + env(safe-area-inset-right,0px));bottom:calc(166px + env(safe-area-inset-bottom,0px))}
@@ -50,7 +55,7 @@ body{margin:0;background:var(--ink);color:var(--paper);font-family:var(--f-hud);
 .cmb.on{background:var(--hud);color:var(--ink);border-color:var(--hud)}
 .cmb.hot{background:var(--warn);color:var(--ink);border-color:var(--warn)}
 .cmb:focus-visible{outline:2px solid var(--hud);outline-offset:2px}
-@media (orientation:portrait){#bGear{top:auto;right:auto;left:calc(10px + env(safe-area-inset-left,0px));bottom:calc(560px + env(safe-area-inset-bottom,0px))}
+@media (orientation:portrait){#bFlaps{top:auto;right:auto;left:calc(10px + env(safe-area-inset-left,0px));bottom:calc(610px + env(safe-area-inset-bottom,0px))}#bGear{top:auto;right:auto;left:calc(10px + env(safe-area-inset-left,0px));bottom:calc(560px + env(safe-area-inset-bottom,0px))}
   #cm{flex-direction:column;flex-wrap:wrap;max-height:270px;align-content:flex-start;left:calc(10px + env(safe-area-inset-left,0px));transform:none;bottom:calc(170px + env(safe-area-inset-bottom,0px))}}
 /* radar control panel: OSB-style buttons around a tappable B-scope */
 #rdr{position:fixed;left:calc(10px + env(safe-area-inset-left,0px));top:calc(80px + env(safe-area-inset-top,0px));width:222px;box-sizing:border-box;
@@ -218,7 +223,10 @@ body.hangar #ov{display:none!important}
 .tn.can{border-color:#6fb7ff}
 .tn.lock{opacity:.45}
 .tn.sel{outline:2px solid var(--paper);outline-offset:1px}
-.tdet h3{margin:4px 0;font:800 20px var(--f-display);text-transform:uppercase}
+.tn.cur{box-shadow:inset 0 0 0 2px var(--hud)}.tn.cur em{color:var(--hud)}
+.tdet{position:sticky;bottom:0;z-index:2;display:flex;align-items:center;gap:10px;flex-wrap:nowrap;background:rgba(8,16,20,.94);border-top:1px solid rgba(232,240,234,.25);padding:4px 10px;margin:0 -2px}
+.tdet .hgNote{display:none}.tdet .row{margin:0;flex:none}.tdet button{white-space:nowrap}
+.tdet h3{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin:0;font:800 17px var(--f-display);text-transform:uppercase}
 .hgT .ok{color:var(--hud);font-size:11px}
 .hgT button.ghost{font-size:11px;padding:6px 8px}
 button:disabled{opacity:.4;cursor:not-allowed}
@@ -227,8 +235,8 @@ button:disabled{opacity:.4;cursor:not-allowed}
 .btn,.cmb{border:var(--stroke) solid var(--hud-dim);background:rgba(8,16,20,.76);color:var(--hud);text-shadow:0 1px 2px rgba(0,0,0,.9);
   box-shadow:0 0 0 1px rgba(0,0,0,.45),0 2px 10px rgba(0,0,0,.35);transition:background 120ms var(--ease),transform 90ms var(--ease),opacity var(--dur),border-color var(--dur)}
 .btn:active,.cmb:active{transform:scale(.94);background:rgba(125,255,154,.32)}
-#bBrake,#bRdr,#bGear,#bCam,#bPause,.cmb{border-radius:var(--r-md)}
-#bBrake,#bRdr,#bGear,#bCam{height:44px}#bPause{width:44px;height:44px}
+#bBrake,#bRdr,#bGear,#bFlaps,#bCam,#bPause,.cmb{border-radius:var(--r-md)}
+#bBrake,#bRdr,#bGear,#bFlaps,#bCam{height:44px}#bPause{width:44px;height:44px}
 .btn.off,.btn:disabled,.cmb.off,.cmb:disabled{opacity:.38;filter:saturate(.45)}
 .btn.empty{opacity:.5;border-color:var(--warn);color:var(--warn)}
 .btn.ready:active{filter:brightness(.9)}
@@ -552,7 +560,7 @@ button:disabled{opacity:.4;cursor:not-allowed}
 
 /* ================= in-flight buttons: thin strokes and chamfered corners ================= */
 .btn,.cmb{border-radius:0;border:0;background:rgba(7,11,15,.74);box-shadow:inset 0 0 0 1.5px var(--hud-dim);clip-path:polygon(9px 0,100% 0,100% calc(100% - 9px),calc(100% - 9px) 100%,0 100%,0 9px)}
-#bBrake,#bRdr,#bGear,#bCam,#bPause,.cmb{border-radius:0}
+#bBrake,#bRdr,#bGear,#bFlaps,#bCam,#bPause,.cmb{border-radius:0}
 .btn.on{box-shadow:inset 0 0 0 1.5px var(--hud)}
 .btn:active,.cmb:active{transform:scale(.95);background:rgba(125,255,154,.3)}
 .btn.off,.btn:disabled,.cmb.off,.cmb:disabled{opacity:.38;filter:saturate(.4)}
@@ -659,3 +667,32 @@ button:disabled{opacity:.4;cursor:not-allowed}
 .mod.own{border-color:rgba(125,255,154,.5)}.mod.res{border-color:rgba(255,200,90,.55)}.mod.lock{opacity:.55}
 .mod .ok{color:var(--hud);font-size:11px}
 .mod button{font-size:11px;padding:6px 8px}
+#btPick{position:fixed;left:50%;bottom:calc(14px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:30;background:var(--panel);border:1px solid var(--hud-dim);border-radius:var(--r-md);padding:10px 14px;max-width:min(96vw,640px);text-align:center;backdrop-filter:blur(6px)}
+#btPick .btRow{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin:8px 0}
+#btPick button:disabled{opacity:.4}
+#kbEdit{position:fixed;inset:0;z-index:60;background:rgba(6,10,8,.94);display:flex;flex-direction:column;padding:calc(10px + env(safe-area-inset-top,0px)) 16px calc(10px + env(safe-area-inset-bottom,0px));color:var(--text,#e8f0ea)}
+#kbEdit[hidden]{display:none}
+#kbEdit .kbHead{display:flex;flex-wrap:wrap;align-items:center;gap:10px 16px}
+#kbEdit .kbHead h2{margin:0;font-size:20px;letter-spacing:.06em;text-transform:uppercase}
+#kbEdit .kbNote{flex-basis:100%;margin:0;font-size:12px;opacity:.7}
+#kbEdit .kbSw{display:flex;gap:6px}
+#kbEdit .kbSw .on{outline:1.5px solid var(--hud,#7dff9a)}
+#kbEdit .kbList{flex:1;overflow:auto;margin:8px 0;padding-right:4px}
+#kbEdit .grp{margin:10px 0 4px;font-size:11px;letter-spacing:.12em;text-transform:uppercase;opacity:.6}
+#kbEdit .kbRow{display:flex;align-items:center;gap:8px;padding:3px 0;border-bottom:1px solid rgba(255,255,255,.06)}
+#kbEdit .kbRow .lab{flex:1;font-size:13px}
+#kbEdit .kbKey{min-width:84px;padding:5px 8px;border-radius:6px;border:1px solid var(--hud-dim,#3a5a44);background:rgba(255,255,255,.05);color:inherit;font:600 12px 'Barlow Condensed',sans-serif;letter-spacing:.04em}
+#kbEdit .kbKey.wait{outline:1.5px solid #ffd24a;color:#ffd24a}
+#kbEdit .kbKey.on{background:rgba(125,255,154,.2)}
+#kbEdit select{min-width:170px;padding:4px;background:rgba(255,255,255,.06);color:inherit;border:1px solid var(--hud-dim,#3a5a44);border-radius:6px}
+#kbEdit input[type=range]{width:170px}
+#kbEdit .kbVal{width:48px;text-align:right;font-size:12px}
+#kbEdit .kbFoot{display:flex;gap:8px;justify-content:flex-end}
+#ov .passRow{display:grid;grid-template-columns:repeat(auto-fill,minmax(82px,1fr));gap:6px;margin-top:8px}
+#ov .pt{display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 4px;border:1px solid var(--hair);border-radius:var(--r-md);background:transparent;color:inherit;font:inherit;font-size:11px;min-height:58px}
+#ov .pt b{font-size:13px}
+#ov .pt span{text-align:center;opacity:.85}
+#ov .pt i{font-style:normal;font-size:10px;letter-spacing:.08em;text-transform:uppercase}
+#ov .pt.open{border-color:var(--hud,#7dff9a);color:var(--hud,#7dff9a)}
+#ov .pt.got{opacity:.5}
+#ov .pt:disabled:not(.got){opacity:.45}

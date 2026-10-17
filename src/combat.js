@@ -13,10 +13,25 @@ function relAngles(p){
   return {az:Math.atan2(-_pv.x,_pv.z),el:Math.atan2(_pv.y,Math.hypot(_pv.x,_pv.z)),d};
 }
 // a target beaming you (≈0 ground-relative closure) while you look down at it hides in ground clutter
-function notched(e){
+function notched(e,k){
   _b.subVectors(e.pos,P.pos).normalize();
-  return Math.abs(e.vel.dot(_b))<35&&e.pos.y<P.pos.y-200;
+  return Math.abs(e.vel.dot(_b))<(k||35)&&e.pos.y<P.pos.y-200;
 }
+/* search sub-modes (War Thunder airborne radars): PD sees farthest and filters ground clutter but loses a target beaming you; MTI sees about half as far
+   but is hard to notch; SRC has no Doppler filter, so ground clutter hides low targets when you look down. Older radars (no TWS) are always SRC. */
+const RSUBS=['PD','MTI','SRC'];
+R.sub='PD';
+const radarPD=()=>!!(AC.radar&&(AC.radar.pd||AC.radar.modes.indexOf('TWS')>=0));
+const radarSub=()=>radarPD()?R.sub:'SRC';
+function clutter(){const pitch=Math.asin(clamp(P.fwd.y,-1,1)),agl=Math.max(0,P.pos.y-Math.max(groundH(P.pos.x,P.pos.z),0));
+  return clamp(clamp(-pitch/.17,0,1)*.7+clamp(1-agl/9000,0,1)*.5,0,1)}   // 0..1: worst looking down at low level
+function radarBlind(e){const s=radarSub();
+  if(s==='PD')return notched(e,35);
+  if(s==='MTI')return notched(e,12);
+  return clutter()>.4&&e.pos.y<Math.max(groundH(e.pos.x,e.pos.z),0)+900;   // SRC: low flyers vanish into the ground return
+}
+const radarSubK=()=>({PD:1,MTI:.55,SRC:.8})[radarSub()];
+function cycleRadarSub(){if(!radarPD()){message('THIS RADAR HAS NO DOPPLER MODES',1);return}R.sub=RSUBS[(RSUBS.indexOf(R.sub)+1)%RSUBS.length];message('RADAR · '+R.sub+({PD:' · PULSE-DOPPLER',MTI:' · MOVING TARGET INDICATION · SHORT RANGE',SRC:' · NO DOPPLER FILTER · CLUTTER'})[R.sub],1.6);syncRadarUI()}
 // IRST detection range (game estimate): ~15 km head-on, farther looking at a hot tailpipe
 function irstRange(e){_c.subVectors(P.pos,e.pos).normalize();const rear=e.fwd.dot(_c)<-.3;const b=AC.irstR||15000;return Math.min(AC.irstMax||55000,b*(rear?1.7:1))}
 function radarTarget(){
@@ -24,7 +39,7 @@ function radarTarget(){
   if(R.mode==='TWS'&&R.bug&&R.tracks.has(R.bug))return R.bug;
   return null;
 }
-function resetRadar(){R.mode='RWS';R.az=0;R.rng=2;R.acm=0;R.sweep=0;R.tracks.clear();R.bug=null;R.stt=null;R.spiked=null;seekT=null;syncRadarUI()}
+function resetRadar(){R.sub='PD';R.mode='RWS';R.az=0;R.rng=2;R.acm=0;R.sweep=0;R.tracks.clear();R.bug=null;R.stt=null;R.spiked=null;seekT=null;syncRadarUI()}
 function lockOn(e){
   if(!e||!e.alive)return;
   R.stt=e;R.acqT=0;R.notchT=0;R.bug=e;R.sttSrc=R.mode==='IRST'?'IRST':'RDR';
@@ -60,8 +75,8 @@ function updateRadar(dt){
     let lost=null;
     const irst=R.sttSrc==='IRST';
     if(Math.hypot(a.az,a.el)>(irst?30:((AC.radar&&AC.radar.gimbal)||60))*DEG)lost='GIMBAL LIMIT';
-    else if(a.d>(irst?irstRange(e)*1.3:radRange(e)*1.1))lost='RANGE';
-    if(!irst&&notched(e)){R.notchT+=dt;if(R.notchT>1.5)lost='NOTCHED'} else R.notchT=0;
+    else if(a.d>(irst?irstRange(e)*1.3:radRange(e)*radarSubK()*1.1))lost='RANGE';
+    if(!irst&&radarBlind(e)){R.notchT+=dt;if(R.notchT>1.5)lost='NOTCHED'} else R.notchT=0;
     if(lost){message('LOCK LOST · '+lost,1.5);breakLock()}
     else R.tracks.set(e,{t:now,az:a.az,d:a.d,pos:e.pos.clone(),vel:e.vel.clone()});
     return;
@@ -90,7 +105,7 @@ function updateRadar(dt){
   const lo=Math.min(prev,R.sweep)-.03,hi=Math.max(prev,R.sweep)+.03;
   for(const e of enemies){
     const a=relAngles(e.pos);
-    if(a.az>=lo&&a.az<=hi&&Math.abs(a.el)<30*DEG&&a.d<radRange(e)&&!notched(e))
+    if(a.az>=lo&&a.az<=hi&&Math.abs(a.el)<30*DEG&&a.d<radRange(e)*radarSubK()&&!radarBlind(e))
       R.tracks.set(e,{t:now,az:a.az,d:a.d,pos:e.pos.clone(),vel:e.vel.clone()});
   }
   const keep=R.mode==='TWS'?4.5:2.6;
@@ -103,6 +118,7 @@ function drawScope(c,x0,y0,w,h,mfd){
   const hits=[];
   c.save();c.beginPath();c.rect(x0,y0,w,h);c.clip();
   c.fillStyle='#020604';c.fillRect(x0,y0,w,h);
+  {const cl=Math.round(clutter()*4);c.font='9px monospace';c.textAlign='left';c.fillStyle='rgba(77,255,136,.75)';c.fillText(radarSub()+'  CLTR '+'▮'.repeat(cl)+'▯'.repeat(4-cl),x0+6,y0+11)}
   c.strokeStyle='rgba(77,255,136,.28)';c.lineWidth=1;
   for(let i=1;i<4;i++){const y=Y(RMAX*i/4);c.beginPath();c.moveTo(x0+6,y);c.lineTo(x0+w-6,y);c.stroke()}
   for(const a of [-30,0,30]){const x=X(a*DEG);c.beginPath();c.moveTo(x,y0+12);c.lineTo(x,y0+h-12);c.stroke()}
@@ -164,7 +180,7 @@ function syncRadarUI(){
   $('rMode').textContent=R.stt?(R.sttSrc==='IRST'?'IR LK':'STT'):R.mode; $('rMode').classList.toggle('on',!!R.stt);
   $('rAz').textContent='A'+(R.mode==='TWS'&&AZS[R.az]>25?'2.5':String(AZS[R.az]/10));
   $('rAcm').textContent=acm?(acm==='20x30'?'20×30':acm):'ACM'; $('rAcm').classList.toggle('on',!!acm);
-  $('rRng').textContent=RANGES[R.rng];
+  $('rRng').textContent=RANGES[R.rng];$('rSub').textContent=radarSub();$('rSub').hidden=!radarPD();
   rdrEl.hidden=!rdrOpen; $('bRdr').classList.toggle('on',rdrOpen);
 }
 function sizeScope(){const r=scope.getBoundingClientRect();if(!r.width)return false;
@@ -176,6 +192,7 @@ function drawRadarPanel(){
   sctx.setTransform(DPR,0,0,DPR,0,0); scopeHits=drawScope(sctx,0,0,w,h,false);
 }
 $('bRdr').addEventListener('click',()=>{rdrOpen=!rdrOpen;try{localStorage.setItem('viperRdr',rdrOpen?'1':'0')}catch(e){};syncRadarUI();sizeScope()});
+$('rSub').addEventListener('click',cycleRadarSub);
 $('rMode').addEventListener('click',()=>{if(R.stt)breakLock();else if(R.acm)R.acm=0;else{const ms=AC.radar.modes;R.mode=ms[(ms.indexOf(R.mode)+1)%ms.length];R.tracks.clear();R.bug=null}syncRadarUI()});
 $('rAz').addEventListener('click',()=>{R.az=(R.az+1)%AZS.length;syncRadarUI()});
 $('rAcm').addEventListener('click',()=>{R.acm=(R.acm+1)%ACMS.length;if(R.stt)breakLock();syncRadarUI()});
@@ -262,24 +279,28 @@ function updateWeapons(dt){
     else launch('120',rt)}
 
   // gun: real rate of fire for the selected jet
-  if(gunHeld&&P.rounds>0&&state==='play'){
+  if(gunHeld&&P.rounds>0&&state==='play'&&!(P.sys&&P.sys.gun)){
     gunAcc+=dt*AC.gunRate; gunSndT-=dt; if(gunSndT<=0){sndGun();gunSndT=.05;buzz(12)}
+    gunHeat=Math.min(3,gunHeat+dt);
     while(gunAcc>=1&&P.rounds>0){gunAcc--;P.rounds--;gunShots++;
-      _d.copy(P.fwd);_d.x+=rand(-.004,.004);_d.y+=rand(-.004,.004);_d.z+=rand(-.004,.004);_d.normalize();
-      const b=take(pBullets);b.on=true;b.life=2;b.m.visible=true;
-      b.m.position.copy(P.pos).addScaledVector(P.fwd,5).addScaledVector(P.right,-.9).addScaledVector(P.up,.4).addScaledVector(_d,rand(0,15));
+      // the barrel sits off the centreline and is harmonised on a point ahead; the pattern opens up as the burst goes on
+      _s2.copy(P.pos).addScaledVector(P.fwd,5).addScaledVector(P.right,-.9).addScaledVector(P.up,.4);
+      _d.copy(P.pos).addScaledVector(P.fwd,AC.gunConv||650).sub(_s2).normalize();
+      const sp=(AC.gunDisp||.0035)*(1+gunHeat*.28);_d.x+=rand(-sp,sp);_d.y+=rand(-sp,sp);_d.z+=rand(-sp,sp);_d.normalize();
+      const b=take(pBullets);b.on=true;b.life=2;b.m.visible=(gunShots%4===0);   // one round in four is a tracer
+      b.m.position.copy(_s2).addScaledVector(_d,rand(0,15));
       b.prev.copy(b.m.position); b.vel.copy(P.vel).addScaledVector(_d,AC.muzzle); b.m.quaternion.setFromUnitVectors(ZF,_d);
     }
     if(P.rounds===0)message('WINCHESTER · GUN EMPTY',1.4);
-  } else gunAcc=0;
+  } else {gunAcc=0;gunHeat=Math.max(0,gunHeat-dt*1.5)}
   for(const b of pBullets){ if(!b.on)continue;
-    if(ground.length)for(const g of ground)if(g.alive&&distSeg(_s1.copy(g.pos).setY(g.pos.y+2),b.prev,b.m.position)<9){kill(b);gunHits++;g.hp-=AC.gunDmg;puff(b.m.position.x,b.m.position.y,b.m.position.z,0,0,0,1,.8,.3,1,5,16,.25);if(g.hp<=0)killGround(g);break}
+    if(ground.length)for(const g of ground)if(g.alive&&distSeg(_s1.copy(g.pos).setY(g.pos.y+2),b.prev,b.m.position)<9){kill(b);gunHits++;g.hp-=AC.gunDmg*BELT().gnd;if(g.hp>0)scEvent('HIT',2,'','ghit');puff(b.m.position.x,b.m.position.y,b.m.position.z,0,0,0,1,.8,.3,1,5,16,.25);if(g.hp<=0)killGround(g);break}
     if(!b.on)continue;
     b.life-=dt; if(b.life<=0){kill(b);continue}
     b.prev.copy(b.m.position); b.vel.y-=G*dt; b.vel.multiplyScalar(gunDrag(b.vel.length(),atm(b.m.position.y).sig,dt)); b.m.position.addScaledVector(b.vel,dt);
     for(const e of enemies){ if(!e.alive)continue;
       if(distSeg(e.pos,b.prev,b.m.position)<(e.kind==='fighter'?7:14)){kill(b);gunHits++;const p=b.m.position;puff(p.x,p.y,p.z,0,0,0,1,.8,.3,1,5,16,.25);
-        hitAI(e,AC.gunDmg,'GUNS',true);break}}
+        hitAI(e,AC.gunDmg*BELT().air,'GUNS',true);break}}
   }
   // missiles: proportional navigation, g-limited by airspeed
   for(const m of missiles){ if(!m.on)continue;
@@ -325,10 +346,9 @@ function updateWeapons(dt){
     if(b.team==='ghost')continue;
     if(b.team==='red'){
       if(state==='play'&&P.alive&&distSeg(P.pos,b.prev,b.m.position)<6){
-        kill(b);P.hp-=4*(b.dmg||1);if(Math.random()<.5)addHole(playerJet,1);hurtT=.35;shake=.4;sndHit();buzz(40);
+        kill(b);if(clock-(P.fdT||-9)>1.5){P.fdT=clock;feed('You were hit by gunfire','loss')}if(Math.random()<.5)addHole(playerJet,1);hurtT=.35;shake=.4;sndHit();buzz(40);
         puff(P.pos.x,P.pos.y+1,P.pos.z,0,0,0,1,.7,.3,1,4,12,.2);
-        if(Math.random()<.12*(b.dmg||1))damageSystem(1);
-        if(P.hp<=0)die('shot');continue}
+        playerGunHit(b.dmg||1);continue}
       for(const f of friends)if(f.alive&&distSeg(f.pos,b.prev,b.m.position)<(f.kind==='fighter'?7:16)){kill(b);hitAI(f,b.dmg||1,'GUNS',false);break}
     } else for(const e of enemies)if(e.alive&&distSeg(e.pos,b.prev,b.m.position)<(e.kind==='fighter'?7:14)){kill(b);hitAI(e,b.dmg||1,'GUNS (WINGMAN)',false);break}
   }
@@ -549,7 +569,7 @@ function updateEnemyMissiles(dt){
     let done=false;
     const fz=s.fuze;
     if(m.team==='red'&&state==='play'&&P.alive&&distSeg(P.pos,m.prev,p)<fz){
-      done=true;recMsl(m,'HIT','');explode(p,false);P.hp-=75;addHole(playerJet,5);hurtT=.8;shake=1.2;sndHit();buzz([120,60,200]);message('MISSILE HIT',1.2);damageSystem(2);if(P.hp<=0)die('missile');
+      done=true;recMsl(m,'HIT','');playerMissileHit();
     } else if(CM.decoy&&m.target===CM.decoy&&distSeg(CM.decoy.pos,m.prev,p)<fz){done=true;recMsl(m,'MISS','HIT YOUR TOWED DECOY');explode(p,false);cutDecoy();syncCM();message('DECOY HIT · DECOY LOST',1.4)}
     else if(m.target&&m.target.kind&&m.target!==P&&distSeg(m.target.pos,m.prev,p)<fz*(m.target.kind==='fighter'?1:1.8)){done=true;recMsl(m,'HIT','');explode(p,false);hitAI(m.target,5,m.name,false)}
     else if(m.target&&m.target.type&&!m.target.kind&&distSeg(m.target.pos,m.prev,p)<fz){done=true;explode(p,false);recMsl(m,'MISS',m.reason||'DECOYED')}

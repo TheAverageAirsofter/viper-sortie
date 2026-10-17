@@ -1,0 +1,13 @@
+{
+  "name": "viper-sortie",
+  "version": "1.0.0",
+  "description": "Viper Sortie - 3D F-16 combat flight sim",
+  "author": "ValidAirsoft Productions",
+  "main": "main.js",
+  "build": {
+    "appId": "com.validairsoft.vipersortie",
+    "productName": "Viper Sortie",
+    "files": ["main.js", "www/**/*"],
+    "win": { "icon": "icon.png", "target": [{ "target": "portable", "arch": ["x64"] }], "artifactName": "viper-sortie.exe" }
+  }
+}

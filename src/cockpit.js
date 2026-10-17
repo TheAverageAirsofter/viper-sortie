@@ -131,7 +131,7 @@ function drawPanel(){
   // caution lights
   const sy=P.sys||{eng:[],hyd:false,radar:false,leak:false};
   const lights=[['MASTER CAUTION',P.hp<50||sy.hyd||sy.radar||sy.leak||sy.eng.some(v=>v>0)||P.bingo,'#ffb347'],['ENG FIRE',sy.eng.some(v=>v===1),'#ff4a3d'],
-    ['HYD',sy.hyd,'#ffb347'],['FUEL',P.bingo||sy.leak,'#ffb347'],['GCAS',P.gcas,'#ffb347']];
+    ['HYD',sy.hyd,'#ffb347'],['FUEL',P.bingo||sy.leak,'#ffb347'],['GCAS',P.gcas,'#ffb347'],['STALL',(P.nAero<1.02&&!P.onGround)||!!P.spin,'#ff4a3d'],['FLAPS',!!P.flaps,'#8ee0ff']];
   lights.forEach(([t,on,col],i)=>{const x=366+i*58,y=140;c.fillStyle=on?col:'#1a1d1f';c.fillRect(x,y,54,34);
     font(10);c.fillStyle=on?'#111':'#4a5054';c.textAlign='center';
     const parts=t.split(' ');parts.forEach((p,j)=>c.fillText(p,x+27,y+17+(j-(parts.length-1)/2)*11))});
@@ -170,8 +170,8 @@ function drawPanelAlt(pit){
     c.strokeStyle='#cfd5d0';c.lineWidth=1.5;for(let i=0;i<12;i++){const a=-Math.PI*.75+i/11*Math.PI*1.5;c.beginPath();c.moveTo(x+Math.sin(a)*r*.75,y-Math.cos(a)*r*.75);c.lineTo(x+Math.sin(a)*r*.92,y-Math.cos(a)*r*.92);c.stroke()}
     const a=-Math.PI*.75+clamp(frac,0,1)*Math.PI*1.5;c.strokeStyle='#f2f2ea';c.lineWidth=3;c.beginPath();c.moveTo(x,y);c.lineTo(x+Math.sin(a)*r*.85,y-Math.cos(a)*r*.85);c.stroke();c.lineWidth=1.5;
     font(9);c.fillStyle='#cfd5d0';c.textAlign='center';c.fillText(label,x,y+r*.5)};
-  const caut=(x,y)=>{const sy=P.sys||{eng:[],hyd:false};[['MASTER',P.hp<50||sy.hyd||sy.eng.some(v=>v>0)||P.bingo,'#ffb347'],['FIRE',sy.eng.some(v=>v===1),'#ff4a3d'],['HYD',sy.hyd,'#ffb347'],['FUEL',P.bingo,'#ffb347']]
-    .forEach(([t,on,col],i)=>{c.fillStyle=on?col:'#1a1d1f';c.fillRect(x+i*58,y,54,28);font(10);c.fillStyle=on?'#111':'#4a5054';c.textAlign='center';c.fillText(rus?({MASTER:'ОТКАЗ',FIRE:'ПОЖАР',HYD:'ГИДР',FUEL:'ТОПЛ'})[t]:t,x+i*58+27,y+14)})};
+  const caut=(x,y)=>{const sy=P.sys||{eng:[],hyd:false};[['MASTER',P.hp<50||sy.hyd||sy.eng.some(v=>v>0)||P.bingo,'#ffb347'],['FIRE',sy.eng.some(v=>v===1),'#ff4a3d'],['HYD',sy.hyd,'#ffb347'],['FUEL',P.bingo,'#ffb347'],['STALL',(P.nAero<1.02&&!P.onGround)||!!P.spin,'#ff4a3d'],['FLAPS',!!P.flaps,'#8ee0ff']]
+    .forEach(([t,on,col],i)=>{c.fillStyle=on?col:'#1a1d1f';c.fillRect(x+i*58,y,54,28);font(10);c.fillStyle=on?'#111':'#4a5054';c.textAlign='center';c.fillText(rus?({MASTER:'ОТКАЗ',FIRE:'ПОЖАР',HYD:'ГИДР',FUEL:'ТОПЛ',STALL:'СРЫВ',FLAPS:'ЗАКР'})[t]:t,x+i*58+27,y+14)})};
   const ft=P.pos.y*3.281;
   if(pit==='LAD'){screen(24,30,976,250);drawScope(c,32,34,560,242,true);sms(612,40,380);caut(24,300);adi(560,340,48);gauge(680,340,44,P.kcas/800,'KT');gauge(790,340,44,(ft%10000)/10000,'ALT');
     font(12);c.fillStyle='#b8ff3d';c.textAlign='left';c.fillText(`M${P.mach.toFixed(2)} ${P.n.toFixed(1)}G ${Math.round(throttle*100)}%`,860,330)}

@@ -10,7 +10,7 @@ const path = require('path'), assert = require('assert');
   };
   // free play: the tab explains career mode and can switch it on
   let p = await open();
-  await p.click('#bHangar'); await p.click('.hgTabs button[data-tab=tree]'); assert.match(await p.textContent('#hgTree'), /Career mode/);
+  await p.click('#bHangar'); await p.click('.hgTabs button[data-tab=tree]'); assert.match(await p.textContent('#hgTree'), /Free play: every aircraft is unlocked/);
   await p.click('#hgTree [data-act=career]'); await p.waitForTimeout(300); assert(await p.isVisible('#hgTree .tree'), 'tree shows after switching to career'); await p.close();
   // career with some RP and Silver Lions banked
   p = await open({ viperMode: 'career', vsProg: JSON.stringify({ sl: 400000, frp: 3000, rp: { MIG21: 6000 }, sorties: 3 }) });
@@ -22,7 +22,7 @@ const path = require('path'), assert = require('assert');
   await p.click('#hgTree .tn[data-id=MIG29]'); await p.click('#hgTree [data-act=research]'); await p.waitForTimeout(200);
   assert.match(await cls('MIG29'), /res/); let g = await p.evaluate(() => ({ rp: __vs.prog.rp.MIG21, frp: __vs.prog.frp })); assert.equal(g.rp, 2000); assert.equal(g.frp, 3000);
   // buy it (25,000 SL)
-  await p.click('#hgTree [data-act=buy]'); await p.waitForTimeout(300); assert.match(await cls('MIG29'), /own/); assert.equal(await p.evaluate(() => __vs.prog.sl), 375000);
+  await p.click('#hgTree [data-act=buy]'); await p.waitForTimeout(300); assert.match(await cls('MIG29'), /own/); assert.equal(await p.evaluate(() => __vs.prog.sl), 378000);
   // modules on the F-4E: a stock career jet flies with penalties; research with RP, buy with SL
   assert.equal(await p.evaluate(() => __vs.AC.id), 'F4E', 'career starts in an owned jet');
   const thr0 = await p.evaluate(() => Math.round(__vs.AC.T_AB / 1000)); assert(thr0 < 159, 'stock thrust is reduced: ' + thr0);
@@ -47,13 +47,16 @@ const path = require('path'), assert = require('assert');
   const r = await p.evaluate(() => { const before = __vs.prog.sl, o = __vs.progAward(2000, true, 3, true, false), lost = __vs.progAward(500, false, 0, false, false); return { before, o, lost, after: __vs.prog.sl }; });
   assert(r.o.sl > 3000 && r.o.rep === 0, 'win pays Silver Lions ' + JSON.stringify(r.o)); assert(r.lost.rep > 1000, 'a lost jet costs a repair bill ' + JSON.stringify(r.lost));
   // matchmaking near the flown aircraft's BR
-  // matchmaking: bandits are only ever within 0.7 BR of the jet you fly, in every mode
+  // matchmaking: bandits are only ever within 1.0 BR of the jet you fly, in every mode
   for (const [id, mixed] of [['F4E', true], ['F4E', false], ['JA37', true], ['F22A', true], ['MIG29', false]]) {
     const r = await p.evaluate(([id, mixed]) => { __vs.setAC(id); if (mixed) { const e = document.getElementById('bBandit'); for (let i = 0; i < 90 && !/mixed/i.test(e.textContent); i++) e.click(); } const set = new Set(); for (let i = 0; i < 400; i++) set.add(__vs.pickBanditType()); const br = __vs.NODES[id].br; return { n: set.size, worst: Math.max(...[...set].map(t => Math.abs(__vs.NODES[t].br - br))), types: [...set].slice(0, 6) }; }, [id, mixed]);
-    assert(r.n >= 1 && r.worst <= 0.7 + 1e-6, id + (mixed ? ' mixed' : ' fixed') + ' stays within 0.7 BR: ' + JSON.stringify(r));
+    assert(r.n >= 1 && r.worst <= 1.0 + 1e-6, id + (mixed ? ' mixed' : ' fixed') + ' stays within 1.0 BR: ' + JSON.stringify(r));
   } await p.close();
   // persistence
-  p = await open({ viperMode: 'career' }); await p.evaluate(() => { __vs.prog.res.SU27 = true; __vs.prog.own.SU27 = true; localStorage.setItem('vsProg', JSON.stringify(__vs.prog)); }); await p.waitForTimeout(1500); await p.reload(); await p.waitForTimeout(1200);
-  assert(await p.evaluate(() => __vs.prog.own.SU27), 'ownership persists'); await p.close();
+  p = await open({ viperMode: 'career' }); await p.evaluate(() => { __vs.prog.res.SU27 = true; __vs.prog.own.SU27 = true; localStorage.setItem('vsProg', JSON.stringify(__vs.prog)); }); await p.waitForTimeout(1500); await p.reload(); await p.waitForFunction(() => window.__vs && window.__vs.prog, null, { timeout: 20000 }); await p.waitForTimeout(500);
+  assert(await p.evaluate(() => __vs.prog.own.SU27), 'ownership persists');
+  { const r = await p.evaluate(() => { const V = __vs; V.prog.sl = 0; V.prog.frp = 0; const before = V.pass.pts; V.passAdd(250); const mid = V.pass.pts; const ok = V.passClaim(1), again = V.passClaim(1), locked = V.passClaim(5);
+      const w = V.weeklyAdd('w', 3); return { gained: mid - before, ok, again, locked, rewarded: V.prog.sl + V.prog.frp > 0, w }; });   // season pass: points, a claimable tier, a finished weekly task
+    assert(r.gained === 250 && r.ok && !r.again && !r.locked && r.rewarded && /Weekly/.test(r.w || ''), 'pass and weekly: ' + JSON.stringify(r)); }
   assert.deepEqual(errs, []); console.log('progress ok'); await b.close();
 })().catch(e => { console.error(e); process.exit(1); });

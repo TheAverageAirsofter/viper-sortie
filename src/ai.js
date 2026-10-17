@@ -11,7 +11,7 @@ function pickTarget(e){
     if(e.kind!=='fighter')return null;
     const tr=friends.find(f=>f.alive&&f.kind==='transport');
     if(tr&&e.escortPref)return tr;
-    let best=null,bd=60000;for(const b of blueJets()){const d=b.pos.distanceTo(e.pos);if(d<bd){bd=d;best=b}}return best;
+    let best=null,bd=e.wp?22000:60000;for(const b of blueJets()){const d=b.pos.distanceTo(e.pos);if(d<bd){bd=d;best=b}}return best;
   }
   // blue wingman / flight
   if(e.cmd==='REJOIN')return null;
@@ -19,7 +19,7 @@ function pickTarget(e){
   if(e.cmd==='SORT'){const taken=new Set(friends.filter(f=>f!==e&&f.alive&&f.cmd==='SORT'&&f.tgt).map(f=>f.tgt));if(lockTarget)taken.add(lockTarget);
     let best=null,bd=60000;for(const r of enemies){if(!r.alive||taken.has(r))continue;const d=r.pos.distanceTo(e.pos);if(d<bd){bd=d;best=r}}if(best)return best}
   if(e.cmd==='COVER'){let best=null,bd=20000;for(const r of enemies){if(!r.alive||r.tgt!==P)continue;const d=r.pos.distanceTo(P.pos);if(d<bd){bd=d;best=r}}return best}
-  let best=null,bd=60000;for(const r of enemies){if(!r.alive)continue;const d=r.pos.distanceTo(e.pos);if(d<bd){bd=d;best=r}}return best;
+  let best=null,bd=e.wp?22000:60000;for(const r of enemies){if(!r.alive)continue;const d=r.pos.distanceTo(e.pos);if(d<bd){bd=d;best=r}}return best;
 }
 // which missile coming at this jet does it know about? radar shots via RWR, heat-seekers only by eye (<3.5 km) or a MAW
 function threatTo(e){
@@ -75,6 +75,7 @@ const dummy=new THREE.Object3D();
 function updateAI(e,dt){
   axes(e); e.flareCd-=dt; e.chaffCd-=dt; e.mslCd-=dt; e.retgtT-=dt;
   if(e.kind!=='fighter'){updateHeavy(e,dt);return}
+  if(e.sys){aiSystems(e,dt);if(!e.alive)return}
   if(e.drone){steer(e,dt,_s4.copy(e.fwd).setY(0).normalize(),1,.8);return}
   if(e.retgtT<=0||!e.tgt||!e.tgt.alive){e.retgtT=1.5;e.tgt=pickTarget(e)}
   const tg=e.tgt, live=state==='play';
@@ -103,6 +104,7 @@ function updateAI(e,dt){
     e.mode='FORM';
     if(lead){_s5.copy(lead.pos).addScaledVector(lead.right,1400*e.side).addScaledVector(lead.fwd,-300).addScaledVector(lead.vel,3);
       dir.subVectors(_s5,e.pos).normalize(); const behind=_s3.subVectors(_s5,e.pos).dot(lead.fwd)>0; thr=behind?1:.72}
+    else if(e.wp){dir.subVectors(e.wp,e.pos);dir.y*=.3;dir.normalize();thr=.9}   // air battle: fly to the zone
     else dir.copy(e.fwd);
   } else {
     // attack: pure pursuit long range (stay high), lead pursuit in the fight, unload when slow
@@ -116,7 +118,7 @@ function updateAI(e,dt){
   if(agl<900||(e.vel.y<-70&&agl<2600)){dir.copy(e.fwd);dir.y=Math.max(.5,dir.y);dir.normalize();thr=1}
   steer(e,dt,dir,gK,thr*(e.thrK??1));
   const fl=e.obj.getObjectByName('flame'); if(fl)fl.scale.z=thr>.95?1.5:.5; setAB(e.obj,thr>.95);
-  if(e.pos.y<Math.max(groundH(e.pos.x,e.pos.z),0)+3){e.alive=false;scene.remove(e.obj);explode(e.pos,true);recEvent((e.team==='red'?'Bandit ':'Wingman ')+'flew into the ground');return}
+  if(e.pos.y<Math.max(groundH(e.pos.x,e.pos.z),0)+3){crashAI(e);return}
   if(!live||!tg)return;
   if(ground.includes(tg)){   // flight ground attack: guided bomb release inside ~6 km, then pull off
     const dh=Math.hypot(tg.pos.x-e.pos.x,tg.pos.z-e.pos.z); e.bombCd=(e.bombCd||0)-dt;

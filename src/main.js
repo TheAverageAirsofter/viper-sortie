@@ -3,7 +3,7 @@ let last=performance.now();
 // AIM-120D: ~30 % more range than the C-7 (86 nm class), two-way datalink, GPS-aided INS (USAF F-16s carry it; approved for some exports)
 function effAC(id){const b0=effAC0(id); let v=ldGet(id);
   if(!ldValid(id,v))v=ldDefault(id);
-  if(mission==='STRIKE'&&!Object.values(v.ag).some(n=>n>0)&&STRIKE_LOAD[id])v=ldStrike(id);
+  if((mission==='STRIKE'||mission==='NAVAL'||mission==='COMBINED')&&!Object.values(v.ag).some(n=>n>0)&&STRIKE_LOAD[id])v=ldStrike(id);
   const c=ldCap(id), d=ldDefault(id), H=JET_HP[id]||{tankKg:0};
   const mrKg=MRKG[b0.mrFull]||180, srKg=SRKG[b0.srFull]||95, agList=Object.entries(v.ag).filter(([,n])=>n>0);
   const agKg=agList.reduce((a,[k,n])=>a+AGKG[k]*n+(AGW[k].perSt>1?Math.ceil(n/AGW[k].perSt)*145:0),0), tkFuel=v.tk*H.tankKg;
@@ -65,7 +65,7 @@ function renderLd(){
   row(b.srFull,'short range · '+c.sr+' rails',v.sr,v.sr>0,v.sr<c.sr,()=>v.sr--,()=>v.sr++);
   if(c.hp)row(b.mrFull,'medium/long range · '+c.hp+' stations',v.mr,v.mr>0,v.mr<c.hp&&free>0,()=>v.mr--,()=>v.mr++);
   for(const k of c.ag){const W=AGW[k],n=v.ag[k]||0,per=W.perSt||1;
-    row(W.name,(W.kind==='arm'?'anti-radiation':W.kind==='dumb'?'unguided bomb · CCIP':'guided bomb')+(per>1?' · '+per+' per rack':''),n,n>0,(n%per!==0)||free>0,
+    row(W.name,(W.kind==='arm'?'anti-radiation':W.kind==='rocket'?'unguided rockets · CCIP':W.kind==='dumb'?'unguided bomb · CCIP / CCRP':'guided bomb')+(per>1?' · '+per+' per rack':''),n,n>0,(n%per!==0)||free>0,
       ()=>{v.ag[k]=n-1;if(!v.ag[k])delete v.ag[k]},()=>{v.ag[k]=n+1})}
   if(c.tanks)row('Drop tanks','+'+(H.tankKg/1000).toFixed(1)+' t fuel each · drag · JETT button',v.tk,v.tk>0,v.tk<c.tanks&&free>0,()=>v.tk--,()=>v.tk++);
   const e=effAC(id), m=e.MASS+.75*e.intFuel+e.tankFuel-.6*e.fuelCap+.6*e.fuelCap*0, tw=(e.T_AB/(m*G));
@@ -121,14 +121,14 @@ function frame(now){
       if(state==='menu'){if(!HG.on&&!HG.bg)updatePlayer(h,true)} else if(state==='play')updatePlayer(h,false);
       if(state!=='menu'&&state!=='replay')updateCombat(h);
     }
-    rec3(dt); voiceWatch(); updateEject(dt); syncEjectBtn();
+    rec3(dt); voiceWatch(); updateEject(dt); if(BT.on)btTick(dt); syncEjectBtn();
     if(state==='dead'){deadT-=dt;if(deadT<=0){state='over';campaignAfter();careerAward();if(score>best){best=score;try{localStorage.setItem('viperBest',best)}catch(e){}}showOverlay('over')}}
     fxTick++; if(P.alive)jetFX(P,AC.id,true);
     for(const e of enemies)if(e.kind==='fighter')jetFX(e,e.type,false);
     for(const f of friends)if(f.kind==='fighter')jetFX(f,f.type,false);
     if(state==='play'||state==='dead'){dmgFX(P,AC.id,true);for(const e of enemies)dmgFX(e,e.type,false);for(const f of friends)dmgFX(f,f.type,false)}
     updateParticles(dt); updateRings(dt);
-    animJet(playerJet.children[0],P,dt,true); if(outside&&VIEWS[view]==='COCKPIT')animJet(outside,P,dt,true); animGear(dt); updateWrecks(dt);
+    animJet(playerJet.children[0],P,dt,true); if(outside&&VIEWS[view]==='COCKPIT')animJet(outside,P,dt,true); animGear(dt); updateWrecks(dt); updateDebris(dt);
     for(const L of [enemies,friends])for(const j of L)if(j.alive&&j.kind==='fighter'){const d=j.pos.distanceTo(camera.position);lodJet(j.obj,d);if(d<3500)animJet(j.obj,j,dt,false)}
   }
   HAZE_MAT.uniforms.t.value=clock; HAZE_MAT.uniforms.k.value=QUALS[quality].fx?1:0;
@@ -149,10 +149,12 @@ function frame(now){
   updateShadow(); gust=1+.35*Math.sin(clock*.7)*Math.sin(clock*1.9+1); updateRain(dt||.016); updateLightning(dt||.016);
   for(const cl of clouds){if(!cl.visible)continue;const d=cl.position.distanceTo(camera.position),o=clamp((d-380)/900,0,1)*.95;if(cl.userData.op!==o){cl.userData.op=o;for(const m of cl.userData.mats)m.opacity=o}}
   sndEngine(); sndExtra(); sndFlyby(); updateGlints(); updateFlareLight(); shadowFollow();
-  renderer.clear(); renderer.render((HG.on||HG.bg)&&hgSaved&&hgScene?hgScene:scene,camera); if(VIEWS[view]!=='COCKPIT'&&!(KC.t>0)&&state!=='replay')heatPass();
-  if(VIEWS[view]==='COCKPIT'&&!(KC.t>0)&&(state==='play'||state==='menu'||state==='paused')){
-    updateCockpit(dt||.016); renderer.clearDepth(); renderer.render(cockScene,cockCam);
-  }
+  const scn=(HG.on||HG.bg)&&hgSaved&&hgScene?hgScene:scene, inCock=VIEWS[view]==='COCKPIT'&&!(KC.t>0)&&(state==='play'||state==='menu'||state==='paused');
+  if(inCock)updateCockpit(dt||.016);
+  if(!postRender(scn,camera,inCock)){
+    renderer.clear(); renderer.render(scn,camera); if(VIEWS[view]!=='COCKPIT'&&!(KC.t>0)&&state!=='replay')heatPass();
+    if(inCock){renderer.clearDepth(); renderer.render(cockScene,cockCam)}
+  }else if(VIEWS[view]!=='COCKPIT'&&!(KC.t>0)&&state!=='replay')heatPass();
   if(TGP.mode&&!PHOTO.on)renderTGP(); else TGP.rect=null;
   if(photoGrab)photoCapture();
   drawHUD(); drawRadarPanel();
@@ -161,11 +163,16 @@ requestAnimationFrame(frame);
 
 /* ---------- HUD colour palette (colour-blind safe option: cyan friendly, orange threat, yellow warning) ---------- */
 const PALS={green:{n:'green',hud:'#7dff9a',dim:'rgba(125,255,154,.45)',warn:'#ffb347',threat:'#ff5a4e'},
-  cb:{n:'blue / orange',hud:'#5cd0ff',dim:'rgba(92,208,255,.45)',warn:'#ffe14d',threat:'#ff8c1a'}};
+  cb:{n:'blue / orange',hud:'#5cd0ff',dim:'rgba(92,208,255,.45)',warn:'#ffe14d',threat:'#ff8c1a'},
+  deut:{n:'cyan / magenta',hud:'#5ce8ff',dim:'rgba(92,232,255,.45)',warn:'#ffe14d',threat:'#ff4fd8'},          // red-green colour blindness: no red or green at all
+  trit:{n:'red / teal',hud:'#9df0e0',dim:'rgba(157,240,224,.45)',warn:'#ffd0a0',threat:'#ff5a6a'},            // blue-yellow colour blindness
+  mono:{n:'white / amber',hud:'#ffffff',dim:'rgba(255,255,255,.5)',warn:'#ffc04a',threat:'#ffffff'},          // threats are told apart by shape and flashing, not hue
+  hc:{n:'high contrast',hud:'#ffffff',dim:'rgba(255,255,255,.7)',warn:'#ffff00',threat:'#ff3030'}};
+const PAL_ORDER=['green','cb','deut','trit','mono','hc'];
 let palKey='green'; try{const k=localStorage.getItem('viperPal');if(PALS[k])palKey=k}catch(e){}
 function applyPal(){const p=PALS[palKey],r=document.documentElement.style;HUD=p.hud;HUDD=p.dim;WARN=p.warn;THREAT=p.threat;
   r.setProperty('--hud',p.hud);r.setProperty('--hud-dim',p.dim);r.setProperty('--warn',p.warn);r.setProperty('--threat',p.threat);$('bPal').textContent='HUD colours: '+p.n}
-$('bPal').addEventListener('click',()=>{palKey=palKey==='green'?'cb':'green';try{localStorage.setItem('viperPal',palKey)}catch(e){};applyPal()});
+$('bPal').addEventListener('click',()=>{palKey=PAL_ORDER[(PAL_ORDER.indexOf(palKey)+1)%PAL_ORDER.length];try{localStorage.setItem('viperPal',palKey)}catch(e){};applyPal()});
 applyPal();
 
 /* ---------- first-run hint: point new pilots at the guided lessons ---------- */
@@ -177,7 +184,7 @@ applyPal();
 })();
 
 /* ---------- movable controls: drag buttons to where your thumbs rest (saved per device) ---------- */
-const LAY_IDS=['bGun','b9','b120','bAg','bAgN','bLock','bGear','bBrake','bRdr','bCam','bPause','bEject','thr','cm'];
+const LAY_IDS=['bGun','b9','b120','bAg','bAgN','bSight','bWpn','bLock','bGear','bFlaps','bBrake','bRdr','bCam','bPause','bEject','thr','cm'];
 const LAY_SIZES=[.85,1,1.2,1.4];
 let lay={s:1,p:{}}; try{const v=JSON.parse(localStorage.getItem('viperLayout')||'null');if(v&&typeof v==='object'){lay.s=LAY_SIZES.includes(v.s)?v.s:1;lay.p=v.p&&typeof v.p==='object'?v.p:{}}}catch(e){}
 function layApply(){for(const id of LAY_IDS){const el=$(id);if(!el)continue;const o=lay.p[id];
@@ -226,7 +233,7 @@ $('layMirror').addEventListener('click',()=>{for(const id of LAY_IDS){const el=$
 
 /* ---------- controls guide: labels every button; shown once after the first launch ---------- */
 const TIPS=[['bGun','<b>GUN</b> hold to fire'],['b9','<b>9X</b> heat-seeking missile'],['b120','<b>120</b> radar missile'],['bLock','<b>LOCK</b> radar target'],
-  ['thr','<b>THROTTLE</b> drag; top = afterburner'],['cm','<b>FLR / CHF</b> decoys vs missiles'],['bGear','<b>GEAR</b> up / down'],['bBrake','<b>BRK</b> speed brake'],
+  ['thr','<b>THROTTLE</b> drag; top = afterburner'],['cm','<b>FLR / CHF</b> decoys vs missiles'],['bGear','<b>GEAR</b> up / down'],['bFlaps','<b>FLAPS</b> up / combat / landing'],['bBrake','<b>BRK</b> speed brake'],
   ['bRdr','<b>RDR</b> radar panel'],['bCam','<b>CAM</b> change view'],['bPause','<b>II</b> pause / menu']];
 function tipsShow(){const box=$('tips');box.querySelectorAll('.tip').forEach(e=>e.remove());box.hidden=false;
   const placed=[],W_=innerWidth,H_=innerHeight,hit=(a,b)=>a.l<b.r&&a.r>b.l&&a.t<b.b&&a.b>b.t;
@@ -243,7 +250,7 @@ function tipsHide(){$('tips').hidden=true;try{localStorage.setItem('vsTips','1')
 $('tips').addEventListener('pointerdown',e=>{e.stopPropagation();e.preventDefault();tipsHide()});
 $('bTips').addEventListener('click',()=>{try{localStorage.removeItem('vsTips')}catch(e){};$('bStart').click()});   // launch, then the guide shows
 $('bStart').addEventListener('click',()=>{let seen=false;try{seen=!!localStorage.getItem('vsTips')}catch(e){}
-  if(!seen)setTimeout(()=>{if(state==='play'&&$('tips').hidden)tipsShow()},700)});
+  if(!seen){let n=0;const t=setInterval(()=>{if(++n>60||!$('tips').hidden){clearInterval(t);return}if(state==='play'){clearInterval(t);setTimeout(()=>{if(state==='play'&&$('tips').hidden)tipsShow()},700)}},250)}});   // the briefing and loading screen come first, so wait for the sortie to begin
 
 /* ---------- local leaderboard (per mission, top 10) and share ---------- */
 function lbGet(m){try{const a=JSON.parse(localStorage.getItem('vsLb_'+m)||'[]');return Array.isArray(a)?a.filter(x=>x&&+x.s>0):[]}catch(e){return[]}}
@@ -264,10 +271,10 @@ const _careerAward=careerAward;
 careerAward=function(){lbAdd();return _careerAward.apply(this,arguments)};
 
 /* ---------- test hook (only with ?test in the URL) ---------- */
-if(/[?&]test\b/.test(location.search))window.__vs={setThr,HEAT,explode,puff,camera,LT,townLights,flashLt,P,fly,dlz,flyout,AC_DEFS,V3,atm,clamp,lbAdd,showOverlay:k=>showOverlay(k),setScore:(n,k)=>{score=n;kills=k},get state(){return state},missiles:()=>missiles.filter(m=>m.on),setAC:id=>{AC=AC_DEFS[id];applyAC()},wt:{   // weapon-test hooks: a clean sky, one drone, scripted launches
+if(/[?&]test\b/.test(location.search))window.__vs={spawnFighter,clockNow:()=>clock,cycleRadarSub,radarBlind,radarSub,clutter,R,AA,killEnemy,aaSpawnWave,AG,agRelease,agSight,agWpn,ccip,agReset,btConditions,NET,netScoreCheck,netTeamScore,sbHtml,killGround,get pass(){return pass},passAdd,passClaim,weeklyAdd,scene,rinfoReset:()=>{renderer.info.autoReset=false;renderer.info.reset()},rinfo:()=>({c:renderer.info.render.calls,t:renderer.info.render.triangles,g:renderer.info.memory.geometries,tx:renderer.info.memory.textures}),KB,kbRebuild,playerGunHit,wingHit,BT,die,btRespawn,TMAP,mapStep,KBM,SC,damageSystem,hitAI,killEnemy,setThr,HEAT,explode,puff,camera,LT,townLights,flashLt,P,fly,dlz,flyout,AC_DEFS,feed,WAR,WAR_V,warBuild,warSpawn,warModules,warDie,warFlags,updateWar,warAlive,buildJet,PLAYER_COLORS,M2,V3,atm,clamp,lbAdd,showOverlay:k=>showOverlay(k),setScore:(n,k)=>{score=n;kills=k},get state(){return state},get enemies(){return enemies},missiles:()=>missiles.filter(m=>m.on),setAC:id=>{AC=AC_DEFS[id];applyAC()},wt:{   // weapon-test hooks: a clean sky, one drone, scripted launches
   begin:id=>{AC=AC_DEFS[id];applyAC();startGame();return AC.id},
   clear:()=>{waveClearT=1e9;for(const e of enemies){e.alive=false;scene.remove(e.obj)}enemies.length=0;P.pos.set(0,6000,0);P.vel.set(0,0,250);throttle=.7;return state},
-  target:(type,dz,away,speed)=>{const e=spawnFighter('red',type,new V3(0,6000,dz),new V3(0,6000,dz+(away?9999:-9999)),{ir:0,rdr:0,speed:speed||220});e.drone=true;return e.id},
+  target:(type,dz,away,speed)=>{const e=spawnFighter('red',type,new V3(0,P.pos.y,dz),new V3(0,P.pos.y,dz+(away?9999:-9999)),{ir:0,rdr:0,speed:speed||220});e.drone=true;return e.id},
   lock:()=>{if(enemies[0])lockOn(enemies[0])},fire:w=>{if(w==='9X')fire9=true;else fire120=true},gun:on=>{gunHeld=on},
   missiles:()=>missiles.filter(m=>m.on),
   st:()=>{const e=enemies[0];return{can9,can120,aim9:P.aim9,aim120:P.aim120,rounds:P.rounds,alive:!!(e&&e.alive),hp:e?e.hp:0,msl:missiles.filter(m=>m.on).length,stt:!!R.stt,sttAcq:R.acqT,d:e?e.pos.distanceTo(P.pos):0,msg:$('msg')?$('msg').textContent:''}}},M2dims:()=>{const o={};for(const id in M2){const S=M2[id],zs=S.fus.map(f=>f[0]).concat(S.noz.map(n=>n[2]-n[4]/2)),L=Math.max(...zs)-Math.min(...zs),sp=2*Math.max(...S.wings.flatMap(w=>w.st.map(q=>q.x)));const k=M2K[id]||[1,1,1];o[id]=[+(L*k[2]).toFixed(2),+(sp*k[0]).toFixed(2)]}return o},ROSTER_IDS,restart:()=>startGame(),spawnAll:()=>{let n=0;for(const id of FIGHTERS){spawnFighter('red',id,P.pos.clone().add(new V3(rand(-4000,4000),rand(-300,300),rand(8000,14000))),P.pos);n++}return n},tableRows:id=>({gear:!!GEAR_SPEC[id],snd:!!ENG_SND[id],hp:!!JET_HP[id],rcs:RCS[id]!=null,paint:!!PAINT[id]||!!(AC_DEFS[id].model),band:!!BANDITS[id],fighter:FIGHTERS.indexOf(id)>=0}),get preset(){return preset},PRESETS,get daily(){return daily},dailyAdd,endTest:o=>{deathCause=o.cause||'win';score=o.score||0;kills=o.kills||0;missionT=o.t||90;P.alive=o.alive!==false;P.rescued=!!o.rescued;state='over';careerAward();showOverlay('over')},get AC(){return AC}};
