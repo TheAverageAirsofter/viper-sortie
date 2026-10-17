@@ -75,7 +75,7 @@ function hgSpecs(){
   h+=T('Weapons',[['Gun',e.ammo+' · '+fx(e.gunRate*60)+' rpm · '+fx(e.gunRounds)+' rounds','muzzle '+fx(e.muzzle)+' m/s, effective range about 1 km'],
     [e.srFull+' × '+v.sr,'to '+km(sr.maxR)+' (min '+fx(sr.minR)+' m)',seekerText(sr,false)+' · '+fx(sr.gmax)+' g · peak Mach '+fx(pk(sr,5000)/340,1)],
     c.hp?[e.mrFull+' × '+v.mr,'to '+km(mr.maxR)+' (min '+fx(mr.minR)+' m)',seekerText(mr,true)+' · '+fx(mr.gmax)+' g · peak Mach '+fx(pk(mr,8000)/295,1)]:null,
-    ...ag.map(([k,n])=>[AGW[k].name+' × '+n,AGW[k].kind==='arm'?'Anti-radiation missile':AGW[k].kind==='dumb'?'Unguided bomb, CCIP aiming':'Guided bomb']),
+    ...ag.map(([k,n])=>[AGW[k].name+' × '+n,AGW[k].kind==='arm'?'Anti-radiation missile':AGW[k].kind==='rocket'?'Unguided rockets, ripple of '+AGW[k].per+', CCIP aiming':AGW[k].kind==='dumb'?'Unguided bomb, CCIP or CCRP aiming':'Guided bomb']),
     v.tk?['Drop tanks × '+v.tk,'+'+fx(v.tk*(JET_HP[e.id]||{tankKg:0}).tankKg)+' kg fuel','drag until jettisoned']:null,
     ['Stations',fx(ldUsed(v))+' of '+fx(c.hp+c.extra)+' used · '+c.sr+' wingtip/short-range rails']]);
   h+=T('Sensors',[['Radar',((e.radar&&e.radar.name)||'Fire-control radar')+' · '+(((e.radar&&e.radar.modes)||['RWS','TWS']).join(' / '))],['Detection range',both((e.radar&&e.radar.range)||74000),'against a typical fighter; smaller radar cross-section is seen later'],

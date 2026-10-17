@@ -4,6 +4,15 @@
 const BT={on:false,over:false,pts:{blue:0,red:0},zones:[],lineup:[],used:{},pend:{blue:0,red:0},tm:{blue:0,red:0},wpT:0,diedT:0,specI:0,max:300,sp:0};
 const btCost=id=>Math.max(2,Math.min(8,Math.round(2+(progBR(id)-1)*.5)));   // spawn points: stronger jets cost more
 const btAfford=id=>!BT.used[id]&&btCost(id)<=BT.sp;
+/* saved battle lineup (Hangar > Loadout > Battle lineup): up to four jets that team battles offer first; the rest is filled from the matchmaking pool */
+let lineupPref=[];try{lineupPref=(JSON.parse(localStorage.getItem('vsLineup')||'[]')||[]).filter(id=>typeof id==='string').slice(0,4)}catch(e){}
+function lineupLabel(){const i=lineupPref.indexOf(AC.id);$('bLineup').textContent='Battle lineup: '+(i>=0?'remove this jet':'add this jet')+' ('+lineupPref.length+'/4)';$('bLineup').title=lineupPref.map(id=>AC_DEFS[id]?AC_DEFS[id].name:id).join(', ')||'Empty: lineups are filled at random'}
+$('bLineup').addEventListener('click',()=>{const i=lineupPref.indexOf(AC.id);if(i>=0)lineupPref.splice(i,1);else if(lineupPref.length<4)lineupPref.push(AC.id);else{message('LINEUP FULL · REMOVE A JET FIRST',1.4)}
+  try{localStorage.setItem('vsLineup',JSON.stringify(lineupPref))}catch(e){}lineupLabel()});
+setInterval(()=>{if(!$('bLineup').closest('[hidden]'))lineupLabel()},900);lineupLabel();
+function btBuildLineup(){
+  const lu=[AC.id];for(const id of lineupPref)if(lu.length<4&&lu.indexOf(id)<0&&AC_DEFS[id]&&unlocked(id))lu.push(id);
+  const pool=banditPool().filter(id=>lu.indexOf(id)<0&&unlocked(id));while(lu.length<4&&pool.length)lu.push(pool.splice(Math.random()*pool.length|0,1)[0]);return lu}
 const BT_ZONES=[['A',0,14000],['B',-9000,25000],['C',9000,25000]], BT_R=4500, BT_AI={blue:3,red:4};
 /* battle conditions: the weather and time of day are rolled at the start and drift during the fight (clear -> cloud -> rain, day -> dusk -> night) */
 const BT_WX=['CLEAR','SCATTERED','OVERCAST','RAIN'], BT_TIME=['DAY','DUSK','NIGHT'];
@@ -18,10 +27,9 @@ function btConditions(first){
 }
 function btRestoreConditions(){if(BT.saved){weather=BT.saved.weather;timeOfDay=BT.saved.timeOfDay;BT.saved=null;applyEnv()}}
 function setupBattle(){
-  BT.on=true;BT.online=false;BT.over=false;BT.ground=false;BT.naval=false;BT.ships=null;BT.cN=0;btConditions(true);BT.pts.blue=BT.pts.red=BT.max;BT.pend.blue=BT.pend.red=0;BT.tm.blue=BT.tm.red=0;BT.wpT=0;BT.diedT=0;BT.specI=0;BT.used={};BT.sp=20;
+  BT.on=true;BT.online=false;BT.over=false;BT.ground=false;BT.naval=false;BT.assault=false;BT.ships=null;BT.cN=0;btConditions(true);BT.pts.blue=BT.pts.red=BT.max;BT.pend.blue=BT.pend.red=0;BT.tm.blue=BT.tm.red=0;BT.wpT=0;BT.diedT=0;BT.specI=0;BT.used={};BT.sp=20;
   BT.zones=BT_ZONES.map(([n,x,z])=>({n,x,z,prog:0,own:0}));
-  const pool=banditPool().filter(id=>id!==AC.id&&unlocked(id));
-  BT.lineup=[AC.id];while(BT.lineup.length<4&&pool.length)BT.lineup.push(pool.splice(Math.random()*pool.length|0,1)[0]);
+  BT.lineup=btBuildLineup();
   BT.used[AC.id]=true;BT.sp=Math.max(0,BT.sp-btCost(AC.id));
   P.pos.set(0,4000,-1500);
   for(let i=0;i<BT_AI.blue;i++)btSpawn('blue',i);
@@ -37,9 +45,45 @@ function btInitOnline(){
   BT.pts.blue=BT.pts.red=BT.max;BT.pend.blue=BT.pend.red=0;BT.tm.blue=BT.tm.red=0;BT.wpT=0;BT.diedT=0;BT.specI=0;BT.used={};BT.sp=20;
   BT.zones=BT_ZONES_ONLINE.map(([n,x,z])=>({n,x,z,prog:0,own:0}));
   const s=netTeamScore(),me=NET.team||'B';BT.kOld={m:s[me]||0,t:s[me==='B'?'R':'B']||0};
-  const pool=banditPool().filter(id=>id!==AC.id&&unlocked(id));
-  BT.lineup=[AC.id];while(BT.lineup.length<4&&pool.length)BT.lineup.push(pool.splice(Math.random()*pool.length|0,1)[0]);
+  BT.lineup=btBuildLineup();
   BT.used[AC.id]=true;BT.sp=Math.max(0,BT.sp-btCost(AC.id));
+}
+/* air assault (from the War Thunder wiki, Air Assault): defend the base against 15 waves of AI bombers (3,500 m) and attackers (1,500 m) coming from about 20 km out,
+   with howitzers that quietly drain tickets until they are destroyed. Wave order B A R B A R B A R B A R A R B (R = either). Tickets are BT.pts.blue. */
+const AA_ORDER='BARBARBARBARARB';
+const AA={wave:0,t:0,total:15,hows:[],on:false};
+function setupAssault(){
+  setupBattle();BT.assault=true;BT.zones=[];BT.pts.blue=150;BT.pts.red=99999;
+  for(const e of enemies)scene.remove(e.obj);enemies=[];   // no fighters: only the waves come
+  AA.wave=0;AA.t=6;AA.hows=[];AA.on=true;
+  message('AIR ASSAULT · DEFEND THE BASE · 15 WAVES · KILL THE HOWITZERS TOO',3.6);
+}
+const aaThreats=()=>enemies.filter(e=>e.alive&&e.kind==='bomber').length;
+const aaHows=()=>AA.hows.filter(g=>g.alive).length;
+function aaSpawnWave(){
+  let k=AA_ORDER[AA.wave];if(k==='R')k=Math.random()<.5?'B':'A';
+  const n=3+(AA.wave>>2), tier=AA.wave;
+  for(let i=0;i<n;i++){
+    const x=rand(-4500,4500),z=19000+i*900+rand(0,1500);
+    const e=spawnHeavy('red','BOMBER',new V3(x,k==='B'?3500:1500,z),new V3(x*.2,k==='B'?3500:1500,-9000),k==='B'?210:250);
+    e.atk=k==='A';e.hp=k==='B'?5+(tier>>2):3+(tier>>3);e.bombed=false}
+  message('WAVE '+(AA.wave+1)+' / '+AA.total+' · '+(k==='B'?n+' BOMBERS · 3,500 M':n+' ATTACKERS · 1,500 M'),3);
+  // howitzers: random, likelier after each wave
+  if(Math.random()<.12+AA.wave*.04&&aaHows()<3){const [x,z]=[rand(-7000,7000),rand(16000,26000)];const g=spawnGround('truck',x,z,false);g.how=true;AA.hows.push(g);message('HOWITZER DEPLOYED · IT DRAINS TICKETS · DESTROY IT',3)}
+}
+function aaTick(dt){
+  if(!AA.on||BT.over)return;
+  // bombers and attackers that reach the base drop and carry on; the ones past it are gone
+  for(const e of enemies){if(!e.alive||e.kind!=='bomber')continue;
+    if(!e.bombed&&Math.hypot(e.pos.x,e.pos.z)<2600){e.bombed=true;BT.pts.blue=Math.max(0,BT.pts.blue-(e.atk?6:12));explode(new V3(e.pos.x,Math.max(groundH(e.pos.x,e.pos.z),0)+3,e.pos.z),true);message('BASE HIT · TICKETS '+Math.round(BT.pts.blue),1.6);sndBoom&&sndBoom(.5)}
+    if(e.pos.z<-7000){e.alive=false;scene.remove(e.obj)}}
+  BT.pts.blue=Math.max(0,BT.pts.blue-aaHows()*.12*dt);   // howitzers shell the base
+  if(!aaThreats()&&state==='play'){
+    AA.t-=dt;
+    if(AA.t<=0){
+      if(AA.wave>=AA.total){if(!aaHows()){BT.over=true;hideBtPick();missionDone=false;if(!P.alive)state='play';endMission(true,'All 15 waves beaten')}return}
+      aaSpawnWave();AA.wave++;AA.t=9;
+      if(AA.wave>1){rearm();message('WAVE '+(AA.wave-1)+' CLEAR · REARMED',1.6)}}}
 }
 /* naval battle: three enemy frigates (SAMs and guns) on the sea; each one alive drains your points, each one sunk drains theirs */
 function findSea(cx,cz){for(let r=0;r<20000;r+=700)for(let k=0;k<14;k++){const x=cx+Math.cos(k*.45)*r,z=cz+Math.sin(k*.45)*r;if(groundH(x,z)<-4)return [x,z]}return [cx,cz]}
@@ -79,6 +123,7 @@ function btLoss(team,pts){   // a jet of this side was lost: points off and a re
   BT.pts[team]=Math.max(0,BT.pts[team]-(pts||12));BT.pend[team]++;if(BT.tm[team]<=0)BT.tm[team]=16;
 }
 function btStatus(){
+  if(BT.assault)return 'WAVE '+Math.min(AA.wave,AA.total)+' / '+AA.total+' · TICKETS '+Math.round(BT.pts.blue)+' · HOWITZERS '+aaHows()+'  SP '+BT.sp;
   const z=BT.naval?'SHIPS '+btShipsLeft():'ZONES '+BT.zones.map(q=>q.n+(q.own>0?'+':q.own<0?'-':'·')).join(' ');
   return 'BLUE '+Math.round(BT.pts.blue)+' · RED '+Math.round(BT.pts.red)+'  '+z+'  SP '+BT.sp;
 }
@@ -106,15 +151,16 @@ function btTick(dt){
     if(o!==z.own){z.own=o;if(state==='play'){message(o>0?'ZONE '+z.n+' CAPTURED':o<0?'ZONE '+z.n+' LOST':'ZONE '+z.n+' NEUTRAL',1.8);if(o)sndZone(o>0)}if(o>0){scEvent('ZONE '+z.n+' CAPTURED',60,'bonus');BT.sp+=3}}
   }
   if(BT.naval)BT.pts.blue=Math.max(0,BT.pts.blue-btShipsLeft()*.35*dt);
+  if(BT.assault)aaTick(dt);
   const bz=BT.zones.filter(z=>z.own>0).length, rz=BT.zones.filter(z=>z.own<0).length;
   BT.pts.red=Math.max(0,BT.pts.red-bz*.6*dt);BT.pts.blue=Math.max(0,BT.pts.blue-rz*.6*dt);
   if(BT.online){const s=netTeamScore(),me=NET.team||'B',th=me==='B'?'R':'B';BT.pts.red=Math.max(0,BT.pts.red-12*Math.max(0,(s[me]||0)-BT.kOld.m));BT.pts.blue=Math.max(0,BT.pts.blue-12*Math.max(0,(s[th]||0)-BT.kOld.t));BT.kOld.m=s[me]||0;BT.kOld.t=s[th]||0}
-  if(!BT.online)for(const team of ['blue','red']){   // reinforcements
+  if(!BT.online&&!BT.assault)for(const team of ['blue','red']){   // reinforcements
     if(BT.pend[team]>0&&BT.pts[team]>0){BT.tm[team]-=dt;if(BT.tm[team]<=0&&btAlive(team)<BT_AI[team]){BT.pend[team]--;BT.tm[team]=BT.pend[team]>0?16:0;btSpawn(team,Math.random()*3|0);btAssign()}}
   }
   BT.wpT-=dt;if(BT.wpT<=0){BT.wpT=5;if(!BT.online)btAssign()}
   BT.cT=(BT.cT||0)+dt;if(BT.cT>=170){BT.cT=0;if(!BT.online)btConditions(false)}
-  if(BT.pts.red<=0||BT.pts.blue<=0){
+  if(BT.pts.red<=0||BT.pts.blue<=0){   // (air assault: the red side never runs out; the base does)
     BT.over=true;hideBtPick();const win=BT.pts.red<=0&&BT.pts.blue>0;
     missionDone=false;if(!P.alive)state='play';   // endMission re-enters 'dead' with the usual short fade to the debrief
     endMission(win,win?'Enemy points depleted':'Your points ran out');return}

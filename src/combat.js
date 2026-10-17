@@ -13,10 +13,25 @@ function relAngles(p){
   return {az:Math.atan2(-_pv.x,_pv.z),el:Math.atan2(_pv.y,Math.hypot(_pv.x,_pv.z)),d};
 }
 // a target beaming you (≈0 ground-relative closure) while you look down at it hides in ground clutter
-function notched(e){
+function notched(e,k){
   _b.subVectors(e.pos,P.pos).normalize();
-  return Math.abs(e.vel.dot(_b))<35&&e.pos.y<P.pos.y-200;
+  return Math.abs(e.vel.dot(_b))<(k||35)&&e.pos.y<P.pos.y-200;
 }
+/* search sub-modes (War Thunder airborne radars): PD sees farthest and filters ground clutter but loses a target beaming you; MTI sees about half as far
+   but is hard to notch; SRC has no Doppler filter, so ground clutter hides low targets when you look down. Older radars (no TWS) are always SRC. */
+const RSUBS=['PD','MTI','SRC'];
+R.sub='PD';
+const radarPD=()=>!!(AC.radar&&(AC.radar.pd||AC.radar.modes.indexOf('TWS')>=0));
+const radarSub=()=>radarPD()?R.sub:'SRC';
+function clutter(){const pitch=Math.asin(clamp(P.fwd.y,-1,1)),agl=Math.max(0,P.pos.y-Math.max(groundH(P.pos.x,P.pos.z),0));
+  return clamp(clamp(-pitch/.17,0,1)*.7+clamp(1-agl/9000,0,1)*.5,0,1)}   // 0..1: worst looking down at low level
+function radarBlind(e){const s=radarSub();
+  if(s==='PD')return notched(e,35);
+  if(s==='MTI')return notched(e,12);
+  return clutter()>.4&&e.pos.y<Math.max(groundH(e.pos.x,e.pos.z),0)+900;   // SRC: low flyers vanish into the ground return
+}
+const radarSubK=()=>({PD:1,MTI:.55,SRC:.8})[radarSub()];
+function cycleRadarSub(){if(!radarPD()){message('THIS RADAR HAS NO DOPPLER MODES',1);return}R.sub=RSUBS[(RSUBS.indexOf(R.sub)+1)%RSUBS.length];message('RADAR · '+R.sub+({PD:' · PULSE-DOPPLER',MTI:' · MOVING TARGET INDICATION · SHORT RANGE',SRC:' · NO DOPPLER FILTER · CLUTTER'})[R.sub],1.6);syncRadarUI()}
 // IRST detection range (game estimate): ~15 km head-on, farther looking at a hot tailpipe
 function irstRange(e){_c.subVectors(P.pos,e.pos).normalize();const rear=e.fwd.dot(_c)<-.3;const b=AC.irstR||15000;return Math.min(AC.irstMax||55000,b*(rear?1.7:1))}
 function radarTarget(){
@@ -24,7 +39,7 @@ function radarTarget(){
   if(R.mode==='TWS'&&R.bug&&R.tracks.has(R.bug))return R.bug;
   return null;
 }
-function resetRadar(){R.mode='RWS';R.az=0;R.rng=2;R.acm=0;R.sweep=0;R.tracks.clear();R.bug=null;R.stt=null;R.spiked=null;seekT=null;syncRadarUI()}
+function resetRadar(){R.sub='PD';R.mode='RWS';R.az=0;R.rng=2;R.acm=0;R.sweep=0;R.tracks.clear();R.bug=null;R.stt=null;R.spiked=null;seekT=null;syncRadarUI()}
 function lockOn(e){
   if(!e||!e.alive)return;
   R.stt=e;R.acqT=0;R.notchT=0;R.bug=e;R.sttSrc=R.mode==='IRST'?'IRST':'RDR';
@@ -60,8 +75,8 @@ function updateRadar(dt){
     let lost=null;
     const irst=R.sttSrc==='IRST';
     if(Math.hypot(a.az,a.el)>(irst?30:((AC.radar&&AC.radar.gimbal)||60))*DEG)lost='GIMBAL LIMIT';
-    else if(a.d>(irst?irstRange(e)*1.3:radRange(e)*1.1))lost='RANGE';
-    if(!irst&&notched(e)){R.notchT+=dt;if(R.notchT>1.5)lost='NOTCHED'} else R.notchT=0;
+    else if(a.d>(irst?irstRange(e)*1.3:radRange(e)*radarSubK()*1.1))lost='RANGE';
+    if(!irst&&radarBlind(e)){R.notchT+=dt;if(R.notchT>1.5)lost='NOTCHED'} else R.notchT=0;
     if(lost){message('LOCK LOST · '+lost,1.5);breakLock()}
     else R.tracks.set(e,{t:now,az:a.az,d:a.d,pos:e.pos.clone(),vel:e.vel.clone()});
     return;
@@ -90,7 +105,7 @@ function updateRadar(dt){
   const lo=Math.min(prev,R.sweep)-.03,hi=Math.max(prev,R.sweep)+.03;
   for(const e of enemies){
     const a=relAngles(e.pos);
-    if(a.az>=lo&&a.az<=hi&&Math.abs(a.el)<30*DEG&&a.d<radRange(e)&&!notched(e))
+    if(a.az>=lo&&a.az<=hi&&Math.abs(a.el)<30*DEG&&a.d<radRange(e)*radarSubK()&&!radarBlind(e))
       R.tracks.set(e,{t:now,az:a.az,d:a.d,pos:e.pos.clone(),vel:e.vel.clone()});
   }
   const keep=R.mode==='TWS'?4.5:2.6;
@@ -103,6 +118,7 @@ function drawScope(c,x0,y0,w,h,mfd){
   const hits=[];
   c.save();c.beginPath();c.rect(x0,y0,w,h);c.clip();
   c.fillStyle='#020604';c.fillRect(x0,y0,w,h);
+  {const cl=Math.round(clutter()*4);c.font='9px monospace';c.textAlign='left';c.fillStyle='rgba(77,255,136,.75)';c.fillText(radarSub()+'  CLTR '+'▮'.repeat(cl)+'▯'.repeat(4-cl),x0+6,y0+11)}
   c.strokeStyle='rgba(77,255,136,.28)';c.lineWidth=1;
   for(let i=1;i<4;i++){const y=Y(RMAX*i/4);c.beginPath();c.moveTo(x0+6,y);c.lineTo(x0+w-6,y);c.stroke()}
   for(const a of [-30,0,30]){const x=X(a*DEG);c.beginPath();c.moveTo(x,y0+12);c.lineTo(x,y0+h-12);c.stroke()}
@@ -164,7 +180,7 @@ function syncRadarUI(){
   $('rMode').textContent=R.stt?(R.sttSrc==='IRST'?'IR LK':'STT'):R.mode; $('rMode').classList.toggle('on',!!R.stt);
   $('rAz').textContent='A'+(R.mode==='TWS'&&AZS[R.az]>25?'2.5':String(AZS[R.az]/10));
   $('rAcm').textContent=acm?(acm==='20x30'?'20×30':acm):'ACM'; $('rAcm').classList.toggle('on',!!acm);
-  $('rRng').textContent=RANGES[R.rng];
+  $('rRng').textContent=RANGES[R.rng];$('rSub').textContent=radarSub();$('rSub').hidden=!radarPD();
   rdrEl.hidden=!rdrOpen; $('bRdr').classList.toggle('on',rdrOpen);
 }
 function sizeScope(){const r=scope.getBoundingClientRect();if(!r.width)return false;
@@ -176,6 +192,7 @@ function drawRadarPanel(){
   sctx.setTransform(DPR,0,0,DPR,0,0); scopeHits=drawScope(sctx,0,0,w,h,false);
 }
 $('bRdr').addEventListener('click',()=>{rdrOpen=!rdrOpen;try{localStorage.setItem('viperRdr',rdrOpen?'1':'0')}catch(e){};syncRadarUI();sizeScope()});
+$('rSub').addEventListener('click',cycleRadarSub);
 $('rMode').addEventListener('click',()=>{if(R.stt)breakLock();else if(R.acm)R.acm=0;else{const ms=AC.radar.modes;R.mode=ms[(ms.indexOf(R.mode)+1)%ms.length];R.tracks.clear();R.bug=null}syncRadarUI()});
 $('rAz').addEventListener('click',()=>{R.az=(R.az+1)%AZS.length;syncRadarUI()});
 $('rAcm').addEventListener('click',()=>{R.acm=(R.acm+1)%ACMS.length;if(R.stt)breakLock();syncRadarUI()});

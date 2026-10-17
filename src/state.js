@@ -44,11 +44,11 @@ function resetPlayer(){
   P.vel.set(0,0,230); P.onGround=false; P.onDeck=false; P.ejected=null; P.jetGhost=null; P.rescued=false; if(chute)chute.visible=false; P.scramble=false; P.stopT=0; if(typeof setGear==='function')setGear(false); P.n=1; P.hp=100; P.flaps=0; P.spin=0; P.fuel=.75*(AC.intFuel||AC.fuelCap)+(AC.tankFuel||0); P.flamedOut=false; resetSystems(); P.gStress=0; P.gloc=0; P.gcas=false; P.maxG=1; axes(P); qPrev.copy(playerJet.quaternion); omega.set(0,0,0);
   rearm(); throttle=.8; setThr(.8);
 }
-const isBT=()=>mission==='BATTLE'||mission==='COMBINED'||mission==='NAVAL'||(mission==='ONLINE'&&BT.online);
+const isBT=()=>mission==='BATTLE'||mission==='COMBINED'||mission==='NAVAL'||mission==='ASSAULT'||(mission==='ONLINE'&&BT.online);
 let friends=[], mission='WAVES', banditType='F16', missionT=0, missionDone=false, spawnQ=[];
 try{mission=localStorage.getItem('viperMission')||'WAVES';banditType=localStorage.getItem('viperBandit')||'F16'}catch(e){}
 const RUSH_KILLS=8, RUSH_TIME=300;   // time-attack: bandits keep arriving, four at a time
-const MISSIONS={WAVES:'Waves',STRIKE:'Strike / SEAD',INTERCEPT:'Intercept bombers',RUSH:'Bandit rush (8 in 5 min)',ESCORT:'Escort the C-130','2V4':'2 v 4 with wingman','4SHIP':'4-ship vs 6',CONVOY:'Convoy attack',GROUNDWAR:'Ground war (CAS)',BATTLE:'Air battle (domination)',COMBINED:'Combined arms battle',NAVAL:'Naval battle',ANTISHIP:'Anti-ship strike',CRUISE:'Cruise missile defence',CAMPAIGN:'Campaign',ONLINE:'Online dogfight',TRAINING:'Training'};
+const MISSIONS={WAVES:'Waves',STRIKE:'Strike / SEAD',INTERCEPT:'Intercept bombers',RUSH:'Bandit rush (8 in 5 min)',ESCORT:'Escort the C-130','2V4':'2 v 4 with wingman','4SHIP':'4-ship vs 6',CONVOY:'Convoy attack',GROUNDWAR:'Ground war (CAS)',BATTLE:'Air battle (domination)',COMBINED:'Combined arms battle',NAVAL:'Naval battle',ASSAULT:'Air assault (defend the base)',ANTISHIP:'Anti-ship strike',CRUISE:'Cruise missile defence',CAMPAIGN:'Campaign',ONLINE:'Online dogfight',TRAINING:'Training'};
 const LESSONS={BFM:'Dogfighting basics',DEFENSE:'Missile defense',BVR:'Long-range shot',LANDING:'Landing',REFUEL:'Air refueling'};
 let lesson='BFM'; try{if(LESSONS[localStorage.getItem('vsLesson')])lesson=localStorage.getItem('vsLesson')}catch(e){}
 let trainDefeated=0, trainConnT=0;
@@ -135,6 +135,7 @@ function setupMission(){
   if(mission==='CONVOY'){P.pos.set(0,6000,0);P.vel.set(0,0,240);setupConvoy(rand(-4000,4000),34000);spawnPair(pickBanditType(),new V3(0,7000,52000),new V3(0,5000,0));message('CONVOY · STOP AT LEAST 4 OF THE 5 TRUCKS BEFORE THEY GET THROUGH',3);return}
   if(mission==='BATTLE'){setupBattle();return}
   if(mission==='NAVAL'){setupNaval();return}
+  if(mission==='ASSAULT'){setupAssault();return}
   if(mission==='COMBINED'){setupGroundWar();const c=sortie.center.clone();setupBattle();BT.ground=true;BT.zones[0].x=c.x;BT.zones[0].z=c.z;btAssign();message('COMBINED ARMS · BLUE ARMOUR HOLDS ZONE A · SUPPORT IT FROM THE AIR',3.4);return}
   if(mission==='GROUNDWAR'){setupGroundWar();spawnPair(pickBanditType(),new V3(sortie.center.x,7000,sortie.center.z+16000),new V3(0,5000,0));message('GROUND WAR · SUPPORT THE BLUE ARMOUR (GEPARD COVERS IT) · DESTROY THE '+sortie.need+' RED VEHICLES · ZSU-23-4 AND ZSU-57-2 WILL SHOOT AT YOU',3.6);return}
   if(mission==='ANTISHIP'){P.pos.set(0,6000,0);P.vel.set(0,0,240);setupShip();spawnPair(pickBanditType(),new V3(19600,7000,36000),new V3(0,5000,0));message('ANTI-SHIP · SINK THE FRIGATE NE OF THE BASE · IT HAS SAMS',3);return}
@@ -276,6 +277,18 @@ function nextWave(){
 }
 /* AI fighters take module damage like the player: wings, engine fire, controls, pilot. Missiles, rams and bombs (amt >= 5) usually destroy the jet outright. */
 const aiKill=(t,how,by)=>{if(t.team==='red')killEnemy(t,how,by);else killFriend(t,how)};
+/* credit rules (War Thunder destroy rules): critical damage (a torn wing, fire, wounded pilot, dead controls) is credited for 90 s, plain hits for 15 s;
+   a jet that crashes inside its window counts as shot down by whoever damaged it; a pilot who bails out counts as a shootdown */
+const CRIT_WINDOW=90, HIT_WINDOW=15;
+function crashAI(e){
+  const credit=e.team==='red'&&e.hitBy&&clock-e.hitBy<(e.critT&&clock-e.critT<CRIT_WINDOW?CRIT_WINDOW:HIT_WINDOW);
+  if(credit){killEnemy(e,'CRASH',true);return}
+  e.alive=false;scene.remove(e.obj);explode(e.pos,true);recEvent((e.team==='red'?'Bandit ':'Wingman ')+'flew into the ground')}
+function aiBail(e,by){   // the pilot of a doomed jet may get out: a chute drifts down, the kill is still credited
+  if(Math.random()>.55||e.pos.y<Math.max(groundH(e.pos.x,e.pos.z),0)+250)return;
+  const c=new THREE.Mesh(new THREE.SphereGeometry(2.2,10,6,0,Math.PI*2,0,Math.PI/2),new THREE.MeshStandardMaterial({color:0xf2f2ea,side:THREE.DoubleSide}));
+  c.position.copy(e.pos);scene.add(c);DEBRIS.push({m:c,v:new THREE.Vector3(WIND.x*.6,-5,WIND.z*.6),w:new THREE.Vector3(0,0,0),t:60,chute:true});
+  if(by)message('PILOT EJECTED',1.4)}
 function aiGunHit(t,amt,by){
   const s=t.sys||(t.sys={wL:0,wR:0,eng:0,fireT:0,fatal:false,pilot:0,ctl:1,spin:0,by:false});s.by=by||s.by;let label='';
   if(Math.random()<.03*amt*(1+3*s.pilot))return 'PILOT KILLED';
@@ -293,9 +306,9 @@ function aiSystems(e,dt){   // per frame: fires burn out or spread, wings and co
   const wd=Math.max(s.wL,s.wR);
   e.gLim=Math.max(3,e.gLim0*(1-.5*wd)*(s.ctl<1?.8:1));e.rollK=(1-.3*wd)*(s.ctl<1?.8:1);e.thrK=s.eng===2?.35:s.eng===1?.8:1;
   if(s.eng===1){s.fireT-=dt;if(Math.random()<dt*10)puff(e.pos.x,e.pos.y,e.pos.z,e.vel.x*.2,e.vel.y*.2,e.vel.z*.2,.15,.15,.15,.7,4,10,2.5);
-    if(s.fireT<=0){if(s.fatal){aiKill(e,'FIRE',s.by);return}s.eng=2}}
+    if(s.fireT<=0){if(s.fatal){aiBail(e,s.by);aiKill(e,'FIRE',s.by);return}s.eng=2}}
   if(wd>.25&&Math.random()<dt*8*wd)puff(e.pos.x,e.pos.y,e.pos.z,e.vel.x*.3,e.vel.y*.3,e.vel.z*.3,.2,.2,.2,.7,3,10,2);
-  if(s.spin){s.spin+=dt;e.obj.rotateZ(dt*3);if(s.spin>4.5)aiKill(e,'WING',s.by)}   // a wing off: the jet tumbles for a few seconds then breaks up
+  if(s.spin){s.spin+=dt;e.obj.rotateZ(dt*3);if(s.spin>4.5){aiBail(e,s.by);aiKill(e,'WING',s.by)}}   // a wing off: the jet tumbles for a few seconds then breaks up
 }
 function hitAI(t,amt,how,byPlayer){
   if(!t.alive)return;
@@ -306,6 +319,7 @@ function hitAI(t,amt,how,byPlayer){
     if(amt>=5){const s=t.sys||(t.sys={wL:0,wR:0,eng:0,fireT:0,fatal:false,pilot:0,ctl:1,spin:0,by:false});s.by=byPlayer||s.by;s[Math.random()<.5?'wL':'wR']=Math.min(1,.6+Math.random()*.4);if(!s.eng){s.eng=1;s.fireT=9;s.fatal=Math.random()<.4}if(s.wL>=1||s.wR>=1){s.spin=1;breakWing(t.obj,s.wL>=1?'wL':'wR',t.pos,t.vel)}label='CRITICAL DAMAGE';t.hp=.6}
     else{label=aiGunHit(t,amt,byPlayer);if(label==='PILOT KILLED'){if(byPlayer){t.hitBy=clock;scEvent('PILOT KILLED',30,'crit')}aiKill(t,how,byPlayer);return}}
     addHole(t.obj,amt>3?4:1);puff(t.pos.x,t.pos.y,t.pos.z,0,0,0,.3,.3,.3,.8,14,20,2);
+    if(byPlayer&&label)t.critT=clock;
     if(byPlayer){t.hitBy=clock;if(label)scEvent(label,25,'crit');else if(how==='GUNS')scEvent('HIT',3,'','hit');else scEvent('DIRECT HIT',20,'crit','dh')}
     if(byPlayer&&clock-(t.fdT||-9)>1.5){t.fdT=clock;feed((label?'Critical hit: ':'Hit: ')+(AC_DEFS[t.type]?AC_DEFS[t.type].name:'target')+(label?' · '+label.toLowerCase():'')+' ('+how.replace(' (WINGMAN)','').toLowerCase()+')','hit')}
     return}
@@ -468,11 +482,11 @@ $('bPause').addEventListener('click',()=>pause());
    Arrow keys always roll and pitch, Right Shift / = and Right Ctrl / - always move the throttle, Esc always pauses. */
 const KB_ACTS=[['pitchPull','Pitch up (pull)','Flight'],['pitchPush','Pitch down (push)','Flight'],['rollL','Roll left','Flight'],['rollR','Roll right','Flight'],['yawL','Rudder left','Flight'],['yawR','Rudder right','Flight'],
   ['thrUp','Throttle up','Flight'],['thrDn','Throttle down','Flight'],['brake','Speed brake','Flight'],['flaps','Flaps','Flight'],['gear','Landing gear','Flight'],['auto','Autopilot','Flight'],
-  ['gun','Guns','Weapons'],['aim9','Short-range missile','Weapons'],['aim120','Long-range missile','Weapons'],['agRel','Air-to-ground release','Weapons'],['agNext','Next air-to-ground weapon','Weapons'],
-  ['lock','Lock nearest target','Sensors'],['nextTgt','Next target','Sensors'],['radar','Radar panel','Sensors'],['radarMode','Radar mode','Sensors'],['acm','ACM mode','Sensors'],['rangeUp','Radar range up','Sensors'],['rangeDn','Radar range down','Sensors'],
+  ['gun','Guns','Weapons'],['aim9','Short-range missile','Weapons'],['aim120','Long-range missile','Weapons'],['agRel','Air-to-ground release','Weapons'],['agNext','Next ground target','Weapons'],['agWpn','Next air-to-ground weapon','Weapons'],['agSight','Sight mode (standard / ballistic computer / CCRP)','Weapons'],
+  ['lock','Lock nearest target','Sensors'],['nextTgt','Next target','Sensors'],['radar','Radar panel','Sensors'],['radarMode','Radar mode','Sensors'],['acm','ACM mode','Sensors'],['radarSub','Radar sub-mode (PD / MTI / SRC)','Sensors'],['rangeUp','Radar range up','Sensors'],['rangeDn','Radar range down','Sensors'],
   ['flare','Flares','Defence'],['chaff','Chaff','Defence'],['ecm','Jammer','Defence'],['decoy','Towed decoy','Defence'],
   ['view','Cycle camera','Other'],['map','Tactical map','Other'],['pause','Pause','Other']];
-const KB_COMMON={thrUp:['ShiftLeft','Equal'],thrDn:['ControlLeft','Minus'],brake:['KeyB'],flaps:['KeyO'],gear:['KeyL'],auto:['KeyU'],gun:['Space'],aim9:['KeyF'],aim120:['KeyR'],agRel:['KeyH'],agNext:['KeyN'],lock:['KeyT'],nextTgt:['KeyY'],radar:['KeyX'],radarMode:['KeyM'],acm:['KeyG'],rangeUp:['BracketRight'],rangeDn:['BracketLeft'],flare:['KeyZ'],chaff:['KeyC'],ecm:['KeyJ'],decoy:['KeyK'],view:['KeyV'],map:['Tab'],pause:['KeyP']};
+const KB_COMMON={thrUp:['ShiftLeft','Equal'],thrDn:['ControlLeft','Minus'],brake:['KeyB'],flaps:['KeyO'],gear:['KeyL'],auto:['KeyU'],gun:['Space'],aim9:['KeyF'],aim120:['KeyR'],agRel:['KeyH'],agNext:['KeyN'],agWpn:['Period'],agSight:['KeyI'],lock:['KeyT'],nextTgt:['KeyY'],radar:['KeyX'],radarMode:['KeyM'],acm:['KeyG'],radarSub:['Quote'],rangeUp:['BracketRight'],rangeDn:['BracketLeft'],flare:['KeyZ'],chaff:['KeyC'],ecm:['KeyJ'],decoy:['KeyK'],view:['KeyV'],map:['Tab'],pause:['KeyP']};
 const KB_DEF={kb:Object.assign({},KB_COMMON,{pitchPull:['KeyS'],pitchPush:['KeyW'],rollL:['KeyA'],rollR:['KeyD'],yawL:['KeyQ'],yawR:['KeyE']}),
   kbm:Object.assign({},KB_COMMON,{pitchPull:[],pitchPush:[],rollL:[],rollR:[],yawL:['KeyA','KeyQ'],yawR:['KeyD','KeyE'],thrUp:['KeyW','ShiftLeft'],thrDn:['KeyS','ControlLeft']})};
 const KB_MOUSE_ACTS=['','gun','aim9','aim120','flare','chaff','lock','nextTgt','brake','flaps','view','gear','agRel','ecm','decoy'];
@@ -494,12 +508,12 @@ function actDown(a){
   switch(a){
     case 'gun':gunHeld=true;break;case 'aim9':fire9=true;break;case 'aim120':fire120=true;break;case 'brake':brake=true;break;
     case 'flaps':cycleFlaps();break;case 'view':cycleView();break;case 'gear':$('bGear').click();break;case 'lock':quickLock();break;case 'nextTgt':stepTarget();break;
-    case 'acm':$('rAcm').click();break;case 'radarMode':$('rMode').click();break;case 'rangeUp':$('rUp').click();break;case 'rangeDn':$('rDn').click();break;
+    case 'acm':$('rAcm').click();break;case 'radarSub':cycleRadarSub();break;case 'radarMode':$('rMode').click();break;case 'rangeUp':$('rUp').click();break;case 'rangeDn':$('rDn').click();break;
     case 'radar':$('bRdr').click();break;case 'map':mapStep();break;case 'flare':if(!CM.flrHeld){CM.flrHeld=true;CM.flrT=0}break;case 'chaff':if(!CM.chfHeld){CM.chfHeld=true;CM.chfT=0}break;
-    case 'ecm':toggleECM();break;case 'decoy':deployDecoy();break;case 'agRel':agRelease();break;case 'agNext':agNext();break;case 'auto':$('cAuto').click();break;case 'pause':pause();break;
+    case 'ecm':toggleECM();break;case 'decoy':deployDecoy();break;case 'agRel':agRelease();break;case 'agNext':agNext();break;case 'agWpn':agWpn();break;case 'agSight':agSight();break;case 'auto':$('cAuto').click();break;case 'pause':pause();break;
   }
 }
-function actUp(a){if(a==='gun')gunHeld=false;else if(a==='brake')brake=false;else if(a==='flare')CM.flrHeld=false;else if(a==='chaff')CM.chfHeld=false}
+function actUp(a){if(a==='agRel')AG.hold=false;if(a==='gun')gunHeld=false;else if(a==='brake')brake=false;else if(a==='flare')CM.flrHeld=false;else if(a==='chaff')CM.chfHeld=false}
 const KBE={open:false};   // the bindings editor (menu.js) captures keys while it is open
 addEventListener('keydown',e=>{
   if(KBE.open)return;
@@ -682,8 +696,8 @@ function breakWing(root,side,pos,vel){
   ch.position.copy(pos);scene.add(ch);DEBRIS.push({m:ch,v:vel.clone().add(new THREE.Vector3(s*8,5,0)),w:new THREE.Vector3(rand(-3,3),rand(-2,2),rand(4,9)),t:7});
   puff(pos.x,pos.y,pos.z,0,0,0,1,.6,.2,1,6,14,.3);
 }
-function updateDebris(dt){for(let i=DEBRIS.length-1;i>=0;i--){const d=DEBRIS[i];d.t-=dt;d.v.y-=9.8*dt;d.m.position.addScaledVector(d.v,dt);d.m.rotation.x+=d.w.x*dt;d.m.rotation.y+=d.w.y*dt;d.m.rotation.z+=d.w.z*dt;
-  if(Math.random()<dt*14)puff(d.m.position.x,d.m.position.y,d.m.position.z,0,0,0,.2,.2,.2,.7,3,10,2);
+function updateDebris(dt){for(let i=DEBRIS.length-1;i>=0;i--){const d=DEBRIS[i];d.t-=dt;if(!d.chute)d.v.y-=9.8*dt;d.m.position.addScaledVector(d.v,dt);d.m.rotation.x+=d.w.x*dt;d.m.rotation.y+=d.w.y*dt;d.m.rotation.z+=d.w.z*dt;
+  if(!d.chute&&Math.random()<dt*14)puff(d.m.position.x,d.m.position.y,d.m.position.z,0,0,0,.2,.2,.2,.7,3,10,2);
   if(d.t<=0||d.m.position.y<Math.max(groundH(d.m.position.x,d.m.position.z),0)){scene.remove(d.m);DEBRIS.splice(i,1)}}}
 function wingHit(side,amt){
   const sy=P.sys;if(sy[side]>=1)return;sy[side]=Math.min(1,sy[side]+amt);

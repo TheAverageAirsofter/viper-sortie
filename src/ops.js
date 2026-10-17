@@ -105,19 +105,22 @@ const AGW={
   MK84:{name:'Mk 84 2,000 lb',sh:'MK84',kind:'dumb',blast:40,len:3.3,r:.23},
   FAB250:{name:'FAB-250',sh:'FAB250',kind:'dumb',blast:26,len:2.1,r:.15},
   AGM65:{name:'AGM-65 Maverick',sh:'MAV',kind:'gps',glide:3,blast:22,len:2.45,r:.15},
-  KH25ML:{name:'Kh-25ML',sh:'KH25',kind:'gps',glide:3.4,blast:24,len:3.8,r:.14}};
+  KH25ML:{name:'Kh-25ML',sh:'KH25',kind:'gps',glide:3.4,blast:24,len:3.8,r:.14},
+  // unguided rocket pods: one press fires a ripple of `per` rockets (calibre and counts est.)
+  HYDRA:{name:'Hydra 70 pod',sh:'HYDRA',kind:'rocket',per:7,blast:11,len:2.0,r:.15,burn:1.0,acc:300,spread:.014},
+  S8:{name:'S-8 pod',sh:'S-8',kind:'rocket',per:10,blast:12,len:1.7,r:.17,burn:.9,acc:330,spread:.017}};
 // strike loadouts: [weapon, count], and how many medium-range air-to-air missiles stay on (game fits, based on each jet's cleared stores)
 const STRIKE_LOAD={FA18E:{ag:[['HARM',2],['JDAM',2]],keep:2},MIG29K:{ag:[['KH31P',2],['KAB500KR',2]],keep:2},SU33:{ag:[['FAB500',6]],keep:2},F16:{ag:[['HARM',2],['JDAM',2]],keep:2},F16B70:{ag:[['HARM',2],['JDAM',2]],keep:2},F15EX:{ag:[['JDAM',4]],keep:4},
   GRIPEN:{ag:[['GBU49',2]],keep:2},GRIPENE:{ag:[['SDB',4]],keep:2},TYPHOON:{ag:[['PAVE4',4]],keep:4},RAFALE:{ag:[['AASM',4]],keep:2},
   MIG29:{ag:[['FAB500',4]],keep:0},MIG29UPG:{ag:[['KH31P',2],['KAB500KR',2]],keep:2},MIG35:{ag:[['KH31P',2],['KAB500S',2]],keep:4},
   SU27:{ag:[['FAB500',6]],keep:2},SU35:{ag:[['KH31P',2],['KAB500S',4]],keep:4},J10C:{ag:[['YJ91',2],['LS6',2]],keep:2},
-  A10A:{ag:[['AGM65',4],['MK82',4]],keep:0},SU25:{ag:[['KH25ML',2],['FAB250',4]],keep:0},A7E:{ag:[['MK82',6]],keep:0},A4E:{ag:[['MK82',3]],keep:0},SU22M3:{ag:[['KH25ML',2],['FAB250',4]],keep:0},
+  A10A:{ag:[['AGM65',2],['MK82',4],['HYDRA',2]],keep:0},SU25:{ag:[['KH25ML',2],['FAB250',2],['S8',2]],keep:0},A7E:{ag:[['MK82',6]],keep:0},A4E:{ag:[['MK82',3]],keep:0},SU22M3:{ag:[['KH25ML',2],['FAB250',4]],keep:0},
   ALPHAJET:{ag:[['MK82',4]],keep:0},G91Y:{ag:[['MK82',4]],keep:0},JAGUAR:{ag:[['MK84',2],['MK82',2]],keep:0},Q5A:{ag:[['FAB250',4]],keep:0},AMX:{ag:[['MK84',2],['MK82',2]],keep:0},F104S:{ag:[['MK82',3]],keep:0},TORNADOIT:{ag:[['MK84',2],['MK82',2]],keep:0}};
-const AG={load:[],tgt:null,tgtT:0,w:[],sel:0};
+const AG={load:[],tgt:null,tgtT:0,w:[],sel:0,pref:null,sight:0,hold:false};   // sight: 0 standard, 1 ballistic computer (gun + rocket CCIP), 2 CCRP bombing
 AGW.SDB.perSt=4; for(const k of ['GBU49','PAVE4','KAB500KR','AGM65','KH25ML'])AGW[k].track=true;   // laser / TV seekers follow a moving target   // GBU-39s ride four to a BRU-61 rack
 // store weights (kg) and the extra stations (centreline / heavy inboard) beyond the missile rails; tanks: max count and fuel per tank.
 // Cleared weapons follow each type's real stores where known; tank sizes from published tank capacities (e.g. F-16 370 gal, F-15 600 gal, PTB-2000).
-const AGKG={HARM:361,KH31P:600,YJ91:600,JDAM:925,SDB:130,GBU49:240,PAVE4:230,AASM:340,KAB500S:560,KAB500KR:520,LS6:500,FAB500:500,MK82:241,MK84:900,FAB250:250,AGM65:210,KH25ML:300};
+const AGKG={HARM:361,KH31P:600,YJ91:600,JDAM:925,SDB:130,GBU49:240,PAVE4:230,AASM:340,KAB500S:560,KAB500KR:520,LS6:500,FAB500:500,MK82:241,MK84:900,FAB250:250,AGM65:210,KH25ML:300,HYDRA:95,S8:120};
 const MRKG={'AIM-120C':152,'AIM-120C-7':161,'AIM-120D':161,'R-27R':253,'R-27ER':350,'R-77':175,'R-77-1':190,'R-37M':510,'METEOR':190,'PL-15':210};
 const SRKG={'AIM-9X':85,'R-73':105,'IRIS-T':87,'PL-10':89,'MICA IR':112};
 const JET_HP={F16:{extra:1,tanks:3,tankKg:1130,ag:['HARM','JDAM']},F16B70:{extra:1,tanks:3,tankKg:1130,ag:['HARM','JDAM']},
@@ -127,8 +130,8 @@ const JET_HP={F16:{extra:1,tanks:3,tankKg:1130,ag:['HARM','JDAM']},F16B70:{extra
   MIG29K:{extra:1,tanks:3,tankKg:1150,ag:['KH31P','KAB500KR','FAB500']},MIG35:{extra:1,tanks:3,tankKg:1150,ag:['KH31P','KAB500S','FAB500']},
   SU27:{extra:0,tanks:0,tankKg:0,ag:['FAB500']},SU33:{extra:2,tanks:0,tankKg:0,ag:['FAB500']},SU35:{extra:2,tanks:2,tankKg:1600,ag:['KH31P','KAB500S','FAB500']},
   J10C:{extra:1,tanks:3,tankKg:1100,ag:['YJ91','LS6']},J20:{extra:0,tanks:0,tankKg:0,ag:[]}};
-rosterFill(JET_HP,{A10A:{extra:10,tanks:0,tankKg:0,ag:['AGM65','MK82','MK84']},SU25:{extra:8,tanks:2,tankKg:1300,ag:['KH25ML','FAB250','FAB500']},A7E:{extra:6,tanks:2,tankKg:1000,ag:['MK82','MK84']},A4E:{extra:3,tanks:1,tankKg:1000,ag:['MK82']},SU22M3:{extra:6,tanks:2,tankKg:1300,ag:['KH25ML','FAB250','FAB500']},
-  ALPHAJET:{extra:4,tanks:1,tankKg:245,ag:['MK82']},G91Y:{extra:4,tanks:2,tankKg:500,ag:['MK82']},JAGUAR:{extra:5,tanks:3,tankKg:1000,ag:['MK82','MK84']},Q5A:{extra:6,tanks:0,tankKg:0,ag:['FAB250']},AMX:{extra:5,tanks:2,tankKg:500,ag:['MK82','MK84']},F104S:{extra:3,tanks:2,tankKg:900,ag:['MK82']},TORNADOIT:{extra:5,tanks:2,tankKg:1170,ag:['MK82','MK84']},
+rosterFill(JET_HP,{A10A:{extra:10,tanks:0,tankKg:0,ag:['AGM65','MK82','MK84','HYDRA']},SU25:{extra:8,tanks:2,tankKg:1300,ag:['KH25ML','FAB250','FAB500','S8']},A7E:{extra:6,tanks:2,tankKg:1000,ag:['MK82','MK84','HYDRA']},A4E:{extra:3,tanks:1,tankKg:1000,ag:['MK82','HYDRA']},SU22M3:{extra:6,tanks:2,tankKg:1300,ag:['KH25ML','FAB250','FAB500','S8']},
+  ALPHAJET:{extra:4,tanks:1,tankKg:245,ag:['MK82','HYDRA']},G91Y:{extra:4,tanks:2,tankKg:500,ag:['MK82','HYDRA']},JAGUAR:{extra:5,tanks:3,tankKg:1000,ag:['MK82','MK84','HYDRA']},Q5A:{extra:6,tanks:0,tankKg:0,ag:['FAB250','S8']},AMX:{extra:5,tanks:2,tankKg:500,ag:['MK82','MK84','HYDRA']},F104S:{extra:3,tanks:2,tankKg:900,ag:['MK82']},TORNADOIT:{extra:5,tanks:2,tankKg:1170,ag:['MK82','MK84']},
   F4C:{extra:2,tanks:3,tankKg:1800,ag:[]},F5A:{extra:1,tanks:3,tankKg:700,ag:[]},J35D:{extra:0,tanks:1,tankKg:600,ag:[]},J29F:{extra:0,tanks:0,tankKg:0,ag:[]},J6A:{extra:0,tanks:2,tankKg:400,ag:[]},MIG21MF:{extra:1,tanks:2,tankKg:490,ag:[]},F8E:{extra:0,tanks:2,tankKg:1000,ag:[]},F100D:{extra:1,tanks:2,tankKg:1000,ag:[]},MIG19PT:{extra:0,tanks:2,tankKg:400,ag:[]},MIG21F13:{extra:0,tanks:1,tankKg:400,ag:[]},HUNTER:{extra:0,tanks:2,tankKg:540,ag:[]},MIRAGE3C:{extra:0,tanks:2,tankKg:800,ag:[]},F4E:{extra:2,tanks:3,tankKg:1800,ag:['PAVE4']},F35A:{extra:2,tanks:0,tankKg:0,ag:['JDAM']},F22A:{extra:0,tanks:0,tankKg:0,ag:[]},F104G:{extra:1,tanks:2,tankKg:700,ag:[]},
   MIG21:{extra:1,tanks:2,tankKg:400,ag:['FAB500']},SU57:{extra:2,tanks:0,tankKg:0,ag:['KAB500S']},J35F:{extra:0,tanks:1,tankKg:600,ag:[]},JA37:{extra:1,tanks:1,tankKg:1000,ag:[]},
   LIGHTNING:{extra:0,tanks:1,tankKg:1000,ag:[]},TORNADO3:{extra:1,tanks:2,tankKg:1500,ag:[]},KFIR:{extra:2,tanks:3,tankKg:900,ag:['PAVE4']},F15E:{extra:3,tanks:3,tankKg:1820,ag:['JDAM','SDB']},
@@ -145,7 +148,7 @@ const ldUsed=(v)=>v.mr+Object.entries(v.ag).reduce((a,[k,n])=>a+Math.ceil(n/(AGW
 function ldValid(id,v){const c=ldCap(id);return v.sr>=0&&v.sr<=c.sr&&v.mr>=0&&v.mr<=c.hp&&v.tk>=0&&v.tk<=c.tanks&&Object.keys(v.ag).every(k=>c.ag.includes(k)&&v.ag[k]>=0)&&ldUsed(v)<=c.hp+c.extra}
 const agStoreMat=new THREE.MeshStandardMaterial({color:0x8a8f7a,roughness:.6,flatShading:true});
 function agCount(){return AG.load.reduce((a,l)=>a+l.n,0)}
-function agReset(){AG.load=(AC.agList||[]).map(([k,n])=>({k,n,max:n}));AG.tgt=null;AG.w.forEach(w=>{scene.remove(w.m)});AG.w=[];agStores();agSync()}
+function agReset(){AG.hold=false;AG.pref=null;AG.load=(AC.agList||[]).map(([k,n])=>({k,n,max:n}));AG.tgt=null;AG.w.forEach(w=>{scene.remove(w.m)});AG.w=[];agStores();agSync()}
 // hang the stores on the freed rails (and extra stations under the fuselage)
 function agStores(){
   const g=playerJet.children[0]; if(!g)return; g.children.filter(o=>/^(ag_|agpy_|tgp_)/.test(o.name)).forEach(o=>g.remove(o));
@@ -178,28 +181,34 @@ function storeMesh(W){const g=new THREE.Group(),mat=W.kind==='arm'?new THREE.Mes
   if(W.kind==='gps'&&W.glide>3){const w=new THREE.Mesh(new THREE.BoxGeometry(r*9,.02,L*.18),mat);w.position.set(0,r*.9,0);g.add(w)}
   return g}
 function agPylon(g,p,r,name){const S=M2[AC.id];if(!S)return;const top=bellyAt(S,p.z,p.x)+.05,y0=p.y+r;if(top-y0<.08)return;const m=new THREE.Mesh(new THREE.BoxGeometry(.1,top-y0+.05,1.5),pylMat);m.name=name;m.position.set(p.x,(top+y0)/2,p.z);g.add(m)}
-function agSync(){const on=AG.load.length>0;$('bAg').hidden=!on;$('bAgN').hidden=!on;if(!on)return;const l=agPick();
+function agSync(){const on=AG.load.length>0;$('bAg').hidden=!on;$('bAgN').hidden=!on;$('bSight').hidden=!on;$('bWpn').hidden=!on;$('bSight').firstChild.nodeValue=['STD','BC','CCRP'][AG.sight];if(!on)return;const l=agPick();
   $('bAg').firstChild.nodeValue=l?AGW[l.k].sh:'AG';$('cAg').textContent=l?l.n:0}
 const emitting=g=>g&&g.alive&&(g.kind==='sam'||g.kind==='aaa'||g.kind==='radar'||g.kind==='ship')&&!(g.offT>0);
 // weapon choice: an anti-radiation missile against an emitter, otherwise a bomb
-function agPick(){const t=AG.tgt, arm=AG.load.find(l=>AGW[l.k].kind==='arm'&&l.n>0), bomb=AG.load.find(l=>AGW[l.k].kind!=='arm'&&l.n>0);
+function agWpn(){const L=AG.load.filter(l=>AGW[l.k].kind!=='arm'&&l.n>0);if(L.length<2){message(L.length?AGW[L[0].k].name:'NO STORES',.9);return}
+  const i=L.findIndex(l=>l.k===AG.pref);AG.pref=L[(i+1)%L.length].k;message('WEAPON · '+AGW[AG.pref].name,1);agSync()}
+const SIGHTS=['STANDARD SIGHT','BALLISTIC COMPUTER · GUN / ROCKET CCIP','CCRP BOMBING · HOLD RELEASE AT THE CUE'];
+function agSight(){AG.sight=(AG.sight+1)%3;AG.hold=false;message(SIGHTS[AG.sight],1.6);agSync()}
+function agPick(){const t=AG.tgt, arm=AG.load.find(l=>AGW[l.k].kind==='arm'&&l.n>0), bomb=AG.load.find(l=>l.k===AG.pref&&l.n>0&&AGW[l.k].kind!=='arm')||AG.load.find(l=>AGW[l.k].kind!=='arm'&&l.n>0);
   return t&&emitting(t)&&arm?arm:bomb||arm||null}
 function agCandidates(){return ground.filter(g=>g.alive&&g.pos.distanceTo(P.pos)<110000).map(g=>{_s1.subVectors(g.pos,P.pos);const d=_s1.length();return{g,d,a:_s1.normalize().angleTo(P.fwd)}}).filter(c=>c.a<1.2).sort((a,b)=>a.d-b.d)}
 function agNext(){const c=agCandidates();if(!c.length){AG.tgt=null;message('NO GROUND TARGETS AHEAD',1);return}
   const i=c.findIndex(x=>x.g===AG.tgt);AG.tgt=c[(i+1)%c.length].g;message('TGT · '+agName(AG.tgt),.9);agSync()}
-const agName=g=>({sam:'SAM LAUNCHER',aaa:'AAA',radar:'EW RADAR',bunker:'BUNKER',truck:'TRUCK',ship:'FRIGATE'})[g.kind]||'TARGET';
+const agName=g=>g.how?'HOWITZER':({sam:'SAM LAUNCHER',aaa:'AAA',radar:'EW RADAR',bunker:'BUNKER',truck:'TRUCK',ship:'FRIGATE'})[g.kind]||'TARGET';
 // how far a glide bomb can reach from here (est.): height and speed set the glide footprint
 function agReach(W){if(!W.glide)return 0;const agl=Math.max(0,P.pos.y-Math.max(groundH(P.pos.x,P.pos.z),0));return W.glide*agl*(.55+.45*Math.min(P.mach||.8,1.3))+(W.boost||0)+Math.max(0,P.vel.y)*20}
 function agInRange(l,t){if(!l||!t)return false;const W=AGW[l.k],d=Math.hypot(t.pos.x-P.pos.x,t.pos.z-P.pos.z);
   if(W.kind==='arm')return emitting(t)&&d<W.maxR&&d>W.minR; if(W.kind==='gps')return d<agReach(W); return false}
 // CCIP: integrate a dumb bomb from release to the ground
 const _ci=new V3(),_cv=new V3();
-function ccip(){_ci.copy(P.pos);_cv.copy(P.vel);for(let i=0;i<600;i++){_cv.y-=G*.05;_cv.multiplyScalar(1-.0004*_cv.length()*.05);_ci.addScaledVector(_cv,.05);if(_ci.y<=Math.max(groundH(_ci.x,_ci.z),0))return _ci}return null}
-function agRelease(){
+function ccip(){_ci.copy(P.pos);_cv.copy(P.vel);for(let i=0;i<1400;i++){_cv.y-=G*.05;_cv.multiplyScalar(1-.0004*_cv.length()*.05);_ci.addScaledVector(_cv,.05);if(_ci.y<=Math.max(groundH(_ci.x,_ci.z),0))return _ci}return null}
+function agRelease(auto){
   if(state!=='play'||!P.alive)return; const l=agPick(); if(!l){message('NO STORES',.8);return}
   const W=AGW[l.k], t=AG.tgt;
+  if(W.kind==='dumb'&&AG.sight===2&&!auto){if(!t){message('CCRP · NO TARGET POINT',1);return}AG.hold=true;message('CCRP · HOLD · RELEASE AT THE CUE',1.2);return}   // bombs go by themselves when the impact point reaches the target
   if(W.kind==='arm'&&!emitting(t)){message(t?'TARGET NOT EMITTING':'NO TARGET',1);return}
   if(W.kind==='gps'&&!t){message('NO TARGET',1);return}
+  if(W.kind==='rocket'){agRockets(l,W);return}
   const g=playerJet.children[0], st=g.getObjectByName('ag_'+l.k+'_'+(l.max-l.n)); l.n--;
   const p=new V3(); if(st){st.getWorldPosition(p);st.visible=false}else p.copy(P.pos).addScaledVector(P.up,-1.5);
   const m=storeMesh(W); m.position.copy(p); scene.add(m);
@@ -207,6 +216,20 @@ function agRelease(){
   if(t&&W.kind==='gps'&&Math.hypot(t.pos.x-P.pos.x,t.pos.z-P.pos.z)>w.reach)w.short=true;
   AG.w.push(w); recEvent('You released '+W.name+(t?' at the '+agName(t).toLowerCase():''));
   message(W.kind==='arm'?'MAGNUM':W.kind==='dumb'?'BOMBS AWAY':'PICKLE · '+W.sh,1); if(W.kind==='arm')sndMsl(); agSync()}
+// a rocket pod: the ripple leaves with a small spread, burns for about a second, then falls ballistically
+function agRockets(l,W){
+  const g=playerJet.children[0], st=g.getObjectByName('ag_'+l.k+'_'+(l.max-l.n)); l.n--;
+  const p=new V3(); if(st){st.getWorldPosition(p);st.visible=false}else p.copy(P.pos).addScaledVector(P.up,-1.5);
+  for(let i=0;i<W.per;i++){
+    const m=storeMesh({kind:'dumb',len:W.len*.5,r:W.r*.35}); m.position.copy(p).addScaledVector(P.right,rand(-.5,.5)).addScaledVector(P.up,rand(-.3,.3)); scene.add(m);
+    const d=_s3.copy(P.fwd);d.x+=rand(-W.spread,W.spread);d.y+=rand(-W.spread,W.spread);d.z+=rand(-W.spread,W.spread);d.normalize();
+    AG.w.push({W,m,pos:m.position,vel:P.vel.clone().addScaledVector(d,30),dir:d.clone(),t:-i*.06,tgt:null,aim:null,reach:0,start:m.position.clone(),lift:false,err:new V3()})}
+  recEvent('You fired '+W.name);message('ROCKETS AWAY',.9);sndMsl();agSync()}
+function rocketImpact(){   // ballistic computer: where a rocket fired now lands (burn then free fall), nil beyond the pod's useful range
+  const W=(agPick()&&AGW[agPick().k]);if(!W||W.kind!=='rocket')return null;
+  _ci.copy(P.pos);_cv.copy(P.vel).addScaledVector(P.fwd,30);let t=0;for(let i=0;i<500;i++){if(t<W.burn)_cv.addScaledVector(_a.copy(_cv).normalize(),W.acc*.05);_cv.y-=G*.05;_cv.multiplyScalar(1-.0005*_cv.length()*.05);_ci.addScaledVector(_cv,.05);t+=.05;if(_ci.y<=Math.max(groundH(_ci.x,_ci.z),0))return _ci}return null}
+function gunImpact(){   // where a round fired now lands (ballistic computer, guns, ground only)
+  _ci.copy(P.pos).addScaledVector(P.fwd,6);_cv.copy(P.vel).addScaledVector(P.fwd,AC.muzzle);for(let i=0;i<200;i++){_cv.y-=G*.02;_cv.multiplyScalar(gunDrag(_cv.length(),1,.02));_ci.addScaledVector(_cv,.02);if(_ci.y<=Math.max(groundH(_ci.x,_ci.z),0))return _ci}return null}
 /* ammunition choices: the gun belt trades damage against aircraft for damage against armour; the bomb fuse trades blast on soft targets for penetration of hard ones */
 const BELTS=[{id:'MIX',n:'universal',air:1,gnd:1,d:'Balanced mix of AP, HE and tracer.'},{id:'AP',n:'armour piercing',air:.8,gnd:1.7,d:'Armour-piercing rounds: weak against aircraft, much better against vehicles.'},{id:'HEI',n:'high explosive',air:1.3,gnd:.5,d:'High-explosive incendiary: strong against aircraft, poor against armour.'}];
 const FUSES=[{id:'INST',n:'instant',hard:.8,soft:1.15,d:'Bursts on contact: wider damage on soft targets.'},{id:'DELAY',n:'delayed',hard:1.7,soft:.7,d:'Penetrates before it bursts: bunkers, tanks and ships take far more, soft targets less.'}];
@@ -225,7 +248,12 @@ function updateAG(dt){
   if(AG.load.length&&state==='play'){AG.tgtT-=dt;
     if(AG.tgt&&!AG.tgt.alive)AG.tgt=null;
     if(!AG.tgt&&AG.tgtT<=0){AG.tgtT=.5;const c=agCandidates();if(c.length){AG.tgt=c[0].g;agSync()}}}
+  if(AG.hold&&AG.sight===2){const l=agPick();if(l&&AGW[l.k].kind==='dumb'&&AG.tgt&&AG.tgt.alive){const ip=ccip();if(ip&&ip.distanceTo(AG.tgt.pos)<30){AG.hold=false;agRelease(true)}}else AG.hold=false}
   for(const w of AG.w){if(w.dead)continue; w.t+=dt; const W=w.W, v=w.vel.length();
+    if(W.kind==='rocket'){if(w.t<0){w.m.position.copy(w.pos);continue}   // ripple delay
+      if(w.t<W.burn){_a.copy(w.vel).normalize();w.vel.addScaledVector(_a,W.acc*dt);if(Math.random()<.7)puff(w.pos.x,w.pos.y,w.pos.z,0,0,0,.9,.9,.9,.5,2,8,.8)}
+      w.vel.y-=G*dt;w.vel.multiplyScalar(1-.0005*v*dt);w.pos.addScaledVector(w.vel,dt);w.m.quaternion.setFromUnitVectors(ZF,_a.copy(w.vel).normalize());
+      if(w.pos.y<=Math.max(groundH(w.pos.x,w.pos.z),0)+1||w.t>25)agDetonate(w);continue}
     if(W.kind==='arm'){
       if(w.tgt&&emitting(w.tgt))w.aim.copy(w.tgt.pos);
       else if(w.tgt&&!w.lostSet){w.lostSet=true;w.err.set(rand(-70,70),0,rand(-70,70));w.aim.add(w.err)}   // radar went quiet: fly to the last fix
@@ -247,7 +275,9 @@ function updateAG(dt){
       if(w.pos.y<=Math.max(groundH(w.pos.x,w.pos.z),0)+(w.aim&&w.pos.distanceTo(w.aim)<6?6:0)||w.t>200)agDetonate(w)}}
   AG.w=AG.w.filter(w=>!w.dead)}
 $('bAg').addEventListener('pointerdown',e=>{e.preventDefault();audioInit();agRelease()});
+$('bAg').addEventListener('pointerup',()=>{AG.hold=false});$('bAg').addEventListener('pointercancel',()=>{AG.hold=false});
 $('bAgN').addEventListener('pointerdown',e=>{e.preventDefault();agNext()});
+$('bSight').addEventListener('click',agSight);$('bWpn').addEventListener('click',agWpn);
 function drawAGHud(c){
   if(!AG.load.length||state!=='play')return; const l=agPick(), t=AG.tgt;
   if(t){const p=proj(_d.copy(t.pos).setY(t.pos.y+3)); const d=t.pos.distanceTo(P.pos), inR=agInRange(l,t);
@@ -255,7 +285,17 @@ function drawAGHud(c){
       txt(c,(emitting(t)?'◆ ':'')+agName(t),p.x,p.y-18,'center',inR?HUD:WARN,10,700)}
     const Wp=l&&AGW[l.k], rng=Wp?(Wp.kind==='arm'?Wp.maxR:Wp.kind==='gps'?agReach(Wp):0):0;
     txt(c,'TGT '+agName(t)+' · '+(d/1000).toFixed(1)+' KM'+(l?' · '+AGW[l.k].sh+(Wp.kind==='dumb'?' · CCIP':inR?' · IN RNG':' · RNG '+(rng/1000).toFixed(0)+' KM'):''),W/2,H*.82,'center',inR?HUD:WARN,12,700)}
-  if(l&&AGW[l.k].kind==='dumb'){const ip=ccip();if(ip){const q=proj(ip);if(q.ok){c.strokeStyle=HUD;c.lineWidth=1.5;c.beginPath();c.arc(q.x,q.y,7,0,Math.PI*2);c.stroke();c.fillStyle=HUD;c.fillRect(q.x-1,q.y-1,2,2);
+  if(AG.sight>=1&&state==='play'){
+    const drawCcip=(ip,max,rocket)=>{if(!ip||ip.distanceTo(P.pos)>max)return;const q=proj(ip);if(!q.ok)return;c.strokeStyle=HUD;c.lineWidth=1.5;c.beginPath();c.arc(q.x,q.y,rocket?5:8,0,6.283);
+      c.moveTo(q.x-12,q.y-12);c.lineTo(q.x-5,q.y-5);c.moveTo(q.x+12,q.y-12);c.lineTo(q.x+5,q.y-5);c.moveTo(q.x-12,q.y+12);c.lineTo(q.x-5,q.y+5);c.moveTo(q.x+12,q.y+12);c.lineTo(q.x+5,q.y+5);c.stroke();   // angled cross-hairs: the CCIP marker
+      if(rocket){c.beginPath();c.moveTo(q.x-3,q.y-3);c.lineTo(q.x+3,q.y+3);c.moveTo(q.x+3,q.y-3);c.lineTo(q.x-3,q.y+3);c.stroke()}};
+    if(AG.sight===1){drawCcip(gunImpact(),2600,false);if(l&&AGW[l.k].kind==='rocket')drawCcip(rocketImpact(),5200,true);txt(c,'BC · CCIP',W/2,H*.86,'center',HUD,10,700)}
+    if(AG.sight===2&&l&&AGW[l.k].kind==='dumb'){const ip=ccip();
+      if(t&&ip){const q=proj(_d.copy(t.pos));const dd=ip.distanceTo(t.pos);const ahead=_s1.subVectors(t.pos,P.pos).setY(0).dot(_s2.copy(P.fwd).setY(0))>0;
+        txt(c,AG.hold?(dd<400?'RELEASE IN '+Math.round(dd/Math.max(1,P.vel.length()))+' S':'HOLD · BOMB RELEASE PERMISSION'):'CCRP · PRESS AND HOLD DROP',W/2,H*.86,'center',AG.hold?WARN:HUD,11,700);
+        if(q.ok){c.strokeStyle=HUD;c.lineWidth=1.5;c.beginPath();c.arc(q.x,q.y-70,6,0,6.283);c.stroke();const ly=q.y-70-clamp(dd/60,0,60)*(ahead?1:-1);c.beginPath();c.moveTo(q.x-18,ly);c.lineTo(q.x+18,ly);c.moveTo(q.x,q.y-64);c.lineTo(q.x,q.y+4);c.stroke()}}   // the line falls onto the circle as the release point nears
+      else txt(c,'CCRP · SELECT A TARGET (TGT)',W/2,H*.86,'center',WARN,11,700)}}
+  if(l&&AGW[l.k].kind==='dumb'&&AG.sight!==2){const ip=ccip();if(ip){const q=proj(ip);if(q.ok){c.strokeStyle=HUD;c.lineWidth=1.5;c.beginPath();c.arc(q.x,q.y,7,0,Math.PI*2);c.stroke();c.fillStyle=HUD;c.fillRect(q.x-1,q.y-1,2,2);
     const fpm=proj(_e.copy(P.pos).addScaledVector(P.vel,3));if(fpm.ok){c.beginPath();c.moveTo(fpm.x,fpm.y);c.lineTo(q.x,q.y);c.stroke()}}}}}
 
 /* ---------------- aircraft carrier: catapult (CATOBAR) or ski-jump (STOBAR) launch, angled deck, 4 arresting wires, optical landing aid ----------------

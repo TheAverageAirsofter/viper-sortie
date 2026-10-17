@@ -118,7 +118,7 @@ function updateAI(e,dt){
   if(agl<900||(e.vel.y<-70&&agl<2600)){dir.copy(e.fwd);dir.y=Math.max(.5,dir.y);dir.normalize();thr=1}
   steer(e,dt,dir,gK,thr*(e.thrK??1));
   const fl=e.obj.getObjectByName('flame'); if(fl)fl.scale.z=thr>.95?1.5:.5; setAB(e.obj,thr>.95);
-  if(e.pos.y<Math.max(groundH(e.pos.x,e.pos.z),0)+3){e.alive=false;scene.remove(e.obj);explode(e.pos,true);recEvent((e.team==='red'?'Bandit ':'Wingman ')+'flew into the ground');return}
+  if(e.pos.y<Math.max(groundH(e.pos.x,e.pos.z),0)+3){crashAI(e);return}
   if(!live||!tg)return;
   if(ground.includes(tg)){   // flight ground attack: guided bomb release inside ~6 km, then pull off
     const dh=Math.hypot(tg.pos.x-e.pos.x,tg.pos.z-e.pos.z); e.bombCd=(e.bombCd||0)-dt;

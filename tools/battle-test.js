@@ -14,6 +14,9 @@ const assert = require('assert'), path = require('path');
   await p.evaluate(() => { const z = __vs.BT.zones[0]; __vs.P.pos.set(z.x, 4000, z.z); __vs.enemies.forEach(e => { e.pos.set(0, 4000, 60000) }); });
   await p.waitForFunction(() => __vs.BT.zones[0].prog > .15, null, { timeout: 100000 });
   await p.evaluate(() => { for (let i = 0; i < 4; i++) __vs.btConditions(false); });   // the weather and light drift without errors
+  // a saved lineup is offered first
+  const lu = await p.evaluate(() => { localStorage.setItem('vsLineup', JSON.stringify(['F4E', 'MIG21'])); document.getElementById('bLineup').click(); return document.getElementById('bLineup').textContent; });
+  assert(/\(\d\/4\)/.test(lu), 'lineup button: ' + lu);
   // shot down: lineup picker appears, battle keeps going
   await p.evaluate(() => __vs.die('shot'));
   await p.waitForSelector('#btPick:not([hidden]) button:not([disabled])', { timeout: 100000 });
@@ -61,5 +64,17 @@ const assert = require('assert'), path = require('path');
   await p4.waitForFunction(b0 => __vs.BT.pts.red < b0 - 30, kp, { timeout: 60000 });
   await p4.evaluate(() => __vs.die('shot'));
   await p4.waitForSelector('#btPick:not([hidden]) button:not([disabled])', { timeout: 100000 });
+  // air assault: waves of bombers, the base loses tickets when one gets through, howitzers drain tickets, clearing a wave brings the next
+  await p4.close();
+  const p5 = await b.newPage({ viewport: { width: 900, height: 420 } });
+  await p5.addInitScript(() => { try { localStorage.setItem('vsTips', '1'); localStorage.setItem('viperMission', 'ASSAULT'); } catch (e) {} });
+  p5.on('pageerror', e => errs.push(e.message)); await p5.route(/fonts\.(googleapis|gstatic)\.com/, r => r.abort());
+  await p5.goto('file://' + path.resolve(__dirname, '../index.html') + '?test'); await p5.waitForTimeout(1500);
+  await p5.sortie(); await p5.waitForFunction(() => __vs.state === 'play' && __vs.AA.wave >= 1 && __vs.enemies.some(e => e.kind === 'bomber'), null, { timeout: 100000 });
+  const as = await p5.evaluate(() => { const V = __vs, e = V.enemies.find(x => x.kind === 'bomber'); const t0 = V.BT.pts.blue; e.pos.set(0, 3500, 100); return { t0, wave: V.AA.wave, bombers: V.enemies.filter(x => x.kind === 'bomber').length }; });
+  assert(as.wave === 1 && as.bombers >= 3, 'first wave: ' + JSON.stringify(as));
+  await p5.waitForFunction(t => __vs.BT.pts.blue < t, as.t0, { timeout: 60000 });
+  await p5.evaluate(() => { __vs.enemies.filter(x => x.kind === 'bomber').forEach(x => __vs.killEnemy(x, 'test', true)); });
+  await p5.waitForFunction(() => __vs.AA.wave >= 2, null, { timeout: 100000 });
   assert.deepEqual(errs, []); console.log('battle ok'); await b.close();
 })().catch(e => { console.error(e); process.exit(1); });

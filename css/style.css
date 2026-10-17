@@ -34,6 +34,9 @@ body{margin:0;background:var(--ink);color:var(--paper);font-family:var(--f-hud);
 #b9{width:64px;height:64px;right:calc(124px + env(safe-area-inset-right,0px));bottom:calc(18px + env(safe-area-inset-bottom,0px))}
 #bAg{width:64px;height:64px;font-size:10px;right:calc(196px + env(safe-area-inset-right,0px));bottom:calc(18px + env(safe-area-inset-bottom,0px))}
 #bAgN{width:50px;height:50px;font-size:10px;right:calc(203px + env(safe-area-inset-right,0px));bottom:calc(92px + env(safe-area-inset-bottom,0px))}
+#bSight,#bWpn{width:50px;height:44px;font-size:10px;right:calc(203px + env(safe-area-inset-right,0px))}
+#bSight{bottom:calc(150px + env(safe-area-inset-bottom,0px))}
+#bWpn{bottom:calc(200px + env(safe-area-inset-bottom,0px))}
 #b120{width:64px;height:64px;right:calc(124px + env(safe-area-inset-right,0px));bottom:calc(92px + env(safe-area-inset-bottom,0px))}
 #bBrake,#bRdr{width:52px;height:42px;border-radius:8px;font-size:11px;letter-spacing:.06em;top:calc(10px + env(safe-area-inset-top,0px))}
 #bBrake{right:calc(186px + env(safe-area-inset-right,0px))}

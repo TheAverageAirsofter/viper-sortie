@@ -20,8 +20,6 @@ const assert = require('assert'), path = require('path');
     const rnd = Math.random; Math.random = () => .5; for (let i = 0; i < 3; i++) V.playerGunHit(1); Math.random = rnd; out.alive3 = V.P.alive; out.hp3 = V.P.hp; return out; });
   assert(d.alive3, 'a few gun hits do not kill by themselves');
   const n = await p.evaluate(() => { __vs.P.sys.wL = 0; __vs.P.sys.wR = 0; __vs.P.sys.pilot = 0; const seen = new Set(); for (let i = 0; i < 200; i++) { const S = __vs.P.sys; const before = JSON.stringify(S); __vs.damageSystem(1); if (JSON.stringify(S) !== before) seen.add(1); } return seen.size });
-  const k = await p.evaluate(() => { const V = __vs; V.P.sys.wL = 1; V.P.sys.wR = .9; V.wingHit('wR', .2); return V.P.alive });
-  assert.equal(k, false, 'both wings gone loses the jet');
   // AI fighters take module damage too: wings, fire, pilot; enough gun hits always bring one down, a missile usually does
   await p.waitForFunction(() => __vs.enemies.filter(x => x.alive && x.kind === 'fighter').length >= 2, null, { timeout: 40000 });
   const ai = await p.evaluate(async () => { const V = __vs, es = V.enemies.filter(x => x.alive && x.kind === 'fighter'); const a = es[0], b = es[1]; let n = 0, labels = new Set();
@@ -30,6 +28,13 @@ const assert = require('assert'), path = require('path');
     return { n, aDead: !a.alive, labels: [...labels], bState: b.alive ? 'crippled' : 'dead', bSys: !!b.sys }; });
   assert(ai.aDead && ai.n < 400, 'gun hits bring an AI fighter down: ' + JSON.stringify(ai));
   assert(ai.bState === 'dead' || ai.bSys, 'a missile kills or cripples: ' + JSON.stringify(ai));
+  // credit rules: a jet that crashes inside its damage window counts as shot down by the player
+  const r2 = await p.evaluate(async () => { const V = __vs; const a = V.spawnFighter('red', 'F16', new V.V3(0, 6000, 30000), new V.V3(0, 6000, 0), {}); const t = V.clockNow();
+    a.hitBy = t; a.critT = t; a.pos.y = -20; V.SC.list.length = 0; await new Promise(r => setTimeout(r, 1500));
+    return { aDead: !a.alive, destroyed: V.SC.list.some(x => /DESTROYED/.test(x.text)) }; });
+  assert(r2.aDead && r2.destroyed, 'crash credit inside the damage window: ' + JSON.stringify(r2));
+  const k = await p.evaluate(() => { const V = __vs; V.P.sys.wL = 1; V.P.sys.wR = .9; V.wingHit('wR', .2); return V.P.alive });
+  assert.equal(k, false, 'both wings gone loses the jet');
   // ammunition choices cycle and persist
   await p.evaluate(() => { document.getElementById('bBelt').click(); document.getElementById('bFuse').click(); });
   assert.equal(await p.evaluate(() => localStorage.getItem('vsBelt') + '/' + localStorage.getItem('vsFuse')), 'AP/DELAY');

@@ -73,6 +73,13 @@ Player gun rounds start at the off-centre barrel and are harmonised on `AC.gunCo
 ## Late additions (battle weather, cockpit lights, online zones)
 Team battles roll weather and time of day and let them drift (`btConditions`, Settings > Gameplay > Battle weather, vsDynWx; the player's settings come back at the next `startGame` via `btRestoreConditions`). The HUD shows a plan-view damage diagram (`drawDamageDiagram`) and the cockpit panels have STALL and FLAPS lights. Carrier jets launch from the deck in the naval battle (`placeOnCarrier`). Online team matches (`btInitOnline`, called from `netStart` when `NET.mode==='TEAMS'`) are zone battles: remote pilots live in `friends` / `enemies`, so each client integrates zone control and kill points (`netTeamScore`) locally; the lineup and respawn work as offline. J-10A and JH-7A are also late alias jets. `tools/battle-test.js` covers all battle modes, including a fake online match.
 
+## From the War Thunder wiki (ballistic computer, radar modes, Air Assault, destroy rules)
+- Ballistic computer (ops.js): `AG.sight` 0 standard / 1 BC (gun CCIP within 2.6 km via `gunImpact`, rocket CCIP within 5.2 km via `rocketImpact`) / 2 CCRP (hold the drop key; `AG.hold` and `updateAG` release a dumb bomb by themselves when `ccip()` reaches the target). Rocket pods (`HYDRA`, `S8`, kind `rocket`, `agRockets`) ripple `per` rockets. Touch buttons `bSight`, `bWpn`; key actions `agSight` (I), `agWpn` (.). `tools/bombing-test.js`.
+- Radar sub-modes (combat.js): `R.sub` PD / MTI / SRC (`radarSub`, `radarBlind`, `radarSubK`, `clutter`, button `rSub`, key `'`); radars without TWS are always SRC. A clutter meter shows on the scope. `tools/radar-test.js`.
+- Air Assault (`ASSAULT`, battle.js `setupAssault` / `aaTick`): 15 waves `AA_ORDER` of bombers (3,500 m) and attackers (1,500 m) from 20 km, tickets = `BT.pts.blue`, howitzers (`g.how`) drain tickets until destroyed.
+- Destroy rules (state.js): `CRIT_WINDOW` 90 s / `HIT_WINDOW` 15 s credit for crashes (`crashAI`), pilots may bail out (`aiBail`, a chute in `DEBRIS`).
+- Saved battle lineup: Hangar > Loadout > Battle lineup (`vsLineup`, `btBuildLineup`).
+
 ## Tasks, pass, accessibility
 progress.js: `WEEKLY` tasks (Monday reset, `weeklyAdd`) and the monthly season pass (`PASS_TIERS` x `PASS_PTS`, `passAdd`, `passReward`, `passClaim`; stored as vsWeekly / vsPass); `careerAward` feeds them and the Pilot pane shows them (`weeklyPassUI` in menu.js). Accessibility: `PALS` / `PAL_ORDER` in main.js (green, blue/orange, cyan/magenta, red/teal, white/amber, high contrast), the Reduce motion setting (`REDUCED`, vsReduce), kills and critical hits mirrored to the screen-reader live region.
 
