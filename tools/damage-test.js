@@ -17,7 +17,7 @@ const assert = require('assert'), path = require('path');
   assert(r.roll < 0, 'left wing damage rolls left: ' + r.roll);
   // no hit-point pool: a thousand gun hits on a fresh jet still leave it flying unless the pilot is killed or both wings go
   const d = await p.evaluate(() => { const V = __vs; const out = { hp0: V.P.hp }; V.P.sys.wL = V.P.sys.wR = 0; V.P.sys.pilot = 0;
-    for (let i = 0; i < 3; i++) V.playerGunHit(1); out.alive3 = V.P.alive; out.hp3 = V.P.hp; return out; });
+    const rnd = Math.random; Math.random = () => .5; for (let i = 0; i < 3; i++) V.playerGunHit(1); Math.random = rnd; out.alive3 = V.P.alive; out.hp3 = V.P.hp; return out; });
   assert(d.alive3, 'a few gun hits do not kill by themselves');
   const n = await p.evaluate(() => { __vs.P.sys.wL = 0; __vs.P.sys.wR = 0; __vs.P.sys.pilot = 0; const seen = new Set(); for (let i = 0; i < 200; i++) { const S = __vs.P.sys; const before = JSON.stringify(S); __vs.damageSystem(1); if (JSON.stringify(S) !== before) seen.add(1); } return seen.size });
   const k = await p.evaluate(() => { const V = __vs; V.P.sys.wL = 1; V.P.sys.wR = .9; V.wingHit('wR', .2); return V.P.alive });

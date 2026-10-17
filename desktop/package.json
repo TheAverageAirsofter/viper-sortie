@@ -8,6 +8,6 @@
     "appId": "com.validairsoft.vipersortie",
     "productName": "Viper Sortie",
     "files": ["main.js", "www/**/*"],
-    "win": { "target": [{ "target": "portable", "arch": ["x64"] }], "artifactName": "viper-sortie.exe" }
+    "win": { "icon": "icon.png", "target": [{ "target": "portable", "arch": ["x64"] }], "artifactName": "viper-sortie.exe" }
   }
 }

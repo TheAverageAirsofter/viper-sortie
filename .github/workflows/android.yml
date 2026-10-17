@@ -85,6 +85,7 @@ jobs:
         with: { node-version: 22 }
       - run: node tools/make-www.js
       - run: node -e "require('fs').cpSync('www','desktop/www',{recursive:true});require('fs').cpSync('fonts','desktop/www/fonts',{recursive:true})"
+      - run: node -e "require('fs').copyFileSync('assets/icon-512.png','desktop/icon.png')"
       - run: npm install --no-save electron@33 electron-builder@25
         working-directory: desktop
       - run: npx electron-builder --win portable --publish never

@@ -4,7 +4,7 @@ const path = require('path');
 app.commandLine.appendSwitch('ignore-gpu-blocklist');
 app.commandLine.appendSwitch('enable-gpu-rasterization');
 function open() {
-  const w = new BrowserWindow({ width: 1280, height: 720, backgroundColor: '#000', fullscreen: true, autoHideMenuBar: true, title: 'Viper Sortie', webPreferences: { backgroundThrottling: false } });
+  const w = new BrowserWindow({ width: 1280, height: 720, backgroundColor: '#000', fullscreen: true, autoHideMenuBar: true, title: 'Viper Sortie', icon: path.join(__dirname, 'icon.png'), webPreferences: { backgroundThrottling: false } });
   Menu.setApplicationMenu(null);
   w.loadFile(path.join(__dirname, 'www', 'index.html'));
   w.webContents.on('before-input-event', (e, i) => {

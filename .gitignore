@@ -1,5 +1,6 @@
 node_modules/
 *.png
+!assets/**/*.png
 android/
 www/
 desktop/www/

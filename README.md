@@ -68,3 +68,9 @@ npm run smoke                # loads the game headless and reports console error
 - **Get it:** GitHub > Actions > *Android APK* > latest run > Artifacts, or run the workflow manually / push a `v*` tag to publish a downloadable GitHub Release.
 - **Install:** allow "install unknown apps" for your browser, open the APK. It is a debug build, not a Play Store release; a Play Store build needs your own signing key.
 - The web build needs no tooling; the APK build only runs in CI (it needs the Android SDK).
+
+## Signing the builds
+The GitHub releases ship a debug-signed APK and an unsigned Windows exe, so Android asks to allow installs from unknown sources and Windows SmartScreen shows a warning on first run.
+- **Android release APK and Play Store bundle:** add the four repository secrets `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS` and `ANDROID_KEY_PASSWORD` (see the comment at the top of `.github/workflows/android.yml`). Create the keystore once with `keytool -genkeypair -v -keystore release.jks -alias viper -keyalg RSA -keysize 2048 -validity 10000`, keep it somewhere safe, and `base64 -w0 release.jks` for the first secret. The same workflow then also publishes a signed `viper-sortie-release.apk` and `.aab`.
+- **Windows exe:** needs a code-signing certificate (an EV certificate removes the SmartScreen warning immediately; a standard one builds reputation over time). It is not set up; once you have one, add it as secrets and extend the `exe` job with electron-builder's `CSC_LINK` / `CSC_KEY_PASSWORD`.
+- Icons are generated from `icon.svg` with `node tools/make-icons.js` into `assets/` (committed).
