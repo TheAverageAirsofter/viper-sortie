@@ -184,7 +184,7 @@ applyPal();
 })();
 
 /* ---------- movable controls: drag buttons to where your thumbs rest (saved per device) ---------- */
-const LAY_IDS=['bGun','b9','b120','bAg','bAgN','bLock','bGear','bBrake','bRdr','bCam','bPause','bEject','thr','cm'];
+const LAY_IDS=['bGun','b9','b120','bAg','bAgN','bLock','bGear','bFlaps','bBrake','bRdr','bCam','bPause','bEject','thr','cm'];
 const LAY_SIZES=[.85,1,1.2,1.4];
 let lay={s:1,p:{}}; try{const v=JSON.parse(localStorage.getItem('viperLayout')||'null');if(v&&typeof v==='object'){lay.s=LAY_SIZES.includes(v.s)?v.s:1;lay.p=v.p&&typeof v.p==='object'?v.p:{}}}catch(e){}
 function layApply(){for(const id of LAY_IDS){const el=$(id);if(!el)continue;const o=lay.p[id];
@@ -233,7 +233,7 @@ $('layMirror').addEventListener('click',()=>{for(const id of LAY_IDS){const el=$
 
 /* ---------- controls guide: labels every button; shown once after the first launch ---------- */
 const TIPS=[['bGun','<b>GUN</b> hold to fire'],['b9','<b>9X</b> heat-seeking missile'],['b120','<b>120</b> radar missile'],['bLock','<b>LOCK</b> radar target'],
-  ['thr','<b>THROTTLE</b> drag; top = afterburner'],['cm','<b>FLR / CHF</b> decoys vs missiles'],['bGear','<b>GEAR</b> up / down'],['bBrake','<b>BRK</b> speed brake'],
+  ['thr','<b>THROTTLE</b> drag; top = afterburner'],['cm','<b>FLR / CHF</b> decoys vs missiles'],['bGear','<b>GEAR</b> up / down'],['bFlaps','<b>FLAPS</b> up / combat / landing'],['bBrake','<b>BRK</b> speed brake'],
   ['bRdr','<b>RDR</b> radar panel'],['bCam','<b>CAM</b> change view'],['bPause','<b>II</b> pause / menu']];
 function tipsShow(){const box=$('tips');box.querySelectorAll('.tip').forEach(e=>e.remove());box.hidden=false;
   const placed=[],W_=innerWidth,H_=innerHeight,hit=(a,b)=>a.l<b.r&&a.r>b.l&&a.t<b.b&&a.b>b.t;

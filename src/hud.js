@@ -1,4 +1,5 @@
 /* ---------------- camera ---------------- */
+const spinCamQ=new THREE.Quaternion();
 let camSnap=true; const camUp=new V3(0,1,0);
 const headQ=new THREE.Quaternion(),headE=new THREE.Euler(),headP=new V3();
 function padTarget(){
@@ -52,12 +53,13 @@ function updateCamera(dt){
     camera.position.copy(flyCam); camera.up.set(0,1,0); camUp.set(0,1,0); camera.lookAt(P.pos);
   } else {
     // chase, orbitable by dragging the right side
-    _a.set(0,4.5,-21).applyAxisAngle(_e.set(1,0,0),-look.pitch*.8).applyAxisAngle(_e.set(0,1,0),-look.yaw).applyQuaternion(q).add(P.pos);
+    const qc=P.spin?spinCamQ.setFromAxisAngle(UP,P.camYaw):q;   // in a spin the chase camera holds its heading so you see the jet turn about itself
+    _a.set(0,4.5,-21).applyAxisAngle(_e.set(1,0,0),-look.pitch*.8).applyAxisAngle(_e.set(0,1,0),-look.yaw).applyQuaternion(qc).add(P.pos);
     camera.position.lerp(_a,look.id!==null?1:k);
-    camUp.lerp(_b.copy(P.up).multiplyScalar(.75).addScaledVector(UP,.25).normalize(),Math.min(1,dt*5)).normalize();
+    camUp.lerp(P.spin?UP:_b.copy(P.up).multiplyScalar(.75).addScaledVector(UP,.25).normalize(),Math.min(1,dt*5)).normalize();
     camera.up.copy(camUp);
     const ahead=1-Math.min(1,Math.abs(look.yaw)+Math.abs(look.pitch));
-    camera.lookAt(_c.set(0,2,40*ahead).applyQuaternion(q).add(P.pos));
+    if(P.spin)camera.lookAt(P.pos);else camera.lookAt(_c.set(0,2,40*ahead).applyQuaternion(q).add(P.pos));
   }
   if(shake>0&&(v==='CHASE'||v==='PADLOCK')){const sk=shake*(REDUCED?.25:1)*(v==='COCKPIT'?.15:1);camera.position.x+=rand(-1,1)*sk;camera.position.y+=rand(-1,1)*sk}
 }

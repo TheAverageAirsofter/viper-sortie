@@ -4,13 +4,14 @@ function newJet(obj,gLim,ac){return {ac:ac||AC_DEFS.F16,obj,pos:obj.position,vel
 function axes(j){const q=j.obj.quaternion;j.fwd.set(0,0,1).applyQuaternion(q);j.up.set(0,1,0).applyQuaternion(q);j.right.set(-1,0,0).applyQuaternion(q)}
 /* flaps (player): 0 up, 1 combat, 2 landing. More lift and drag; the gear forces landing flaps; over the speed limit they are torn off.
    Stall and spin (player, jets without stall protection): below stall speed with the nose high and rudder or full roll in, the jet departs into a spin until you centre the stick and build speed. */
+const spinE=new THREE.Euler(), _qf=new THREE.Quaternion();
 const FLAP_CL=[0,.1,.3], FLAP_CD=[0,.008,.035], FLAP_VMAX=[999,380,270];
 const SPIN_SAFE=/^(F16|F35|F22|FA18|F18|GRIPEN|TYPHOON|EF2|RAFALE|SU27|SU3|SU35|SU57|MIG29|MIG35|J10|J11|J16|J20|F15)/;
 function fly(j,dt,rollIn,pitchIn,yawIn,thr,brake){
   const q=j.obj.quaternion, A=j.ac;
   let fl=0,CLM=A.CLMAX;
   if(j===P){
-    if(P.gear)P.flaps=2;else if(P.flaps===2)P.flaps=1;
+    if(P.gear)P.flaps=2;else if(P.flaps===2&&!P.flapManual)P.flaps=1;   // gear up retracts landing flaps unless you chose them
     if(P.sys&&P.sys.flapOff)P.flaps=0;
     if(P.flaps===1&&P.kcas>330)P.flaps=0;   // combat flaps retract by themselves
     fl=P.flaps||0;if(fl===2&&P.kcas>FLAP_VMAX[fl]&&P.sys&&state==='play'){P.flaps=0;fl=0;P.sys.flapOff=true;message('FLAPS TORN OFF · OVERSPEED',2);recEvent('Flaps torn off by overspeed');sndTear&&sndTear()}
@@ -20,11 +21,15 @@ function fly(j,dt,rollIn,pitchIn,yawIn,thr,brake){
       if(!j.spin){
         const dep=(j.kcas<stallC*.92||(j.fwd.y>.5&&j.kcas<stallC*1.1))&&(Math.abs(yawIn||0)>.4||Math.abs(rollIn)>.6)&&pitchIn>.2;
         j.dep=dep?(j.dep||0)+dt:Math.max(0,(j.dep||0)-dt*2);
-        if(j.dep>.6){j.spin=(rollIn||yawIn||1)>0?1:-1;j.dep=0;j.spinT=0;message('DEPARTED · SPIN · CENTRE THE CONTROLS AND DIVE',2.6);recEvent('Departed controlled flight')}
+        if(j.dep>.6){j.spin=(rollIn||yawIn||1)>0?1:-1;j.dep=0;j.spinT=0;j.spinYaw=Math.atan2(j.fwd.x,j.fwd.z);j.camYaw=j.spinYaw;message('DEPARTED · SPIN · CENTRE THE CONTROLS AND DIVE',2.6);recEvent('Departed controlled flight')}
       } else {
         j.spinT+=dt;
-        if(j.kcas>stallC*1.45&&cen||j.spinT>40){j.spin=0;message('RECOVERED',1.4)}
-        else{j.vel.applyAxisAngle(UP,-j.spin*.9*dt);j.vel.y-=G*.8*dt;j.obj.rotateZ(j.spin*1.5*dt);rollIn=0;pitchIn=0;yawIn=0;shake=Math.max(shake,.15)}
+        if(j.kcas>stallC*1.45&&cen||j.spinT>40){j.spin=0;j.recT=1;message('RECOVERED',1.4)}
+        else{   // the nose drops and the jet turns about its own vertical axis while it falls: attitude is set directly, not taken from the flight path
+          j.spinYaw+=j.spin*2.0*dt;j.camYaw+=j.spin*.18*dt;
+          q.setFromEuler(spinE.set(.95+Math.sin(j.spinT*1.7)*.14,j.spinYaw,j.spin*(.28+Math.sin(j.spinT*2.3)*.22),'YXZ'));
+          axes(j);j.vel.x*=1-1.1*dt;j.vel.z*=1-1.1*dt;j.vel.y=Math.max(-160,j.vel.y-G*.85*dt);
+          rollIn=0;pitchIn=0;yawIn=0;thr=Math.min(thr,.25);shake=Math.max(shake,.15)}
       }
     } else if(j.spin)j.spin=0;
   }
@@ -54,7 +59,9 @@ function fly(j,dt,rollIn,pitchIn,yawIn,thr,brake){
       k=turbK*(clamp(1-(agl-1500)/3500,.25,1)+nearDeck)*clamp(v/120,.3,1.2), t=clock;
     const bp=Math.sin(t*2.7)*.6+Math.sin(t*4.9+1.3)*.3+Math.sin(t*9.1+.7)*.15, br=Math.sin(t*3.3+2.1)*.6+Math.sin(t*6.1+.4)*.3+Math.sin(t*11.3)*.12;
     j.obj.rotateX(bp*.035*k*dt*6); j.obj.rotateZ(br*.05*k*dt*6); axes(j); j.vel.y+=bp*k*2.2*dt*6*.4}
-  _vd.copy(j.vel).normalize(); qa.setFromUnitVectors(j.fwd,_vd); q.premultiply(qa); q.normalize();
+  if(j.spin){axes(j);return}   // in a spin the attitude is not slaved to the velocity
+  _vd.copy(j.vel).normalize(); qa.setFromUnitVectors(j.fwd,_vd); if(j.recT>0){j.recT-=dt;qa.identity().slerp(_qf.setFromUnitVectors(j.fwd,_vd),.1)}   // ease out of a spin
+  q.premultiply(qa); q.normalize();
   axes(j);
 }
 const bankOf=j=>Math.atan2(-j.right.y,j.up.y);
@@ -342,7 +349,7 @@ function whoosh(v,sp){const c=A.ctx,t=c.currentTime,s=c.createBufferSource();s.b
 function sonicBoom(v){sndNoise(.35,160,1.1*v);setTimeout(()=>sndNoise(.4,150,1.0*v),110);buzz([60,40,80])}
 
 const GEAR_H=1.95;
-function setGear(down){P.gear=down; P.xcd=(down?.022:0)+(AC.scd||0)-(P.tanksGone?(AC.tanks||0)*.0025:0); if(!P.alive||state!=='play'||P.onGround)P.gearT=down?1:0; $('nGear').textContent=down?'DOWN':'UP'; $('bGear').classList.toggle('down',down)}
+function setGear(down){P.gear=down;P.flapManual=false; P.xcd=(down?.022:0)+(AC.scd||0)-(P.tanksGone?(AC.tanks||0)*.0025:0); if(!P.alive||state!=='play'||P.onGround)P.gearT=down?1:0; $('nGear').textContent=down?'DOWN':'UP'; $('bGear').classList.toggle('down',down)}
 // rolling on the runway: thrust, drag, rolling friction, wheel brakes, nosewheel steering; lift-off once the wing can hold the jet
 function groundRoll(dt,rollIn,pitchIn){
   const A=AC, at=atm(P.pos.y); let v=Math.hypot(P.vel.x,P.vel.z);

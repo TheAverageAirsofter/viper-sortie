@@ -43,7 +43,9 @@ body{margin:0;background:var(--ink);color:var(--paper);font-family:var(--f-hud);
 #bBrake,#bRdr{width:52px;height:42px;border-radius:8px;font-size:11px;letter-spacing:.06em;top:calc(10px + env(safe-area-inset-top,0px))}
 #bBrake{right:calc(186px + env(safe-area-inset-right,0px))}
 #bGear{width:52px;height:42px;border-radius:8px;font-size:10px;letter-spacing:.04em;top:calc(10px + env(safe-area-inset-top,0px));right:calc(248px + env(safe-area-inset-right,0px))}
-#bGear small{margin-top:1px;font-size:9px}
+#bGear small,#bFlaps small{margin-top:1px;font-size:9px}
+#bFlaps{width:52px;height:42px;border-radius:8px;font-size:10px;letter-spacing:.04em;top:calc(10px + env(safe-area-inset-top,0px));right:calc(310px + env(safe-area-inset-right,0px))}
+#bFlaps.down{background:var(--warn);color:var(--ink);border-color:var(--warn)}
 #bGear.down{background:var(--warn);color:var(--ink);border-color:var(--warn)}
 #bRdr{right:calc(124px + env(safe-area-inset-right,0px))}
 #bLock{width:58px;height:58px;font-size:11px;right:calc(127px + env(safe-area-inset-right,0px));bottom:calc(166px + env(safe-area-inset-bottom,0px))}
@@ -55,7 +57,7 @@ body{margin:0;background:var(--ink);color:var(--paper);font-family:var(--f-hud);
 .cmb.on{background:var(--hud);color:var(--ink);border-color:var(--hud)}
 .cmb.hot{background:var(--warn);color:var(--ink);border-color:var(--warn)}
 .cmb:focus-visible{outline:2px solid var(--hud);outline-offset:2px}
-@media (orientation:portrait){#bGear{top:auto;right:auto;left:calc(10px + env(safe-area-inset-left,0px));bottom:calc(560px + env(safe-area-inset-bottom,0px))}
+@media (orientation:portrait){#bFlaps{top:auto;right:auto;left:calc(10px + env(safe-area-inset-left,0px));bottom:calc(610px + env(safe-area-inset-bottom,0px))}#bGear{top:auto;right:auto;left:calc(10px + env(safe-area-inset-left,0px));bottom:calc(560px + env(safe-area-inset-bottom,0px))}
   #cm{flex-direction:column;flex-wrap:wrap;max-height:270px;align-content:flex-start;left:calc(10px + env(safe-area-inset-left,0px));transform:none;bottom:calc(170px + env(safe-area-inset-bottom,0px))}}
 /* radar control panel: OSB-style buttons around a tappable B-scope */
 #rdr{position:fixed;left:calc(10px + env(safe-area-inset-left,0px));top:calc(80px + env(safe-area-inset-top,0px));width:222px;box-sizing:border-box;
@@ -235,8 +237,8 @@ button:disabled{opacity:.4;cursor:not-allowed}
 .btn,.cmb{border:var(--stroke) solid var(--hud-dim);background:rgba(8,16,20,.76);color:var(--hud);text-shadow:0 1px 2px rgba(0,0,0,.9);
   box-shadow:0 0 0 1px rgba(0,0,0,.45),0 2px 10px rgba(0,0,0,.35);transition:background 120ms var(--ease),transform 90ms var(--ease),opacity var(--dur),border-color var(--dur)}
 .btn:active,.cmb:active{transform:scale(.94);background:rgba(125,255,154,.32)}
-#bBrake,#bRdr,#bGear,#bCam,#bPause,.cmb{border-radius:var(--r-md)}
-#bBrake,#bRdr,#bGear,#bCam{height:44px}#bPause{width:44px;height:44px}
+#bBrake,#bRdr,#bGear,#bFlaps,#bCam,#bPause,.cmb{border-radius:var(--r-md)}
+#bBrake,#bRdr,#bGear,#bFlaps,#bCam{height:44px}#bPause{width:44px;height:44px}
 .btn.off,.btn:disabled,.cmb.off,.cmb:disabled{opacity:.38;filter:saturate(.45)}
 .btn.empty{opacity:.5;border-color:var(--warn);color:var(--warn)}
 .btn.ready:active{filter:brightness(.9)}
@@ -556,7 +558,7 @@ button:disabled{opacity:.4;cursor:not-allowed}
 
 /* ================= in-flight buttons: thin strokes and chamfered corners ================= */
 .btn,.cmb{border-radius:0;border:0;background:rgba(7,11,15,.74);box-shadow:inset 0 0 0 1.5px var(--hud-dim);clip-path:polygon(9px 0,100% 0,100% calc(100% - 9px),calc(100% - 9px) 100%,0 100%,0 9px)}
-#bBrake,#bRdr,#bGear,#bCam,#bPause,.cmb{border-radius:0}
+#bBrake,#bRdr,#bGear,#bFlaps,#bCam,#bPause,.cmb{border-radius:0}
 .btn.on{box-shadow:inset 0 0 0 1.5px var(--hud)}
 .btn:active,.cmb:active{transform:scale(.95);background:rgba(125,255,154,.3)}
 .btn.off,.btn:disabled,.cmb.off,.cmb:disabled{opacity:.38;filter:saturate(.4)}
@@ -710,6 +712,7 @@ button:disabled{opacity:.4;cursor:not-allowed}
   <div id="stickHint">DRAG<br>TO FLY</div>
   <div id="stickBase" hidden><div id="stickKnob"></div></div>
   <button class="btn" id="bGear" aria-label="Landing gear">GEAR<small id="nGear">UP</small></button>
+  <button class="btn" id="bFlaps" aria-label="Flaps">FLAPS<small id="nFlaps">UP</small></button>
   <button class="btn" id="bBrake" aria-label="Speed brake">BRK</button>
   <button class="btn" id="bRdr" aria-label="Radar panel">RDR</button>
   <button class="btn" id="bLock" aria-label="Radar lock">LOCK</button>
@@ -3749,13 +3752,14 @@ function newJet(obj,gLim,ac){return {ac:ac||AC_DEFS.F16,obj,pos:obj.position,vel
 function axes(j){const q=j.obj.quaternion;j.fwd.set(0,0,1).applyQuaternion(q);j.up.set(0,1,0).applyQuaternion(q);j.right.set(-1,0,0).applyQuaternion(q)}
 /* flaps (player): 0 up, 1 combat, 2 landing. More lift and drag; the gear forces landing flaps; over the speed limit they are torn off.
    Stall and spin (player, jets without stall protection): below stall speed with the nose high and rudder or full roll in, the jet departs into a spin until you centre the stick and build speed. */
+const spinE=new THREE.Euler(), _qf=new THREE.Quaternion();
 const FLAP_CL=[0,.1,.3], FLAP_CD=[0,.008,.035], FLAP_VMAX=[999,380,270];
 const SPIN_SAFE=/^(F16|F35|F22|FA18|F18|GRIPEN|TYPHOON|EF2|RAFALE|SU27|SU3|SU35|SU57|MIG29|MIG35|J10|J11|J16|J20|F15)/;
 function fly(j,dt,rollIn,pitchIn,yawIn,thr,brake){
   const q=j.obj.quaternion, A=j.ac;
   let fl=0,CLM=A.CLMAX;
   if(j===P){
-    if(P.gear)P.flaps=2;else if(P.flaps===2)P.flaps=1;
+    if(P.gear)P.flaps=2;else if(P.flaps===2&&!P.flapManual)P.flaps=1;   // gear up retracts landing flaps unless you chose them
     if(P.sys&&P.sys.flapOff)P.flaps=0;
     if(P.flaps===1&&P.kcas>330)P.flaps=0;   // combat flaps retract by themselves
     fl=P.flaps||0;if(fl===2&&P.kcas>FLAP_VMAX[fl]&&P.sys&&state==='play'){P.flaps=0;fl=0;P.sys.flapOff=true;message('FLAPS TORN OFF · OVERSPEED',2);recEvent('Flaps torn off by overspeed');sndTear&&sndTear()}
@@ -3765,11 +3769,15 @@ function fly(j,dt,rollIn,pitchIn,yawIn,thr,brake){
       if(!j.spin){
         const dep=(j.kcas<stallC*.92||(j.fwd.y>.5&&j.kcas<stallC*1.1))&&(Math.abs(yawIn||0)>.4||Math.abs(rollIn)>.6)&&pitchIn>.2;
         j.dep=dep?(j.dep||0)+dt:Math.max(0,(j.dep||0)-dt*2);
-        if(j.dep>.6){j.spin=(rollIn||yawIn||1)>0?1:-1;j.dep=0;j.spinT=0;message('DEPARTED · SPIN · CENTRE THE CONTROLS AND DIVE',2.6);recEvent('Departed controlled flight')}
+        if(j.dep>.6){j.spin=(rollIn||yawIn||1)>0?1:-1;j.dep=0;j.spinT=0;j.spinYaw=Math.atan2(j.fwd.x,j.fwd.z);j.camYaw=j.spinYaw;message('DEPARTED · SPIN · CENTRE THE CONTROLS AND DIVE',2.6);recEvent('Departed controlled flight')}
       } else {
         j.spinT+=dt;
-        if(j.kcas>stallC*1.45&&cen||j.spinT>40){j.spin=0;message('RECOVERED',1.4)}
-        else{j.vel.applyAxisAngle(UP,-j.spin*.9*dt);j.vel.y-=G*.8*dt;j.obj.rotateZ(j.spin*1.5*dt);rollIn=0;pitchIn=0;yawIn=0;shake=Math.max(shake,.15)}
+        if(j.kcas>stallC*1.45&&cen||j.spinT>40){j.spin=0;j.recT=1;message('RECOVERED',1.4)}
+        else{   // the nose drops and the jet turns about its own vertical axis while it falls: attitude is set directly, not taken from the flight path
+          j.spinYaw+=j.spin*2.0*dt;j.camYaw+=j.spin*.18*dt;
+          q.setFromEuler(spinE.set(.95+Math.sin(j.spinT*1.7)*.14,j.spinYaw,j.spin*(.28+Math.sin(j.spinT*2.3)*.22),'YXZ'));
+          axes(j);j.vel.x*=1-1.1*dt;j.vel.z*=1-1.1*dt;j.vel.y=Math.max(-160,j.vel.y-G*.85*dt);
+          rollIn=0;pitchIn=0;yawIn=0;thr=Math.min(thr,.25);shake=Math.max(shake,.15)}
       }
     } else if(j.spin)j.spin=0;
   }
@@ -3799,7 +3807,9 @@ function fly(j,dt,rollIn,pitchIn,yawIn,thr,brake){
       k=turbK*(clamp(1-(agl-1500)/3500,.25,1)+nearDeck)*clamp(v/120,.3,1.2), t=clock;
     const bp=Math.sin(t*2.7)*.6+Math.sin(t*4.9+1.3)*.3+Math.sin(t*9.1+.7)*.15, br=Math.sin(t*3.3+2.1)*.6+Math.sin(t*6.1+.4)*.3+Math.sin(t*11.3)*.12;
     j.obj.rotateX(bp*.035*k*dt*6); j.obj.rotateZ(br*.05*k*dt*6); axes(j); j.vel.y+=bp*k*2.2*dt*6*.4}
-  _vd.copy(j.vel).normalize(); qa.setFromUnitVectors(j.fwd,_vd); q.premultiply(qa); q.normalize();
+  if(j.spin){axes(j);return}   // in a spin the attitude is not slaved to the velocity
+  _vd.copy(j.vel).normalize(); qa.setFromUnitVectors(j.fwd,_vd); if(j.recT>0){j.recT-=dt;qa.identity().slerp(_qf.setFromUnitVectors(j.fwd,_vd),.1)}   // ease out of a spin
+  q.premultiply(qa); q.normalize();
   axes(j);
 }
 const bankOf=j=>Math.atan2(-j.right.y,j.up.y);
@@ -4087,7 +4097,7 @@ function whoosh(v,sp){const c=A.ctx,t=c.currentTime,s=c.createBufferSource();s.b
 function sonicBoom(v){sndNoise(.35,160,1.1*v);setTimeout(()=>sndNoise(.4,150,1.0*v),110);buzz([60,40,80])}
 
 const GEAR_H=1.95;
-function setGear(down){P.gear=down; P.xcd=(down?.022:0)+(AC.scd||0)-(P.tanksGone?(AC.tanks||0)*.0025:0); if(!P.alive||state!=='play'||P.onGround)P.gearT=down?1:0; $('nGear').textContent=down?'DOWN':'UP'; $('bGear').classList.toggle('down',down)}
+function setGear(down){P.gear=down;P.flapManual=false; P.xcd=(down?.022:0)+(AC.scd||0)-(P.tanksGone?(AC.tanks||0)*.0025:0); if(!P.alive||state!=='play'||P.onGround)P.gearT=down?1:0; $('nGear').textContent=down?'DOWN':'UP'; $('bGear').classList.toggle('down',down)}
 // rolling on the runway: thrust, drag, rolling friction, wheel brakes, nosewheel steering; lift-off once the wing can hold the jet
 function groundRoll(dt,rollIn,pitchIn){
   const A=AC, at=atm(P.pos.y); let v=Math.hypot(P.vel.x,P.vel.z);
@@ -5288,10 +5298,15 @@ try{const v=JSON.parse(localStorage.getItem('vsKeys')||'null');if(v){for(const m
   if(v.mouse)Object.assign(KB.mouse,v.mouse);if(v.wheel)KB.wheel=v.wheel;if(+v.msens>0)KB.msens=+v.msens;KB.minv=!!v.minv;kbRebuild()}}catch(e){}
 const KB_ALIAS={rollL:['ArrowLeft'],rollR:['ArrowRight'],pitchPush:['ArrowUp'],pitchPull:['ArrowDown'],thrUp:['ShiftRight','Equal'],thrDn:['ControlRight','Minus']};
 const kbHeld=a=>{const m=KB.map[KBM.on?'kbm':'kb'][a];for(const c of m)if(keys[c])return true;const al=KB_ALIAS[a];if(al)for(const c of al)if(keys[c])return true;return false};
+function cycleFlaps(){
+  if(P.sys&&P.sys.flapOff){message('FLAPS DAMAGED',1);return}
+  if(P.gear){message('LANDING FLAPS WITH THE GEAR DOWN',1);return}
+  P.flaps=((P.flaps||0)+1)%3;P.flapManual=true;message(['FLAPS UP','COMBAT FLAPS','LANDING FLAPS'][P.flaps],1)}
+$('bFlaps').addEventListener('click',cycleFlaps);
 function actDown(a){
   switch(a){
     case 'gun':gunHeld=true;break;case 'aim9':fire9=true;break;case 'aim120':fire120=true;break;case 'brake':brake=true;break;
-    case 'flaps':if(!P.gear&&!(P.sys&&P.sys.flapOff)){P.flaps=((P.flaps||0)+1)%2;message(P.flaps?'COMBAT FLAPS':'FLAPS UP',1)}break;case 'view':cycleView();break;case 'gear':$('bGear').click();break;case 'lock':quickLock();break;case 'nextTgt':stepTarget();break;
+    case 'flaps':cycleFlaps();break;case 'view':cycleView();break;case 'gear':$('bGear').click();break;case 'lock':quickLock();break;case 'nextTgt':stepTarget();break;
     case 'acm':$('rAcm').click();break;case 'radarMode':$('rMode').click();break;case 'rangeUp':$('rUp').click();break;case 'rangeDn':$('rDn').click();break;
     case 'radar':$('bRdr').click();break;case 'map':mapStep();break;case 'flare':if(!CM.flrHeld){CM.flrHeld=true;CM.flrT=0}break;case 'chaff':if(!CM.chfHeld){CM.chfHeld=true;CM.chfT=0}break;
     case 'ecm':toggleECM();break;case 'decoy':deployDecoy();break;case 'agRel':agRelease();break;case 'agNext':agNext();break;case 'auto':$('cAuto').click();break;case 'pause':pause();break;
@@ -5517,6 +5532,7 @@ function damageSystem(n){
 }
 function updateSystems(dt,auto){
   const sy=P.sys; let k=0;
+  {const t=['UP','CBT','LDG'][P.flaps||0];if($('nFlaps').textContent!==t){$('nFlaps').textContent=t;$('bFlaps').classList.toggle('down',!!P.flaps)}}
   for(let i=0;i<sy.eng.length;i++){
     if(sy.eng[i]===1){sy.fireT[i]-=dt; if(Math.random()<.6)puff(P.pos.x,P.pos.y,P.pos.z,P.vel.x*.2,P.vel.y*.2,P.vel.z*.2,.15,.15,.15,.7,4,10,2.5);
       if(sy.fireT[i]<=0){sy.eng[i]=2;message(ENG_NAME(i)+'ENGINE FAILED',2);recEvent(ENG_NAME(i).toLowerCase()+'engine failed')}}
@@ -7084,6 +7100,7 @@ function updateCombat(dt){
 }
 
 /* ---------------- camera ---------------- */
+const spinCamQ=new THREE.Quaternion();
 let camSnap=true; const camUp=new V3(0,1,0);
 const headQ=new THREE.Quaternion(),headE=new THREE.Euler(),headP=new V3();
 function padTarget(){
@@ -7137,12 +7154,13 @@ function updateCamera(dt){
     camera.position.copy(flyCam); camera.up.set(0,1,0); camUp.set(0,1,0); camera.lookAt(P.pos);
   } else {
     // chase, orbitable by dragging the right side
-    _a.set(0,4.5,-21).applyAxisAngle(_e.set(1,0,0),-look.pitch*.8).applyAxisAngle(_e.set(0,1,0),-look.yaw).applyQuaternion(q).add(P.pos);
+    const qc=P.spin?spinCamQ.setFromAxisAngle(UP,P.camYaw):q;   // in a spin the chase camera holds its heading so you see the jet turn about itself
+    _a.set(0,4.5,-21).applyAxisAngle(_e.set(1,0,0),-look.pitch*.8).applyAxisAngle(_e.set(0,1,0),-look.yaw).applyQuaternion(qc).add(P.pos);
     camera.position.lerp(_a,look.id!==null?1:k);
-    camUp.lerp(_b.copy(P.up).multiplyScalar(.75).addScaledVector(UP,.25).normalize(),Math.min(1,dt*5)).normalize();
+    camUp.lerp(P.spin?UP:_b.copy(P.up).multiplyScalar(.75).addScaledVector(UP,.25).normalize(),Math.min(1,dt*5)).normalize();
     camera.up.copy(camUp);
     const ahead=1-Math.min(1,Math.abs(look.yaw)+Math.abs(look.pitch));
-    camera.lookAt(_c.set(0,2,40*ahead).applyQuaternion(q).add(P.pos));
+    if(P.spin)camera.lookAt(P.pos);else camera.lookAt(_c.set(0,2,40*ahead).applyQuaternion(q).add(P.pos));
   }
   if(shake>0&&(v==='CHASE'||v==='PADLOCK')){const sk=shake*(REDUCED?.25:1)*(v==='COCKPIT'?.15:1);camera.position.x+=rand(-1,1)*sk;camera.position.y+=rand(-1,1)*sk}
 }
@@ -7635,7 +7653,7 @@ applyPal();
 })();
 
 /* ---------- movable controls: drag buttons to where your thumbs rest (saved per device) ---------- */
-const LAY_IDS=['bGun','b9','b120','bAg','bAgN','bLock','bGear','bBrake','bRdr','bCam','bPause','bEject','thr','cm'];
+const LAY_IDS=['bGun','b9','b120','bAg','bAgN','bLock','bGear','bFlaps','bBrake','bRdr','bCam','bPause','bEject','thr','cm'];
 const LAY_SIZES=[.85,1,1.2,1.4];
 let lay={s:1,p:{}}; try{const v=JSON.parse(localStorage.getItem('viperLayout')||'null');if(v&&typeof v==='object'){lay.s=LAY_SIZES.includes(v.s)?v.s:1;lay.p=v.p&&typeof v.p==='object'?v.p:{}}}catch(e){}
 function layApply(){for(const id of LAY_IDS){const el=$(id);if(!el)continue;const o=lay.p[id];
@@ -7684,7 +7702,7 @@ $('layMirror').addEventListener('click',()=>{for(const id of LAY_IDS){const el=$
 
 /* ---------- controls guide: labels every button; shown once after the first launch ---------- */
 const TIPS=[['bGun','<b>GUN</b> hold to fire'],['b9','<b>9X</b> heat-seeking missile'],['b120','<b>120</b> radar missile'],['bLock','<b>LOCK</b> radar target'],
-  ['thr','<b>THROTTLE</b> drag; top = afterburner'],['cm','<b>FLR / CHF</b> decoys vs missiles'],['bGear','<b>GEAR</b> up / down'],['bBrake','<b>BRK</b> speed brake'],
+  ['thr','<b>THROTTLE</b> drag; top = afterburner'],['cm','<b>FLR / CHF</b> decoys vs missiles'],['bGear','<b>GEAR</b> up / down'],['bFlaps','<b>FLAPS</b> up / combat / landing'],['bBrake','<b>BRK</b> speed brake'],
   ['bRdr','<b>RDR</b> radar panel'],['bCam','<b>CAM</b> change view'],['bPause','<b>II</b> pause / menu']];
 function tipsShow(){const box=$('tips');box.querySelectorAll('.tip').forEach(e=>e.remove());box.hidden=false;
   const placed=[],W_=innerWidth,H_=innerHeight,hit=(a,b)=>a.l<b.r&&a.r>b.l&&a.t<b.b&&a.b>b.t;

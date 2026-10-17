@@ -485,10 +485,15 @@ try{const v=JSON.parse(localStorage.getItem('vsKeys')||'null');if(v){for(const m
   if(v.mouse)Object.assign(KB.mouse,v.mouse);if(v.wheel)KB.wheel=v.wheel;if(+v.msens>0)KB.msens=+v.msens;KB.minv=!!v.minv;kbRebuild()}}catch(e){}
 const KB_ALIAS={rollL:['ArrowLeft'],rollR:['ArrowRight'],pitchPush:['ArrowUp'],pitchPull:['ArrowDown'],thrUp:['ShiftRight','Equal'],thrDn:['ControlRight','Minus']};
 const kbHeld=a=>{const m=KB.map[KBM.on?'kbm':'kb'][a];for(const c of m)if(keys[c])return true;const al=KB_ALIAS[a];if(al)for(const c of al)if(keys[c])return true;return false};
+function cycleFlaps(){
+  if(P.sys&&P.sys.flapOff){message('FLAPS DAMAGED',1);return}
+  if(P.gear){message('LANDING FLAPS WITH THE GEAR DOWN',1);return}
+  P.flaps=((P.flaps||0)+1)%3;P.flapManual=true;message(['FLAPS UP','COMBAT FLAPS','LANDING FLAPS'][P.flaps],1)}
+$('bFlaps').addEventListener('click',cycleFlaps);
 function actDown(a){
   switch(a){
     case 'gun':gunHeld=true;break;case 'aim9':fire9=true;break;case 'aim120':fire120=true;break;case 'brake':brake=true;break;
-    case 'flaps':if(!P.gear&&!(P.sys&&P.sys.flapOff)){P.flaps=((P.flaps||0)+1)%2;message(P.flaps?'COMBAT FLAPS':'FLAPS UP',1)}break;case 'view':cycleView();break;case 'gear':$('bGear').click();break;case 'lock':quickLock();break;case 'nextTgt':stepTarget();break;
+    case 'flaps':cycleFlaps();break;case 'view':cycleView();break;case 'gear':$('bGear').click();break;case 'lock':quickLock();break;case 'nextTgt':stepTarget();break;
     case 'acm':$('rAcm').click();break;case 'radarMode':$('rMode').click();break;case 'rangeUp':$('rUp').click();break;case 'rangeDn':$('rDn').click();break;
     case 'radar':$('bRdr').click();break;case 'map':mapStep();break;case 'flare':if(!CM.flrHeld){CM.flrHeld=true;CM.flrT=0}break;case 'chaff':if(!CM.chfHeld){CM.chfHeld=true;CM.chfT=0}break;
     case 'ecm':toggleECM();break;case 'decoy':deployDecoy();break;case 'agRel':agRelease();break;case 'agNext':agNext();break;case 'auto':$('cAuto').click();break;case 'pause':pause();break;
@@ -714,6 +719,7 @@ function damageSystem(n){
 }
 function updateSystems(dt,auto){
   const sy=P.sys; let k=0;
+  {const t=['UP','CBT','LDG'][P.flaps||0];if($('nFlaps').textContent!==t){$('nFlaps').textContent=t;$('bFlaps').classList.toggle('down',!!P.flaps)}}
   for(let i=0;i<sy.eng.length;i++){
     if(sy.eng[i]===1){sy.fireT[i]-=dt; if(Math.random()<.6)puff(P.pos.x,P.pos.y,P.pos.z,P.vel.x*.2,P.vel.y*.2,P.vel.z*.2,.15,.15,.15,.7,4,10,2.5);
       if(sy.fireT[i]<=0){sy.eng[i]=2;message(ENG_NAME(i)+'ENGINE FAILED',2);recEvent(ENG_NAME(i).toLowerCase()+'engine failed')}}
