@@ -121,10 +121,9 @@ function netRemote(p){
   r.fl=pr.fl||0; r.ch=pr.ch||0;
   // hits other pilots claim on me
   for(const h of (pr.h||[])){const key=p.peer+':'+h[0]; if(NET.seenHits.has(key))continue; NET.seenHits.add(key);
-    if(h[1]===NET.me&&state==='play'&&P.alive&&!(r&&r.mate)){const dmg=clamp(+h[2]||0,0,120);P.hp-=dmg;   // claims are client-reported, so bound what one claim can do
+    if(h[1]===NET.me&&state==='play'&&P.alive&&!(r&&r.mate)){const dmg=clamp(+h[2]||0,0,120);   // claims are client-reported, so bound what one claim can do
     hurtT=dmg>40?.8:.35;shake=dmg>40?1.2:.4;sndHit();buzz(dmg>40?[120,60,200]:40);
-      NET.lastHitBy=p.peer; if(dmg>40){message('MISSILE HIT',1.2);damageSystem(2)}else if(Math.random()<.1)damageSystem(1);
-      if(P.hp<=0)die(dmg>40?'missile':'shot')}}
+      NET.lastHitBy=p.peer; if(dmg>40)playerMissileHit();else playerGunHit(dmg/4)}}
   // their missiles in flight
   const live=new Set();
   for(const mm of (pr.m||[])){const key=p.peer+':'+mm[0]; live.add(key); let g=ghostMsl.get(key);

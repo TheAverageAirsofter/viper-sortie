@@ -433,7 +433,7 @@ function csar(){const p=chute.position, sea=groundH(p.x,p.z)<0;
   P.rescueText=P.rescued?(sea?'Picked out of the water by the rescue helicopter':'Picked up by the CSAR helicopter')+(hostile?' under fire':'')+(P.ejected.fast?' · injured in a high-speed ejection':''):'Captured before the rescue helicopter could reach you';
   message(P.rescued?'RESCUE INBOUND':'CSAR ABORTED',2)}
 $('bEject').addEventListener('click',()=>{if(!$('bEject').dataset.armed){$('bEject').dataset.armed='1';$('bEject').textContent='PULL AGAIN';setTimeout(()=>{delete $('bEject').dataset.armed;$('bEject').textContent='EJECT'},1600);return}eject()});
-function syncEjectBtn(){const show=state==='play'&&P.alive&&(P.hp<45||P.flamedOut||(P.sys&&(P.sys.eng.some(v=>v===1)||P.sys.hyd))||P.fuel<=0);if($('bEject').hidden===show)$('bEject').hidden=!show}
+function syncEjectBtn(){const show=state==='play'&&P.alive&&(P.hp<45||(P.sys&&P.sys.burn>0)||P.flamedOut||(P.sys&&(P.sys.eng.some(v=>v===1)||P.sys.hyd))||P.fuel<=0);if($('bEject').hidden===show)$('bEject').hidden=!show}
 
 /* ---------------- sortie builders shared by the stand-alone missions and the campaign ---------------- */
 let sortie=null;   // {kind, ...} what this flight has to do

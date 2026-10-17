@@ -3044,9 +3044,9 @@ function checkTouchdown(){
   if(bad){message('CRASH · '+bad,2.4);recEvent('Crashed on landing: '+bad.toLowerCase());die(P.gear?'landing':'gearup');return true}
   P.onGround=true; P.vel.y=0; P.pos.y=BASE_Y+GEAR_H;
   const hard=sink>5.5||bank>.22||P.kcas>=240||P.fwd.y<-.12||!rwy;
-  if(hard){const dmg=Math.round(clamp(15+Math.max(0,sink-5.5)*12+Math.max(0,P.kcas-240)*.4+(rwy?0:20),15,70));P.hp-=dmg;hurtT=.5;shake=.6;sndHit();
-    message(rwy?'HARD LANDING · GEAR DAMAGED':'OFF-RUNWAY LANDING · GEAR DAMAGED',2);recEvent('Hard landing at '+Math.round(P.kcas)+' kt, sink '+sink.toFixed(1)+' m/s (-'+dmg+' % airframe)');
-    if(P.hp<=0){die('landing');return true}}
+  if(hard){const dmg=Math.round(clamp(15+Math.max(0,sink-5.5)*12+Math.max(0,P.kcas-240)*.4+(rwy?0:20),15,70));damageSystem(dmg>45?2:1);hurtT=.5;shake=.6;sndHit();
+    message(rwy?'HARD LANDING · GEAR DAMAGED':'OFF-RUNWAY LANDING · GEAR DAMAGED',2);recEvent('Hard landing at '+Math.round(P.kcas)+' kt, sink '+sink.toFixed(1)+' m/s (severity '+dmg+')');
+    if(dmg>=60){die('landing');return true}}
   else message(sink<1.5?'GREASED IT':sink<2.8?'TOUCHDOWN':'FIRM TOUCHDOWN',1.6);
   recEvent('Touched down at '+Math.round(P.kcas)+' kt, sink '+sink.toFixed(1)+' m/s');
   {const dt=dailyAdd('l',1);if(dt)message('DAILY TASK · '+dt,2.6)}
@@ -3501,7 +3501,7 @@ function csar(){const p=chute.position, sea=groundH(p.x,p.z)<0;
   P.rescueText=P.rescued?(sea?'Picked out of the water by the rescue helicopter':'Picked up by the CSAR helicopter')+(hostile?' under fire':'')+(P.ejected.fast?' · injured in a high-speed ejection':''):'Captured before the rescue helicopter could reach you';
   message(P.rescued?'RESCUE INBOUND':'CSAR ABORTED',2)}
 $('bEject').addEventListener('click',()=>{if(!$('bEject').dataset.armed){$('bEject').dataset.armed='1';$('bEject').textContent='PULL AGAIN';setTimeout(()=>{delete $('bEject').dataset.armed;$('bEject').textContent='EJECT'},1600);return}eject()});
-function syncEjectBtn(){const show=state==='play'&&P.alive&&(P.hp<45||P.flamedOut||(P.sys&&(P.sys.eng.some(v=>v===1)||P.sys.hyd))||P.fuel<=0);if($('bEject').hidden===show)$('bEject').hidden=!show}
+function syncEjectBtn(){const show=state==='play'&&P.alive&&(P.hp<45||(P.sys&&P.sys.burn>0)||P.flamedOut||(P.sys&&(P.sys.eng.some(v=>v===1)||P.sys.hyd))||P.fuel<=0);if($('bEject').hidden===show)$('bEject').hidden=!show}
 
 /* ---------------- sortie builders shared by the stand-alone missions and the campaign ---------------- */
 let sortie=null;   // {kind, ...} what this flight has to do
@@ -3992,7 +3992,7 @@ function nextWave(){
     const tp=pickBanditType(), ac=AC_DEFS[tp], ld={ir:Math.min(2,ac.srN),rdr:wave>=4?ac.mrN:wave>=2?Math.min(2,ac.mrN):0};
     if(n-i>=2)spawnPair(tp,c,P.pos,ld); else spawnFighter('red',tp,c,P.pos,ld);
   }
-  if(wave>1){P.hp=Math.min(100,P.hp+35);rearm();refuel()}
+  if(wave>1){resetSystems();rearm();refuel()}
   if(wave>=3&&ground.filter(g=>g.alive).length<wave-1){const a=heading+rand(-1,1),d=rand(12000,18000);spawnGround('sam',P.pos.x+Math.sin(a)*d,P.pos.z+Math.cos(a)*d);spawnGround('aaa',P.pos.x+Math.sin(a)*d+600,P.pos.z+Math.cos(a)*d)}
   message('WAVE '+wave+' · '+n+' BANDITS',2.4);
 }
@@ -4336,10 +4336,31 @@ const qTmp=new THREE.Quaternion();
 
 /* ---------------- fuel and system damage ---------------- */
 // fuel: thrust × specific fuel consumption; jet gets lighter as it burns. Starts at 75 % of internal.
-function resetSystems(){P.sys={eng:Array(AC.engines).fill(0),fireT:Array(AC.engines).fill(0),hyd:false,radar:false,leak:false,wL:0,wR:0,ctl:1,gun:false,pilot:0,torn:0};P.thrK=1;P.rollK=1;P.gLim=AC.gmax;P.bingo=false;P.lowFuel=false}
+function resetSystems(){P.sys={eng:Array(AC.engines).fill(0),fireT:Array(AC.engines).fill(0),hyd:false,radar:false,leak:false,wL:0,wR:0,ctl:1,gun:false,pilot:0,torn:0,burn:0};P.thrK=1;P.rollK=1;P.gLim=AC.gmax;P.bingo=false;P.lowFuel=false}
 function refuel(){P.fuel=Math.max(P.fuel||0,.75*AC.fuelCap);resetSystems();P.bingo=false;P.lowFuel=false}
 const fuelStr=kg=>AC.fuelUnit==='LB'?Math.round(kg*2.2046/10)*10+' LB':Math.round(kg/10)*10+' KG';
 const ENG_NAME=i=>AC.engines>1?(i===0?'LEFT ':'RIGHT '):'';
+/* damage is modular: there is no hit-point pool. A hit rolls the pilot, the wings and the systems; you are lost when the pilot is killed, the
+   airframe is destroyed (missile), both wings are gone or a fuel fire takes hold. P.hp is only a summary of the modules for smoke, lights and the Arcade bar. */
+function wingHit(side,amt){
+  const sy=P.sys;if(sy[side]>=1)return;sy[side]=Math.min(1,sy[side]+amt);
+  if(sy[side]>=1){message((side==='wL'?'LEFT':'RIGHT')+' WING TORN OFF',2.4);recEvent((side==='wL'?'Left':'Right')+' wing torn off');shake=1;hurtT=.8;sy.torn=side==='wL'?-1:1;
+    if(sy.wL>=1&&sy.wR>=1){message('BOTH WINGS GONE',2);die('shot')}}
+}
+function playerGunHit(m){
+  m=m||1;const sy=P.sys,sev=PRESETS[preset].dmg;
+  if(Math.random()<.012*m*sev*(1+3*sy.pilot)){message('PILOT KILLED',1.6);recEvent('The pilot was killed');die('shot');return}
+  const r=Math.random();
+  if(r<.25)wingHit(Math.random()<.5?'wL':'wR',.08*m*sev);
+  else if(r<.37)damageSystem(1);
+}
+function playerMissileHit(){
+  const sy=P.sys,sev=PRESETS[preset].dmg;
+  explode(P.pos,false);addHole(playerJet,5);hurtT=.8;shake=1.2;sndHit();buzz([120,60,200]);
+  if(Math.random()<Math.min(.9,.5*sev)){message('AIRFRAME DESTROYED',1.6);feed('Critical hit: your airframe was destroyed','loss');die('missile');return}
+  message('MISSILE HIT',1.2);feed('Critical hit: you were struck by a missile','loss');damageSystem(3);wingHit(Math.random()<.5?'wL':'wR',.3+Math.random()*.3);
+  if(Math.random()<.3)sy.pilot=Math.min(1,sy.pilot+.5);
+}
 function damageSystem(n){
   n*=PRESETS[preset].dmg;n=Math.floor(n)+(Math.random()<n%1?1:0);   // preset scales how many systems a hit takes out
   for(let i=0;i<n;i++){const r=Math.random();
@@ -4347,7 +4368,7 @@ function damageSystem(n){
     else if(r<.34){if(!P.sys.hyd){P.sys.hyd=true;message('HYDRAULICS FAILED · G AND ROLL LIMITED',1.8);recEvent('Hydraulics failed')}}
     else if(r<.46){if(!P.sys.radar){P.sys.radar=true;if(R.stt&&R.sttSrc==='RDR')breakLock();R.tracks.clear();message('RADAR FAILED',1.6);recEvent('Radar failed')}}
     else if(r<.56){if(!P.sys.leak){P.sys.leak=true;message('FUEL LEAK',1.6);recEvent('Fuel leak')}}
-    else if(r<.74){const side=Math.random()<.5?'wL':'wR';if(P.sys[side]<1){P.sys[side]=Math.min(1,P.sys[side]+.35+Math.random()*.2);message((side==='wL'?'LEFT':'RIGHT')+' WING DAMAGED',1.8);recEvent((side==='wL'?'Left':'Right')+' wing damaged')}}
+    else if(r<.74){const side=Math.random()<.5?'wL':'wR';if(P.sys[side]<1){wingHit(side,.35+Math.random()*.2);if(P.sys[side]<1){message((side==='wL'?'LEFT':'RIGHT')+' WING DAMAGED',1.8);recEvent((side==='wL'?'Left':'Right')+' wing damaged')}}}
     else if(r<.82){if(P.sys.ctl>.6){P.sys.ctl=.55;message('ELEVATOR DAMAGED · PITCH LIMITED',1.8);recEvent('Elevator damaged')}}
     else if(r<.9){if(!P.sys.gun){P.sys.gun=true;message('GUNS JAMMED',1.6);recEvent('Guns jammed')}}
     else if(P.sys.pilot<1){P.sys.pilot=Math.min(1,P.sys.pilot+.5);message('PILOT WOUNDED · G TOLERANCE REDUCED',1.8);recEvent('Pilot wounded')}
@@ -4365,7 +4386,11 @@ function updateSystems(dt,auto){
   const wd=Math.max(sy.wL,sy.wR);
   P.thrK=k; P.rollK=(sy.hyd?.45:1)*(1-.3*wd); P.gLim=(sy.hyd?Math.min(5,AC.gmax):AC.gmax)*(1-.5*wd);
   for(const [side,sgn] of [['wL',-1],['wR',1]])if(sy[side]>.25&&state==='play'&&Math.random()<dt*14*sy[side]){_d.copy(P.pos).addScaledVector(P.right,sgn*(AC.span||8)*.3);puff(_d.x,_d.y,_d.z,P.vel.x*.3,P.vel.y*.3,P.vel.z*.3,.2,.2,.2,.7,3.5,12,2)}   // smoke streams off a damaged wing
-  if(wd>=.7&&!sy.torn&&P.n>4&&Math.random()<dt*(P.n-3)*.25){sy.torn=sy.wL>=sy.wR?-1:1;sy[sy.torn<0?'wL':'wR']=1;P.hp-=45;shake=1;hurtT=.8;message((sy.torn<0?'LEFT':'RIGHT')+' WING TORN OFF',2.4);recEvent('A wing failed under load');if(P.hp<=0)die('shot')}
+  {const on=sy.eng.some(v=>v===1);   // a burning engine with a fuel leak spreads: the airframe is lost in seconds unless the fire burns out
+    if(on&&sy.leak&&state==='play'){if(!sy.burn)message('FUEL FIRE · EJECT',2);sy.burn+=dt*3;if(sy.burn>14){message('AIRFRAME LOST TO FIRE',2);recEvent('A fuel fire destroyed the airframe');die('shot')}}else sy.burn=Math.max(0,sy.burn-dt);
+    const dead=sy.eng.filter(v=>v===2).length/sy.eng.length;
+    P.hp=clamp(100-30*sy.wL-30*sy.wR-20*dead-8*sy.hyd-5*sy.radar-5*sy.leak-10*(sy.ctl<1)-10*sy.gun-15*sy.pilot-(sy.burn>0?20:0),1,100)}
+  if(wd>=.7&&sy.wL<1&&sy.wR<1&&P.n>4&&Math.random()<dt*(P.n-3)*.25){recEvent('A wing failed under load');wingHit(sy.wL>=sy.wR?'wL':'wR',1)}
   if(!auto){
     const sfc=throttle<=.8?AC.sfcDry:AC.sfcDry+(AC.sfcAB-AC.sfcDry)*(throttle-.8)/.2;
     P.fuelFlow=(P.lastT||0)*sfc*2.832e-5;                      // kg/s
@@ -4943,10 +4968,9 @@ function updateWeapons(dt){
     if(b.team==='ghost')continue;
     if(b.team==='red'){
       if(state==='play'&&P.alive&&distSeg(P.pos,b.prev,b.m.position)<6){
-        kill(b);P.hp-=4*(b.dmg||1);if(clock-(P.fdT||-9)>1.5){P.fdT=clock;feed('You were hit by gunfire','loss')}if(Math.random()<.5)addHole(playerJet,1);hurtT=.35;shake=.4;sndHit();buzz(40);
+        kill(b);if(clock-(P.fdT||-9)>1.5){P.fdT=clock;feed('You were hit by gunfire','loss')}if(Math.random()<.5)addHole(playerJet,1);hurtT=.35;shake=.4;sndHit();buzz(40);
         puff(P.pos.x,P.pos.y+1,P.pos.z,0,0,0,1,.7,.3,1,4,12,.2);
-        if(Math.random()<.12*(b.dmg||1))damageSystem(1);
-        if(P.hp<=0)die('shot');continue}
+        playerGunHit(b.dmg||1);continue}
       for(const f of friends)if(f.alive&&distSeg(f.pos,b.prev,b.m.position)<(f.kind==='fighter'?7:16)){kill(b);hitAI(f,b.dmg||1,'GUNS',false);break}
     } else for(const e of enemies)if(e.alive&&distSeg(e.pos,b.prev,b.m.position)<(e.kind==='fighter'?7:14)){kill(b);hitAI(e,b.dmg||1,'GUNS (WINGMAN)',false);break}
   }
@@ -5167,7 +5191,7 @@ function updateEnemyMissiles(dt){
     let done=false;
     const fz=s.fuze;
     if(m.team==='red'&&state==='play'&&P.alive&&distSeg(P.pos,m.prev,p)<fz){
-      done=true;recMsl(m,'HIT','');explode(p,false);P.hp-=75;addHole(playerJet,5);hurtT=.8;shake=1.2;sndHit();buzz([120,60,200]);message('MISSILE HIT',1.2);feed('Critical hit: you were struck by a missile','loss');damageSystem(2);if(P.hp<=0)die('missile');
+      done=true;recMsl(m,'HIT','');playerMissileHit();
     } else if(CM.decoy&&m.target===CM.decoy&&distSeg(CM.decoy.pos,m.prev,p)<fz){done=true;recMsl(m,'MISS','HIT YOUR TOWED DECOY');explode(p,false);cutDecoy();syncCM();message('DECOY HIT · DECOY LOST',1.4)}
     else if(m.target&&m.target.kind&&m.target!==P&&distSeg(m.target.pos,m.prev,p)<fz*(m.target.kind==='fighter'?1:1.8)){done=true;recMsl(m,'HIT','');explode(p,false);hitAI(m.target,5,m.name,false)}
     else if(m.target&&m.target.type&&!m.target.kind&&distSeg(m.target.pos,m.prev,p)<fz){done=true;explode(p,false);recMsl(m,'MISS',m.reason||'DECOYED')}
@@ -5699,10 +5723,9 @@ function netRemote(p){
   r.fl=pr.fl||0; r.ch=pr.ch||0;
   // hits other pilots claim on me
   for(const h of (pr.h||[])){const key=p.peer+':'+h[0]; if(NET.seenHits.has(key))continue; NET.seenHits.add(key);
-    if(h[1]===NET.me&&state==='play'&&P.alive&&!(r&&r.mate)){const dmg=clamp(+h[2]||0,0,120);P.hp-=dmg;   // claims are client-reported, so bound what one claim can do
+    if(h[1]===NET.me&&state==='play'&&P.alive&&!(r&&r.mate)){const dmg=clamp(+h[2]||0,0,120);   // claims are client-reported, so bound what one claim can do
     hurtT=dmg>40?.8:.35;shake=dmg>40?1.2:.4;sndHit();buzz(dmg>40?[120,60,200]:40);
-      NET.lastHitBy=p.peer; if(dmg>40){message('MISSILE HIT',1.2);damageSystem(2)}else if(Math.random()<.1)damageSystem(1);
-      if(P.hp<=0)die(dmg>40?'missile':'shot')}}
+      NET.lastHitBy=p.peer; if(dmg>40)playerMissileHit();else playerGunHit(dmg/4)}}
   // their missiles in flight
   const live=new Set();
   for(const mm of (pr.m||[])){const key=p.peer+':'+mm[0]; live.add(key); let g=ghostMsl.get(key);
@@ -6503,7 +6526,7 @@ const _careerAward=careerAward;
 careerAward=function(){lbAdd();return _careerAward.apply(this,arguments)};
 
 /* ---------- test hook (only with ?test in the URL) ---------- */
-if(/[?&]test\b/.test(location.search))window.__vs={BT,die,btRespawn,TMAP,mapStep,KBM,SC,damageSystem,hitAI,killEnemy,setThr,HEAT,explode,puff,camera,LT,townLights,flashLt,P,fly,dlz,flyout,AC_DEFS,feed,WAR,WAR_V,warBuild,warSpawn,warModules,warDie,warFlags,updateWar,warAlive,buildJet,PLAYER_COLORS,M2,V3,atm,clamp,lbAdd,showOverlay:k=>showOverlay(k),setScore:(n,k)=>{score=n;kills=k},get state(){return state},get enemies(){return enemies},missiles:()=>missiles.filter(m=>m.on),setAC:id=>{AC=AC_DEFS[id];applyAC()},wt:{   // weapon-test hooks: a clean sky, one drone, scripted launches
+if(/[?&]test\b/.test(location.search))window.__vs={playerGunHit,wingHit,BT,die,btRespawn,TMAP,mapStep,KBM,SC,damageSystem,hitAI,killEnemy,setThr,HEAT,explode,puff,camera,LT,townLights,flashLt,P,fly,dlz,flyout,AC_DEFS,feed,WAR,WAR_V,warBuild,warSpawn,warModules,warDie,warFlags,updateWar,warAlive,buildJet,PLAYER_COLORS,M2,V3,atm,clamp,lbAdd,showOverlay:k=>showOverlay(k),setScore:(n,k)=>{score=n;kills=k},get state(){return state},get enemies(){return enemies},missiles:()=>missiles.filter(m=>m.on),setAC:id=>{AC=AC_DEFS[id];applyAC()},wt:{   // weapon-test hooks: a clean sky, one drone, scripted launches
   begin:id=>{AC=AC_DEFS[id];applyAC();startGame();return AC.id},
   clear:()=>{waveClearT=1e9;for(const e of enemies){e.alive=false;scene.remove(e.obj)}enemies.length=0;P.pos.set(0,6000,0);P.vel.set(0,0,250);throttle=.7;return state},
   target:(type,dz,away,speed)=>{const e=spawnFighter('red',type,new V3(0,6000,dz),new V3(0,6000,dz+(away?9999:-9999)),{ir:0,rdr:0,speed:speed||220});e.drone=true;return e.id},

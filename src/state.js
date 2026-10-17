@@ -264,7 +264,7 @@ function nextWave(){
     const tp=pickBanditType(), ac=AC_DEFS[tp], ld={ir:Math.min(2,ac.srN),rdr:wave>=4?ac.mrN:wave>=2?Math.min(2,ac.mrN):0};
     if(n-i>=2)spawnPair(tp,c,P.pos,ld); else spawnFighter('red',tp,c,P.pos,ld);
   }
-  if(wave>1){P.hp=Math.min(100,P.hp+35);rearm();refuel()}
+  if(wave>1){resetSystems();rearm();refuel()}
   if(wave>=3&&ground.filter(g=>g.alive).length<wave-1){const a=heading+rand(-1,1),d=rand(12000,18000);spawnGround('sam',P.pos.x+Math.sin(a)*d,P.pos.z+Math.cos(a)*d);spawnGround('aaa',P.pos.x+Math.sin(a)*d+600,P.pos.z+Math.cos(a)*d)}
   message('WAVE '+wave+' · '+n+' BANDITS',2.4);
 }
@@ -608,10 +608,31 @@ const qTmp=new THREE.Quaternion();
 
 /* ---------------- fuel and system damage ---------------- */
 // fuel: thrust × specific fuel consumption; jet gets lighter as it burns. Starts at 75 % of internal.
-function resetSystems(){P.sys={eng:Array(AC.engines).fill(0),fireT:Array(AC.engines).fill(0),hyd:false,radar:false,leak:false,wL:0,wR:0,ctl:1,gun:false,pilot:0,torn:0};P.thrK=1;P.rollK=1;P.gLim=AC.gmax;P.bingo=false;P.lowFuel=false}
+function resetSystems(){P.sys={eng:Array(AC.engines).fill(0),fireT:Array(AC.engines).fill(0),hyd:false,radar:false,leak:false,wL:0,wR:0,ctl:1,gun:false,pilot:0,torn:0,burn:0};P.thrK=1;P.rollK=1;P.gLim=AC.gmax;P.bingo=false;P.lowFuel=false}
 function refuel(){P.fuel=Math.max(P.fuel||0,.75*AC.fuelCap);resetSystems();P.bingo=false;P.lowFuel=false}
 const fuelStr=kg=>AC.fuelUnit==='LB'?Math.round(kg*2.2046/10)*10+' LB':Math.round(kg/10)*10+' KG';
 const ENG_NAME=i=>AC.engines>1?(i===0?'LEFT ':'RIGHT '):'';
+/* damage is modular: there is no hit-point pool. A hit rolls the pilot, the wings and the systems; you are lost when the pilot is killed, the
+   airframe is destroyed (missile), both wings are gone or a fuel fire takes hold. P.hp is only a summary of the modules for smoke, lights and the Arcade bar. */
+function wingHit(side,amt){
+  const sy=P.sys;if(sy[side]>=1)return;sy[side]=Math.min(1,sy[side]+amt);
+  if(sy[side]>=1){message((side==='wL'?'LEFT':'RIGHT')+' WING TORN OFF',2.4);recEvent((side==='wL'?'Left':'Right')+' wing torn off');shake=1;hurtT=.8;sy.torn=side==='wL'?-1:1;
+    if(sy.wL>=1&&sy.wR>=1){message('BOTH WINGS GONE',2);die('shot')}}
+}
+function playerGunHit(m){
+  m=m||1;const sy=P.sys,sev=PRESETS[preset].dmg;
+  if(Math.random()<.012*m*sev*(1+3*sy.pilot)){message('PILOT KILLED',1.6);recEvent('The pilot was killed');die('shot');return}
+  const r=Math.random();
+  if(r<.25)wingHit(Math.random()<.5?'wL':'wR',.08*m*sev);
+  else if(r<.37)damageSystem(1);
+}
+function playerMissileHit(){
+  const sy=P.sys,sev=PRESETS[preset].dmg;
+  explode(P.pos,false);addHole(playerJet,5);hurtT=.8;shake=1.2;sndHit();buzz([120,60,200]);
+  if(Math.random()<Math.min(.9,.5*sev)){message('AIRFRAME DESTROYED',1.6);feed('Critical hit: your airframe was destroyed','loss');die('missile');return}
+  message('MISSILE HIT',1.2);feed('Critical hit: you were struck by a missile','loss');damageSystem(3);wingHit(Math.random()<.5?'wL':'wR',.3+Math.random()*.3);
+  if(Math.random()<.3)sy.pilot=Math.min(1,sy.pilot+.5);
+}
 function damageSystem(n){
   n*=PRESETS[preset].dmg;n=Math.floor(n)+(Math.random()<n%1?1:0);   // preset scales how many systems a hit takes out
   for(let i=0;i<n;i++){const r=Math.random();
@@ -619,7 +640,7 @@ function damageSystem(n){
     else if(r<.34){if(!P.sys.hyd){P.sys.hyd=true;message('HYDRAULICS FAILED · G AND ROLL LIMITED',1.8);recEvent('Hydraulics failed')}}
     else if(r<.46){if(!P.sys.radar){P.sys.radar=true;if(R.stt&&R.sttSrc==='RDR')breakLock();R.tracks.clear();message('RADAR FAILED',1.6);recEvent('Radar failed')}}
     else if(r<.56){if(!P.sys.leak){P.sys.leak=true;message('FUEL LEAK',1.6);recEvent('Fuel leak')}}
-    else if(r<.74){const side=Math.random()<.5?'wL':'wR';if(P.sys[side]<1){P.sys[side]=Math.min(1,P.sys[side]+.35+Math.random()*.2);message((side==='wL'?'LEFT':'RIGHT')+' WING DAMAGED',1.8);recEvent((side==='wL'?'Left':'Right')+' wing damaged')}}
+    else if(r<.74){const side=Math.random()<.5?'wL':'wR';if(P.sys[side]<1){wingHit(side,.35+Math.random()*.2);if(P.sys[side]<1){message((side==='wL'?'LEFT':'RIGHT')+' WING DAMAGED',1.8);recEvent((side==='wL'?'Left':'Right')+' wing damaged')}}}
     else if(r<.82){if(P.sys.ctl>.6){P.sys.ctl=.55;message('ELEVATOR DAMAGED · PITCH LIMITED',1.8);recEvent('Elevator damaged')}}
     else if(r<.9){if(!P.sys.gun){P.sys.gun=true;message('GUNS JAMMED',1.6);recEvent('Guns jammed')}}
     else if(P.sys.pilot<1){P.sys.pilot=Math.min(1,P.sys.pilot+.5);message('PILOT WOUNDED · G TOLERANCE REDUCED',1.8);recEvent('Pilot wounded')}
@@ -637,7 +658,11 @@ function updateSystems(dt,auto){
   const wd=Math.max(sy.wL,sy.wR);
   P.thrK=k; P.rollK=(sy.hyd?.45:1)*(1-.3*wd); P.gLim=(sy.hyd?Math.min(5,AC.gmax):AC.gmax)*(1-.5*wd);
   for(const [side,sgn] of [['wL',-1],['wR',1]])if(sy[side]>.25&&state==='play'&&Math.random()<dt*14*sy[side]){_d.copy(P.pos).addScaledVector(P.right,sgn*(AC.span||8)*.3);puff(_d.x,_d.y,_d.z,P.vel.x*.3,P.vel.y*.3,P.vel.z*.3,.2,.2,.2,.7,3.5,12,2)}   // smoke streams off a damaged wing
-  if(wd>=.7&&!sy.torn&&P.n>4&&Math.random()<dt*(P.n-3)*.25){sy.torn=sy.wL>=sy.wR?-1:1;sy[sy.torn<0?'wL':'wR']=1;P.hp-=45;shake=1;hurtT=.8;message((sy.torn<0?'LEFT':'RIGHT')+' WING TORN OFF',2.4);recEvent('A wing failed under load');if(P.hp<=0)die('shot')}
+  {const on=sy.eng.some(v=>v===1);   // a burning engine with a fuel leak spreads: the airframe is lost in seconds unless the fire burns out
+    if(on&&sy.leak&&state==='play'){if(!sy.burn)message('FUEL FIRE · EJECT',2);sy.burn+=dt*3;if(sy.burn>14){message('AIRFRAME LOST TO FIRE',2);recEvent('A fuel fire destroyed the airframe');die('shot')}}else sy.burn=Math.max(0,sy.burn-dt);
+    const dead=sy.eng.filter(v=>v===2).length/sy.eng.length;
+    P.hp=clamp(100-30*sy.wL-30*sy.wR-20*dead-8*sy.hyd-5*sy.radar-5*sy.leak-10*(sy.ctl<1)-10*sy.gun-15*sy.pilot-(sy.burn>0?20:0),1,100)}
+  if(wd>=.7&&sy.wL<1&&sy.wR<1&&P.n>4&&Math.random()<dt*(P.n-3)*.25){recEvent('A wing failed under load');wingHit(sy.wL>=sy.wR?'wL':'wR',1)}
   if(!auto){
     const sfc=throttle<=.8?AC.sfcDry:AC.sfcDry+(AC.sfcAB-AC.sfcDry)*(throttle-.8)/.2;
     P.fuelFlow=(P.lastT||0)*sfc*2.832e-5;                      // kg/s
