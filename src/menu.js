@@ -122,7 +122,7 @@ const qr=$('qRows');
     mRow('Team',()=>[{v:'A',t:'Auto'},{v:'B',t:'Blue'},{v:'R',t:'Red'}],()=>NET.teamPref,v=>drive($('bTeam'),()=>NET.teamPref,v,3),{hidden:()=>NET.mode!=='TEAMS'}))}
 
 /* ---- SETTINGS: tabs, rows and a description area ---- */
-const SDESC={'Key bindings':'Rebind every keyboard key and mouse button, set mouse sensitivity and invert, and choose what the wheel does.','Mouse':'Aim: the cursor is a point in the world and the flight computer rolls and pulls onto it. Stick: the mouse deflects the stick directly.','Input':'Keyboard + mouse: the mouse flies (click to capture, Esc to release), left button guns, right button AIM-9, middle button AIM-120, wheel or W/S throttle, A/D rudder.','Stick':'Fly with the on-screen stick, or tilt the phone.','Pull back':'Whether pulling the stick back raises the nose (flight-sim) or lowers it.','Sensitivity':'How far the jet turns for a given stick movement.','Dead zone':'Ignore small stick movements near the centre.',
+const SDESC={'Battle weather':'Team battles roll their own weather and time of day and let them drift: clear to cloud to rain, day to dusk to night. Off keeps your Settings.','Key bindings':'Rebind every keyboard key and mouse button, set mouse sensitivity and invert, and choose what the wheel does.','Mouse':'Aim: the cursor is a point in the world and the flight computer rolls and pulls onto it. Stick: the mouse deflects the stick directly.','Input':'Keyboard + mouse: the mouse flies (click to capture, Esc to release), left button guns, right button AIM-9, middle button AIM-120, wheel or W/S throttle, A/D rudder.','Stick':'Fly with the on-screen stick, or tilt the phone.','Pull back':'Whether pulling the stick back raises the nose (flight-sim) or lowers it.','Sensitivity':'How far the jet turns for a given stick movement.','Dead zone':'Ignore small stick movements near the centre.',
   'Vibration':'Haptic feedback for guns, hits and warnings.','Move buttons':'Drag the on-screen buttons where you want them, then save.','Controls guide':'Launch a sortie and show the controls guide on top.',
   'Graphics':'Lower this if the frame rate drops. Auto-adjusts when the game is struggling.','Cinematic menu':'Film grain, letterbox bars, light flare and the slow camera drift behind the menu.','Kill cam':'A short replay when you shoot something down.',
   'Sound':'All game sound.','Voice warnings':'Spoken cockpit warnings: pull up, missile, bingo fuel.','UI sounds':'Quiet clicks as you move through the menu.',
@@ -155,6 +155,7 @@ let sTab='ctl';
   pane.gp.append(
     mRow('Difficulty',()=>Object.keys(DIFF).map(k=>({v:k,t:DIFF[k].name})),()=>difficulty,v=>drive($('bDiff'),()=>difficulty,v),{hidden:()=>$('bDiff').hidden}),
     mRow('Range',()=>Object.keys(ENG_RANGES).map(k=>({v:k,t:ENG_RANGES[k].n})),()=>rangeKey,v=>drive($('bRange'),()=>rangeKey,v)),
+    onoff('Battle weather',()=>btDyn,()=>setDynWx(!btDyn)),
     mRow('Mode',()=>[{v:'free',t:'Free play'},{v:'career',t:'Career'}],()=>careerOn?'career':'free',v=>drive($('bMode'),()=>careerOn?'career':'free',v,2)));
   for(const k in pane)for(const e of pane[k].querySelectorAll('.mr'))if(!e.dataset.desc&&SDESC[e.dataset.name])e.dataset.desc=SDESC[e.dataset.name];
   // the other quick-mission rows get descriptions too

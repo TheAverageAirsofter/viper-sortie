@@ -72,6 +72,7 @@ async function netStart(){
   // spawn somewhere on a 9 km ring around the arena centre, facing in
   NET.team=pickTeam(); const a=NET.mode==='TEAMS'?(NET.team==='B'?Math.PI:0)+rand(-.5,.5):Math.random()*Math.PI*2; P.pos.set(Math.sin(a)*9000,rand(4500,6500),Math.cos(a)*9000);
   playerJet.lookAt(0,P.pos.y,0); axes(P); P.vel.copy(P.fwd).multiplyScalar(240); qPrev.copy(playerJet.quaternion); camSnap=true;
+  if(NET.mode==='TEAMS')btInitOnline();   // team matches are zone battles with a lineup
   await capsReady;
   if(!roomApi){message('ONLINE ONLY WORKS INSIDE THE CLAUDE APP · FLYING SOLO',3.5);return}
   try{
@@ -101,7 +102,7 @@ function netRemote(p){
   if(!NET.active||!(state==='play'||state==='dead'||state==='paused'))return;
   let r=NET.remotes.get(p.peer);
   if(!pr.ac||!AC_DEFS[pr.ac]||!pr.a){
-    if(r&&r.alive){if(pr.k===NET.me&&!r.mate){kills++;NET.kills++;score+=300;message('SPLASH · '+(r.name||'PILOT').toUpperCase(),1.8);recEvent('You shot down '+(r.name||'another pilot')+' ('+AC_DEFS[r.type].name+')')}
+    if(r&&r.alive){if(pr.k===NET.me&&!r.mate){kills++;NET.kills++;if(BT.online)BT.sp+=2;score+=300;message('SPLASH · '+(r.name||'PILOT').toUpperCase(),1.8);recEvent('You shot down '+(r.name||'another pilot')+' ('+AC_DEFS[r.type].name+')')}
       else recEvent((r.name||'A pilot')+' went down');netRemove(p.peer,true)}
     return;
   }

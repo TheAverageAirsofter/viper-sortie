@@ -5,8 +5,20 @@ const BT={on:false,over:false,pts:{blue:0,red:0},zones:[],lineup:[],used:{},pend
 const btCost=id=>Math.max(2,Math.min(8,Math.round(2+(progBR(id)-1)*.5)));   // spawn points: stronger jets cost more
 const btAfford=id=>!BT.used[id]&&btCost(id)<=BT.sp;
 const BT_ZONES=[['A',0,14000],['B',-9000,25000],['C',9000,25000]], BT_R=4500, BT_AI={blue:3,red:4};
+/* battle conditions: the weather and time of day are rolled at the start and drift during the fight (clear -> cloud -> rain, day -> dusk -> night) */
+const BT_WX=['CLEAR','SCATTERED','OVERCAST','RAIN'], BT_TIME=['DAY','DUSK','NIGHT'];
+let btDyn=true;try{btDyn=localStorage.getItem('vsDynWx')!=='0'}catch(e){}
+function setDynWx(v){btDyn=!!v;try{localStorage.setItem('vsDynWx',v?'1':'0')}catch(e){}}
+function btConditions(first){
+  if(!btDyn)return;
+  if(first){BT.saved={weather,timeOfDay};weather=BT_WX[Math.random()*3|0];timeOfDay=BT_TIME[Math.random()<.6?0:1];BT.cT=0}
+  else{const wi=BT_WX.indexOf(weather),ni=clamp(wi+(Math.random()<.55?1:-1),0,3);if(ni!==wi){weather=BT_WX[ni];message('WEATHER · '+WXS[weather].toUpperCase(),2.4)}
+    if(BT.cN%2===1&&BT_TIME.indexOf(timeOfDay)<2){timeOfDay=BT_TIME[BT_TIME.indexOf(timeOfDay)+1];message('LIGHT FADING · '+TIMES[timeOfDay].toUpperCase(),2.4)}BT.cN++}
+  applyEnv();
+}
+function btRestoreConditions(){if(BT.saved){weather=BT.saved.weather;timeOfDay=BT.saved.timeOfDay;BT.saved=null;applyEnv()}}
 function setupBattle(){
-  BT.on=true;BT.over=false;BT.ground=false;BT.naval=false;BT.ships=null;BT.pts.blue=BT.pts.red=BT.max;BT.pend.blue=BT.pend.red=0;BT.tm.blue=BT.tm.red=0;BT.wpT=0;BT.diedT=0;BT.specI=0;BT.used={};BT.sp=20;
+  BT.on=true;BT.online=false;BT.over=false;BT.ground=false;BT.naval=false;BT.ships=null;BT.cN=0;btConditions(true);BT.pts.blue=BT.pts.red=BT.max;BT.pend.blue=BT.pend.red=0;BT.tm.blue=BT.tm.red=0;BT.wpT=0;BT.diedT=0;BT.specI=0;BT.used={};BT.sp=20;
   BT.zones=BT_ZONES.map(([n,x,z])=>({n,x,z,prog:0,own:0}));
   const pool=banditPool().filter(id=>id!==AC.id&&unlocked(id));
   BT.lineup=[AC.id];while(BT.lineup.length<4&&pool.length)BT.lineup.push(pool.splice(Math.random()*pool.length|0,1)[0]);
@@ -17,12 +29,25 @@ function setupBattle(){
   btAssign();sortie=null;
   message('AIR BATTLE · HOLD MORE ZONES THAN THE ENEMY · '+BT.max+' POINTS EACH',3.2);
 }
+/* online team battle: zones, points and the lineup work on the real pilots. Every client sees the same positions and kills (remote pilots are in friends / enemies),
+   so each one integrates the same zone control and kill points locally; no extra messages are needed. Spawn points and respawns are per player. */
+const BT_ZONES_ONLINE=[['A',0,0],['B',-9000,0],['C',9000,0]];
+function btInitOnline(){
+  BT.on=true;BT.online=true;BT.over=false;BT.ground=false;BT.naval=false;BT.ships=null;BT.cN=0;BT.cT=0;
+  BT.pts.blue=BT.pts.red=BT.max;BT.pend.blue=BT.pend.red=0;BT.tm.blue=BT.tm.red=0;BT.wpT=0;BT.diedT=0;BT.specI=0;BT.used={};BT.sp=20;
+  BT.zones=BT_ZONES_ONLINE.map(([n,x,z])=>({n,x,z,prog:0,own:0}));
+  const s=netTeamScore(),me=NET.team||'B';BT.kOld={m:s[me]||0,t:s[me==='B'?'R':'B']||0};
+  const pool=banditPool().filter(id=>id!==AC.id&&unlocked(id));
+  BT.lineup=[AC.id];while(BT.lineup.length<4&&pool.length)BT.lineup.push(pool.splice(Math.random()*pool.length|0,1)[0]);
+  BT.used[AC.id]=true;BT.sp=Math.max(0,BT.sp-btCost(AC.id));
+}
 /* naval battle: three enemy frigates (SAMs and guns) on the sea; each one alive drains your points, each one sunk drains theirs */
 function findSea(cx,cz){for(let r=0;r<20000;r+=700)for(let k=0;k<14;k++){const x=cx+Math.cos(k*.45)*r,z=cz+Math.sin(k*.45)*r;if(groundH(x,z)<-4)return [x,z]}return [cx,cz]}
 function setupNaval(){
   setupBattle();BT.naval=true;BT.zones=[];BT.ships=[];
   [[-8000,26000],[0,32000],[8000,26000]].forEach(([x,z],i)=>{const [sx,sz]=findSea(x,z),g=spawnGround('ship',sx,sz,true);g.orbit={c:new V3(sx,0,sz),r:700+i*200,a:Math.random()*6.28};g.spd=7;BT.ships.push(g)});
   btAssign();message('NAVAL BATTLE · SINK THE FRIGATES · EACH ONE AFLOAT BLEEDS YOUR POINTS',3.4);
+  if(AC.carrier)placeOnCarrier();   // carrier jets launch from the deck
 }
 const btShipsLeft=()=>BT.ships?BT.ships.filter(g=>g.alive).length:0;
 function btSpawn(team,i){
@@ -83,10 +108,12 @@ function btTick(dt){
   if(BT.naval)BT.pts.blue=Math.max(0,BT.pts.blue-btShipsLeft()*.35*dt);
   const bz=BT.zones.filter(z=>z.own>0).length, rz=BT.zones.filter(z=>z.own<0).length;
   BT.pts.red=Math.max(0,BT.pts.red-bz*.6*dt);BT.pts.blue=Math.max(0,BT.pts.blue-rz*.6*dt);
-  for(const team of ['blue','red']){   // reinforcements
+  if(BT.online){const s=netTeamScore(),me=NET.team||'B',th=me==='B'?'R':'B';BT.pts.red=Math.max(0,BT.pts.red-12*Math.max(0,(s[me]||0)-BT.kOld.m));BT.pts.blue=Math.max(0,BT.pts.blue-12*Math.max(0,(s[th]||0)-BT.kOld.t));BT.kOld.m=s[me]||0;BT.kOld.t=s[th]||0}
+  if(!BT.online)for(const team of ['blue','red']){   // reinforcements
     if(BT.pend[team]>0&&BT.pts[team]>0){BT.tm[team]-=dt;if(BT.tm[team]<=0&&btAlive(team)<BT_AI[team]){BT.pend[team]--;BT.tm[team]=BT.pend[team]>0?16:0;btSpawn(team,Math.random()*3|0);btAssign()}}
   }
-  BT.wpT-=dt;if(BT.wpT<=0){BT.wpT=5;btAssign()}
+  BT.wpT-=dt;if(BT.wpT<=0){BT.wpT=5;if(!BT.online)btAssign()}
+  BT.cT=(BT.cT||0)+dt;if(BT.cT>=170){BT.cT=0;if(!BT.online)btConditions(false)}
   if(BT.pts.red<=0||BT.pts.blue<=0){
     BT.over=true;hideBtPick();const win=BT.pts.red<=0&&BT.pts.blue>0;
     missionDone=false;if(!P.alive)state='play';   // endMission re-enters 'dead' with the usual short fade to the debrief
@@ -104,7 +131,7 @@ function showBtPick(){
   const row=document.createElement('div');row.className='btRow';btPick.appendChild(row);
   for(const id of BT.lineup){
     const b=document.createElement('button');b.type='button';b.className='ghost';const u=BT.used[id];
-    b.textContent=(u?'✕ ':'')+AC_DEFS[id].name+' · '+btCost(id)+' SP';b.disabled=!btAfford(id);
+    b.textContent=(u?'✕ ':'')+AC_DEFS[id].name+' · '+btCost(id)+' SP'+(BT.naval&&AC_DEFS[id].carrier?' · deck':'');b.disabled=!btAfford(id);
     b.addEventListener('click',()=>btRespawn(id));row.appendChild(b)}
   const n=document.createElement('button');n.type='button';n.className='ghost';n.textContent='Spectate next';n.addEventListener('click',()=>{BT.specI++});btPick.appendChild(n);
 }
@@ -115,5 +142,7 @@ function btRespawn(id){
   resetPlayer();resetRadar();resetCM();
   P.pos.set(rand(-2500,2500),4000,-1500);P.alive=true;missionDone=false;lockTarget=null;lockT=0;hurtT=0;shake=0;
   playerJet.visible=true;playerJet.quaternion.identity();state='play';$('ctrls').hidden=false;camSnap=true;BT.diedT=0;
-  message('RESPAWNED · '+AC.name.toUpperCase(),2.2);sndSpawn();
+  if(BT.online){const a=(NET.team==='B'?Math.PI:0)+rand(-.5,.5);P.pos.set(Math.sin(a)*9000,rand(4500,6500),Math.cos(a)*9000);playerJet.lookAt(0,P.pos.y,0);axes(P);P.vel.copy(P.fwd).multiplyScalar(240);qPrev.copy(playerJet.quaternion)}
+  if(BT.naval&&AC.carrier)placeOnCarrier();else message('RESPAWNED · '+AC.name.toUpperCase(),2.2);
+  sndSpawn();
 }

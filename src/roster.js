@@ -1129,5 +1129,35 @@ Object.assign(PAINT,{
   SU24M:{p:2,c:['#8a929a','#707a84','#9aa2a9'],b:'#b0b5ba',nat:'rus',num:'24',nose:'24'},
   AJS37:{p:2,c:['#5c6a4c','#757d63','#6a7480'],b:'#aab0b5',nat:'swe',num:'37-21'},
   JA37DI:{p:2,c:['#6a737a','#7d868d','#8d969d'],b:'#aab0b5',nat:'swe',num:'37-62'}});
+/* ===== Chinese additions (est.): J-10A, JH-7A ===== */
+// J-10A: the first-generation Vigorous Dragon, WS-10A / AL-31FN (~123 kN AB), KLJ-3 pulse-Doppler radar, PL-8 and PL-12
+dv('J10C','J10A','J-10A Vigorous Dragon','Long',{
+  MASS:12400,T_AB:123000,T_MIL:79000,gmax:9,irstR:0,
+  srName:'PL8',srFull:'PL-8',sr:Object.assign({},PL10,{gimbal:.8,cone:.6,maxR:12000,gmax:35,lockT:.9}),mrName:'PL12',mrFull:'PL-12',mr:Object.assign({},PL12),
+  radar:{modes:['RWS','TWS'],name:'KLJ-3',range:90000},
+  cm:{fixed:true,flares:48,chaff:48,decoys:0,maws:false,jam:null,jamName:'',cmds:'CM',
+    stations:[['1','PL8','r9_0'],['2','PL12','r120_0'],['3','PL12','r120_2'],['5','PL12','r120_3'],['6','PL12','r120_1'],['7','PL8','r9_1']]},
+  spec:'<span><b>+9 g</b> (est.)</span><span><b>Mach 1.8</b></span><span>AL-31FN <b>~123 kN</b></span><span>KLJ-3 <b>look-down</b></span><span>PL-12 · PL-8</span><span>GSh-23</span>',
+  srDesc:'PL-8 heat seeker (Python 3 derivative), all-aspect',mrDesc:'PL-12 active radar (Fox 3): datalink, active seeker near the end',cmDesc:'48 + 48 cartridges (est.)'});
+// JH-7A: the Flounder, twin WS-9 (Spey, 91 kN AB each), 2× GSh-23L (500 rds), KJ-8 pods and YJ-83K anti-ship missiles
+dv('F4E','JH7A','JH-7A Flounder','Long',{corner:430,
+  S:52.3,MASS:16500,CLMAX:1.4,T_AB:182000,T_MIL:112000,gmax:6.5,roll:3.2,vne:760,
+  gunRate:57,gunRounds:500,muzzle:715,gunDmg:1,gunSnd:1300,ammo:'23MM',
+  srName:'PL5',srFull:'PL-5',srN:2,mrN:0,mrName:'-',mrFull:'none',sr:Object.assign({},SRM.AIM9P),
+  radar:{modes:['RWS'],name:'JL-10A',range:40000},
+  cm:cmo(48,48,0,true,'ECM','KG300G pod','CM',stn([['1','PL5'],['2','PL5']],[])),
+  spec:'<span><b>+6.5 g</b></span><span><b>Mach 1.7</b></span><span>2× WS-9 <b>182 kN</b></span><span>2× GSh-23L · <b>500 rds</b></span><span>YJ-83K · LS-500</span><span>2× PL-5</span>',
+  srDesc:'PL-5 heat seeker, rear aspect',mrDesc:'No radar missiles',cmDesc:'96 cartridges (est.)'});
+for(const id of ['J10A','JH7A'])delete AC_DEFS[id].model;
+AC_DEFS.JH7A.cut=AC_DEFS.F4E.cut;AC_DEFS.J10A.cut=AC_DEFS.J10C.cut;
+m2Alias('J10A','J10C');m2Alias('JH7A','F4E',{r9:M2.F4E.r9.slice(0,2),r120:[]});
+for(const id of ['J10A','JH7A'])m2Fit(id);
+Object.assign(M2K,{J10A:[1,1,1.073]});
+ROSTER_IDS.push('J10A','JH7A');
+Object.assign(ROSTER_LIKE,{J10A:'J10C',JH7A:'F4E'});
+Object.assign(PITS,{J10A:'TEEN',JH7A:'RUS'});
+Object.assign(PAINT,{
+  J10A:{p:1,c:['#8f989f','#7a858e','#9ca4aa'],nat:'prc',num:'61203',nose:'61203'},
+  JH7A:{p:2,c:['#7d8a78','#98a08c','#7f95a8'],b:'#b4b9be',nat:'prc',num:'80227'}});
 // Balance pass: sustained turn and climb brought toward the War Thunder wiki figures (see WTREF in progress.js)
 for(const [id,o] of [['A10A',{MASS:19200}],['A7E',{MASS:15300}],['A4E',{MASS:8200}],['ALPHAJET',{MASS:6410}],['JAGUAR',{MASS:12700}],['G91Y',{MASS:6745}],['F4C',{MASS:18011}],['J35D',{KIND:0.22}],['J29F',{MASS:8100}],['J6A',{KIND:0.247}],['MIG21MF',{MASS:8136,KIND:0.222}],['F100D',{KIND:0.28}],['MIG19PT',{KIND:0.247}],['MIG21F13',{MASS:8600}],['HUNTER',{MASS:9226}],['MIRAGE3C',{MASS:10030}],['MIG21',{KIND:0.265}],['F4F',{KIND:0.173}],['KFIR',{KIND:0.197}],['J35F',{KIND:0.22}],['LIGHTNING',{MASS:20090}],['M2000',{KIND:0.213}],['MIG23ML',{KIND:0.192}],['MIG25PD',{MASS:40404}]])if(AC_DEFS[id])Object.assign(AC_DEFS[id],o);

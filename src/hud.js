@@ -131,6 +131,19 @@ function drawMap(c){
   tri(cx,cy,ph,'#ffffff',9);
   txt(c,'TACTICAL MAP · '+TMAP.KM[TMAP.z]+' KM · TAP MAP TO ZOOM / CLOSE',W/2,INS.t+22,'center',HUD,12,700);
   c.restore()}
+/* damage diagram: a plan-view jet whose wings, engines, pilot and guns light up amber / red as the modules fail (only drawn once something is damaged) */
+function drawDamageDiagram(c,x,y){
+  const sy=P.sys;if(!sy)return;
+  const eng=sy.eng.some(v=>v>0),any=sy.wL||sy.wR||eng||sy.hyd||sy.ctl<1||sy.gun||sy.pilot||sy.leak||sy.radar||sy.flapOff;if(!any)return;
+  const col=v=>v>=1?THREAT:v>0?WARN:HUDD;
+  c.save();c.translate(x,y);c.lineWidth=1.5;
+  c.strokeStyle=sy.pilot?WARN:HUDD;c.fillStyle=c.strokeStyle;c.beginPath();c.moveTo(0,-26);c.lineTo(4,-8);c.lineTo(4,18);c.lineTo(0,22);c.lineTo(-4,18);c.lineTo(-4,-8);c.closePath();c.stroke();   // fuselage (outline turns amber when the pilot is wounded)
+  for(const [s,v] of [[-1,sy.wL],[1,sy.wR]]){c.strokeStyle=col(v);c.setLineDash(v>=1?[3,3]:[]);c.beginPath();c.moveTo(s*4,-4);c.lineTo(s*24,10);c.lineTo(s*24,16);c.lineTo(s*4,12);c.stroke();   // wings: dashed once torn off
+    c.setLineDash([]);if(v>=1){c.strokeStyle=THREAT;c.beginPath();c.moveTo(s*10,2);c.lineTo(s*20,14);c.stroke()}}
+  sy.eng.forEach((v,i)=>{const n=sy.eng.length,ex=n===1?0:(i-(n-1)/2)*7;c.fillStyle=v===2?THREAT:v===1?WARN:HUDD;c.beginPath();c.arc(ex,19,2.6,0,6.283);c.fill()});
+  c.strokeStyle=sy.ctl<1?WARN:HUDD;c.beginPath();c.moveTo(-8,24);c.lineTo(8,24);c.stroke();   // tailplane / elevator
+  c.font='700 8px '+FONT;c.textAlign='center';c.fillStyle=sy.gun?WARN:HUDD;c.fillText('GUN',-22,-18);c.fillStyle=sy.hyd?WARN:HUDD;c.fillText('HYD',22,-18);c.fillStyle=sy.leak?WARN:HUDD;c.fillText('FUEL',-22,-8);c.fillStyle=sy.radar?WARN:HUDD;c.fillText('RDR',22,-8);
+  c.restore()}
 function drawHUD(){
   const c=hctx; c.clearRect(0,0,W,H); drawNVG(c);
   if(hurtT>0){const g=c.createRadialGradient(W/2,H/2,Math.min(W,H)*.3,W/2,H/2,Math.max(W,H)*.7);g.addColorStop(0,'rgba(255,40,30,0)');g.addColorStop(1,`rgba(255,40,30,${hurtT*1.2})`);c.fillStyle=g;c.fillRect(0,0,W,H)}
@@ -332,7 +345,7 @@ function drawHUD(){
     const t={DL:'DATALINK MIDCOURSE',INS:SPEC[m.type].arh?'INERTIAL · NO UPDATES':'INERTIAL · RE-LOCK BEFORE TERMINAL',TERM:'TERMINAL · HOLD THE LOCK',ACTIVE:'ACTIVE · PITBULL'}[m.gmode]||'';
     if(t)txt(c,AC.mrName+' '+d+' KM · '+t,W/2,H*.79,'center',m.gmode==='INS'?WARN:HUD,11,700);break}
   // fuel + damage readouts
-  if(!pit){txt(c,'FUEL '+fuelStr(P.fuel||0),INS.l+16,tapeY()+78,'left',P.bingo?WARN:HUDD,11,700)}
+  if(!pit){txt(c,'FUEL '+fuelStr(P.fuel||0),INS.l+16,tapeY()+78,'left',P.bingo?WARN:HUDD,11,700);drawDamageDiagram(c,INS.l+44,tapeY()+130)}
   {const sy=P.sys,w=[];if(sy){sy.eng.forEach((v,i)=>{if(v===1)w.push(ENG_NAME(i)+'ENG FIRE');if(v===2)w.push(ENG_NAME(i)+'ENG OUT')});
     if(sy.hyd)w.push('HYD');if(sy.radar)w.push('RDR FAIL');if(sy.leak)w.push('FUEL LEAK');if(sy.wL)w.push(sy.wL>=1?'L WING OFF':'L WING');if(sy.wR)w.push(sy.wR>=1?'R WING OFF':'R WING');if(sy.ctl<1)w.push('ELEV');if(sy.flapOff)w.push('FLAPS OFF');if(sy.gun)w.push('GUN JAM');if(sy.pilot)w.push('WOUNDED')}
     if(P.spin)w.push('SPIN');else if(P.nAero<1.02&&!P.onGround)w.push('STALL');if(P.flaps&&!P.onGround)w.push(P.flaps===2?'FLAPS LDG':'FLAPS CBT');
