@@ -73,7 +73,7 @@ const nm=d=>(d/1852).toFixed(d<18520?1:0);
 // tall phone screens lift the left/right tapes so the countermeasure column fits under them
 const tapeY=()=>W<H?H*.34:H*.42;
 function missionStatus(){
-  if(mission==='BATTLE'&&BT.on)return btStatus();
+  if(BT.on&&isBT())return btStatus();
   if(mission==='TRAINING')return 'TRAINING · '+LESSONS[lesson].toUpperCase();
   if(mission==='ONLINE')return NET.room?('ONLINE · '+(NET.count)+' PILOT'+(NET.count===1?'':'S')+' · '+NET.code.toUpperCase()):'ONLINE · OFFLINE';
   if(sortie)return sortieStatus();

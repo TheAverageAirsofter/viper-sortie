@@ -24,5 +24,13 @@ const assert = require('assert'), path = require('path');
   // points run out: the debrief follows
   await p.evaluate(() => { __vs.BT.pts.red = .2; __vs.BT.zones.forEach(z => { z.own = 1; }); });
   await p.waitForFunction(() => __vs.state === 'over', null, { timeout: 40000 });
+  // combined arms: the tank fight sits on zone A and armour kills cost points
+  const p2 = await b.newPage({ viewport: { width: 900, height: 420 } });
+  await p2.addInitScript(() => { try { localStorage.setItem('vsTips', '1'); localStorage.setItem('viperMission', 'COMBINED'); } catch (e) {} });
+  p2.on('pageerror', e => errs.push(e.message)); await p2.route(/fonts\.(googleapis|gstatic)\.com/, r => r.abort());
+  await p2.goto('file://' + path.resolve(__dirname, '../index.html') + '?test'); await p2.waitForTimeout(1500);
+  await p2.sortie(); await p2.waitForTimeout(3000);
+  const c = await p2.evaluate(() => { const V = __vs, red = V.WAR.units.find(u => u.team === 'red' && u.alive); const z = V.BT.zones[0], d = Math.hypot(red.pos.x - z.x, red.pos.z - z.z); const before = V.BT.pts.red; V.warDie(red, null, 'test'); return { on: V.BT.on, g: V.BT.ground, war: V.WAR.on, d, drop: before - V.BT.pts.red }; });
+  assert(c.on && c.g && c.war && c.d < 4500 && c.drop >= 6, 'combined arms: ' + JSON.stringify(c));
   assert.deepEqual(errs, []); console.log('battle ok'); await b.close();
 })().catch(e => { console.error(e); process.exit(1); });

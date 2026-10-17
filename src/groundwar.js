@@ -132,7 +132,7 @@ function warWreck(u){u.burnT=45;if(u.obj.userData.tur){u.obj.userData.tur.positi
 // the turret flies off when the ammunition goes up
 function warPop(u){const t=u.obj.userData.tur;if(!t||t.parent!==u.obj)return;u.obj.updateMatrixWorld(true);const wp=new V3();t.getWorldPosition(wp);u.obj.remove(t);t.position.copy(wp);t.rotation.set(0,u.heading,0);scene.add(t);
   WAR.debris.push({o:t,vel:new V3(rand(-4,4),rand(16,22),rand(-4,4)),spin:new V3(rand(-1.5,1.5),rand(-1,1),rand(-1.5,1.5)),t:0})}
-function warDie(u,by,why){if(!u.alive)return;u.alive=false;const big=why==='ammunition detonated';explode(new V3(u.pos.x,u.pos.y+2,u.pos.z),big);
+function warDie(u,by,why){if(!u.alive)return;u.alive=false;if(BT.on&&BT.ground&&!BT.over)BT.pts[u.team]=Math.max(0,BT.pts[u.team]-6);const big=why==='ammunition detonated';explode(new V3(u.pos.x,u.pos.y+2,u.pos.z),big);
   if(big)warPop(u);warWreck(u);
   if(by&&by.def)feed((by.team==='blue'?'Blue ':'Red ')+by.def.n+' destroyed '+u.def.n+(why?' ('+why+')':''),u.team==='red'?'kill':'loss');else if(why)feed(u.def.n+': '+why,u.team==='red'?'kill':'loss')}
 const warFlags=u=>{const m=u.mod,a=[];if(m.trk)a.push('TRK');if(m.eng)a.push('ENG');if(m.gun)a.push(m.gun>1?'GUN X':'GUN');if(m.tur)a.push('TUR');if(u.def.crew&&m.crew<u.def.crew)a.push('CREW '+m.crew+'/'+u.def.crew);if(m.fire)a.push('FIRE');return a.join(' ')};
@@ -141,6 +141,7 @@ function updateWar(dt){
   if(!WAR.on)return;
   if(state!=='play'){return}
   WAR.t+=dt;
+  {const R=quality==='LOW'?7000:quality==='MED'?12000:20000,cp=camera.position;for(const u of WAR.units){const dx=u.pos.x-cp.x,dz=u.pos.z-cp.z;u.obj.visible=dx*dx+dz*dz<R*R}}   // far vehicles are specks: skip their draw calls
   for(const x of WAR.debris){if(x.t>6)continue;x.t+=dt;x.vel.y-=9.81*dt;x.o.position.addScaledVector(x.vel,dt);x.o.rotation.x+=x.spin.x*dt;x.o.rotation.y+=x.spin.y*dt;x.o.rotation.z+=x.spin.z*dt;const gh=Math.max(groundH(x.o.position.x,x.o.position.z),0)+.8;if(x.o.position.y<gh){x.o.position.y=gh;x.t=7}}
   for(const u of WAR.units){
     if(!u.alive){if(u.burnT>0){u.burnT-=dt;u.dustT-=dt;if(u.dustT<=0){u.dustT=.35;puff(u.pos.x+rand(-1,1),u.pos.y+2.5,u.pos.z+rand(-1,1),rand(-1,1),rand(6,10),rand(-1,1),.14,.14,.14,.6,rand(5,9),rand(6,12),rand(3,5),-.3)}}continue}

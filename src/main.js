@@ -128,7 +128,7 @@ function frame(now){
     for(const f of friends)if(f.kind==='fighter')jetFX(f,f.type,false);
     if(state==='play'||state==='dead'){dmgFX(P,AC.id,true);for(const e of enemies)dmgFX(e,e.type,false);for(const f of friends)dmgFX(f,f.type,false)}
     updateParticles(dt); updateRings(dt);
-    animJet(playerJet.children[0],P,dt,true); if(outside&&VIEWS[view]==='COCKPIT')animJet(outside,P,dt,true); animGear(dt); updateWrecks(dt);
+    animJet(playerJet.children[0],P,dt,true); if(outside&&VIEWS[view]==='COCKPIT')animJet(outside,P,dt,true); animGear(dt); updateWrecks(dt); updateDebris(dt);
     for(const L of [enemies,friends])for(const j of L)if(j.alive&&j.kind==='fighter'){const d=j.pos.distanceTo(camera.position);lodJet(j.obj,d);if(d<3500)animJet(j.obj,j,dt,false)}
   }
   HAZE_MAT.uniforms.t.value=clock; HAZE_MAT.uniforms.k.value=QUALS[quality].fx?1:0;
@@ -266,7 +266,7 @@ const _careerAward=careerAward;
 careerAward=function(){lbAdd();return _careerAward.apply(this,arguments)};
 
 /* ---------- test hook (only with ?test in the URL) ---------- */
-if(/[?&]test\b/.test(location.search))window.__vs={KB,kbRebuild,playerGunHit,wingHit,BT,die,btRespawn,TMAP,mapStep,KBM,SC,damageSystem,hitAI,killEnemy,setThr,HEAT,explode,puff,camera,LT,townLights,flashLt,P,fly,dlz,flyout,AC_DEFS,feed,WAR,WAR_V,warBuild,warSpawn,warModules,warDie,warFlags,updateWar,warAlive,buildJet,PLAYER_COLORS,M2,V3,atm,clamp,lbAdd,showOverlay:k=>showOverlay(k),setScore:(n,k)=>{score=n;kills=k},get state(){return state},get enemies(){return enemies},missiles:()=>missiles.filter(m=>m.on),setAC:id=>{AC=AC_DEFS[id];applyAC()},wt:{   // weapon-test hooks: a clean sky, one drone, scripted launches
+if(/[?&]test\b/.test(location.search))window.__vs={scene,rinfoReset:()=>{renderer.info.autoReset=false;renderer.info.reset()},rinfo:()=>({c:renderer.info.render.calls,t:renderer.info.render.triangles,g:renderer.info.memory.geometries,tx:renderer.info.memory.textures}),KB,kbRebuild,playerGunHit,wingHit,BT,die,btRespawn,TMAP,mapStep,KBM,SC,damageSystem,hitAI,killEnemy,setThr,HEAT,explode,puff,camera,LT,townLights,flashLt,P,fly,dlz,flyout,AC_DEFS,feed,WAR,WAR_V,warBuild,warSpawn,warModules,warDie,warFlags,updateWar,warAlive,buildJet,PLAYER_COLORS,M2,V3,atm,clamp,lbAdd,showOverlay:k=>showOverlay(k),setScore:(n,k)=>{score=n;kills=k},get state(){return state},get enemies(){return enemies},missiles:()=>missiles.filter(m=>m.on),setAC:id=>{AC=AC_DEFS[id];applyAC()},wt:{   // weapon-test hooks: a clean sky, one drone, scripted launches
   begin:id=>{AC=AC_DEFS[id];applyAC();startGame();return AC.id},
   clear:()=>{waveClearT=1e9;for(const e of enemies){e.alive=false;scene.remove(e.obj)}enemies.length=0;P.pos.set(0,6000,0);P.vel.set(0,0,250);throttle=.7;return state},
   target:(type,dz,away,speed)=>{const e=spawnFighter('red',type,new V3(0,P.pos.y,dz),new V3(0,P.pos.y,dz+(away?9999:-9999)),{ir:0,rdr:0,speed:speed||220});e.drone=true;return e.id},

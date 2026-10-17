@@ -1,14 +1,16 @@
 /* ---------------- air battle (Domination): two teams, three capture zones, points, and a lineup of jets to respawn into ----------------
    Hold more zones than the enemy and their points drain; every loss costs points too. When your jet is lost the battle keeps running:
    you spectate a team-mate and pick the next jet from your lineup. AI pilots fly to the zone they should take and fight what they meet. */
-const BT={on:false,over:false,pts:{blue:0,red:0},zones:[],lineup:[],used:{},pend:{blue:0,red:0},tm:{blue:0,red:0},wpT:0,diedT:0,specI:0,max:300};
+const BT={on:false,over:false,pts:{blue:0,red:0},zones:[],lineup:[],used:{},pend:{blue:0,red:0},tm:{blue:0,red:0},wpT:0,diedT:0,specI:0,max:300,sp:0};
+const btCost=id=>Math.max(2,Math.min(8,Math.round(2+(progBR(id)-1)*.5)));   // spawn points: stronger jets cost more
+const btAfford=id=>!BT.used[id]&&btCost(id)<=BT.sp;
 const BT_ZONES=[['A',0,14000],['B',-9000,25000],['C',9000,25000]], BT_R=4500, BT_AI={blue:3,red:4};
 function setupBattle(){
-  BT.on=true;BT.over=false;BT.pts.blue=BT.pts.red=BT.max;BT.pend.blue=BT.pend.red=0;BT.tm.blue=BT.tm.red=0;BT.wpT=0;BT.diedT=0;BT.specI=0;BT.used={};
+  BT.on=true;BT.over=false;BT.ground=false;BT.pts.blue=BT.pts.red=BT.max;BT.pend.blue=BT.pend.red=0;BT.tm.blue=BT.tm.red=0;BT.wpT=0;BT.diedT=0;BT.specI=0;BT.used={};BT.sp=20;
   BT.zones=BT_ZONES.map(([n,x,z])=>({n,x,z,prog:0,own:0}));
   const pool=banditPool().filter(id=>id!==AC.id&&unlocked(id));
-  BT.lineup=[AC.id];while(BT.lineup.length<3&&pool.length)BT.lineup.push(pool.splice(Math.random()*pool.length|0,1)[0]);
-  BT.used[AC.id]=true;
+  BT.lineup=[AC.id];while(BT.lineup.length<4&&pool.length)BT.lineup.push(pool.splice(Math.random()*pool.length|0,1)[0]);
+  BT.used[AC.id]=true;BT.sp=Math.max(0,BT.sp-btCost(AC.id));
   P.pos.set(0,4000,-1500);
   for(let i=0;i<BT_AI.blue;i++)btSpawn('blue',i);
   for(let i=0;i<BT_AI.red;i++)btSpawn('red',i);
@@ -24,10 +26,12 @@ function btSpawn(team,i){
 // each AI jet flies to the nearest zone its side does not hold yet (or the contested one)
 function btAssign(){
   for(const team of ['blue','red']){
-    const own=team==='blue'?1:-1;
+    const own=team==='blue'?1:-1,load=new Map();
     for(const e of team==='blue'?friends:enemies){
       if(!e.alive||e.kind!=='fighter')continue;
-      let best=null,bd=1e9;for(const z of BT.zones){const d=Math.hypot(z.x-e.pos.x,z.z-e.pos.z)+(z.own===own?9000:0);if(d<bd){bd=d;best=z}}
+      // nearest zone the side does not hold yet; each jet already sent there makes it less attractive, so the flight spreads out
+      let best=null,bd=1e9;for(const z of BT.zones){const d=Math.hypot(z.x-e.pos.x,z.z-e.pos.z)+(z.own===own?9000:0)+(load.get(z)||0)*7000;if(d<bd){bd=d;best=z}}
+      if(best)load.set(best,(load.get(best)||0)+1);
       e.wp=best?new V3(best.x,Math.max(2500,Math.min(5500,e.pos.y)),best.z):null;
     }
   }
@@ -39,12 +43,12 @@ function btLoss(team,pts){   // a jet of this side was lost: points off and a re
 }
 function btStatus(){
   const z=BT.zones.map(q=>q.n+(q.own>0?'+':q.own<0?'-':'·')).join(' ');
-  return 'BLUE '+Math.round(BT.pts.blue)+' · RED '+Math.round(BT.pts.red)+'  ZONES '+z;
+  return 'BLUE '+Math.round(BT.pts.blue)+' · RED '+Math.round(BT.pts.red)+'  ZONES '+z+'  SP '+BT.sp;
 }
 function btDied(){   // called from die(): the battle goes on, the sortie does not end
   if(BT.over)return;
   BT.pts.blue=Math.max(0,BT.pts.blue-12);BT.diedT=clock;
-  const left=BT.lineup.filter(id=>!BT.used[id]);
+  const left=BT.lineup.filter(btAfford);
   deadT=left.length?1e9:2.2;
 }
 function btSpecTarget(){
@@ -52,16 +56,17 @@ function btSpecTarget(){
   const r=enemies.filter(e=>e.alive&&e.kind==='fighter');return r.length?r[BT.specI%r.length]:null;
 }
 function btTick(dt){
-  if(!BT.on||mission!=='BATTLE'||BT.over||(state!=='play'&&state!=='dead'))return;
+  if(!BT.on||!isBT()||BT.over||(state!=='play'&&state!=='dead'))return;
   const live=state==='play'&&P.alive;
   for(const z of BT.zones){
     let b=0,r=0;
     if(live&&Math.hypot(P.pos.x-z.x,P.pos.z-z.z)<BT_R)b++;
     for(const f of friends)if(f.alive&&f.kind==='fighter'&&Math.hypot(f.pos.x-z.x,f.pos.z-z.z)<BT_R)b++;
     for(const e of enemies)if(e.alive&&e.kind==='fighter'&&Math.hypot(e.pos.x-z.x,e.pos.z-z.z)<BT_R)r++;
+    if(BT.ground&&WAR.on)for(const u of WAR.units)if(u.alive&&Math.hypot(u.pos.x-z.x,u.pos.z-z.z)<BT_R){if(u.team==='blue')b++;else r++}
     z.prog=clamp(z.prog+clamp(b-r,-2,2)*.045*dt,-1,1);
     const o=z.prog>.6?1:z.prog<-.6?-1:Math.abs(z.prog)<.12?0:z.own;
-    if(o!==z.own){z.own=o;if(state==='play')message(o>0?'ZONE '+z.n+' CAPTURED':o<0?'ZONE '+z.n+' LOST':'ZONE '+z.n+' NEUTRAL',1.8);if(o>0)scEvent('ZONE '+z.n+' CAPTURED',60,'bonus')}
+    if(o!==z.own){z.own=o;if(state==='play'){message(o>0?'ZONE '+z.n+' CAPTURED':o<0?'ZONE '+z.n+' LOST':'ZONE '+z.n+' NEUTRAL',1.8);if(o)sndZone(o>0)}if(o>0){scEvent('ZONE '+z.n+' CAPTURED',60,'bonus');BT.sp+=3}}
   }
   const bz=BT.zones.filter(z=>z.own>0).length, rz=BT.zones.filter(z=>z.own<0).length;
   BT.pts.red=Math.max(0,BT.pts.red-bz*.6*dt);BT.pts.blue=Math.max(0,BT.pts.blue-rz*.6*dt);
@@ -79,23 +84,23 @@ function btTick(dt){
 const btPick=document.createElement('div');btPick.id='btPick';btPick.hidden=true;document.body.appendChild(btPick);
 function hideBtPick(){btPick.hidden=true;btPick.dataset.k=''}
 function showBtPick(){
-  const left=BT.lineup.filter(id=>!BT.used[id]),key=left.join(',')+'|'+BT.over;
+  const key=BT.lineup.filter(btAfford).join(',')+'|'+BT.sp+'|'+BT.over;
   if(!btPick.hidden&&btPick.dataset.k===key)return;
   btPick.dataset.k=key;btPick.hidden=false;btPick.innerHTML='';
-  const h=document.createElement('p');h.className='eyebrow';h.textContent='Shot down · '+btStatus();btPick.appendChild(h);
+  const h=document.createElement('p');h.className='eyebrow';h.textContent='Shot down · '+btStatus()+' · spawn points are earned by kills and zone captures';btPick.appendChild(h);
   const row=document.createElement('div');row.className='btRow';btPick.appendChild(row);
   for(const id of BT.lineup){
     const b=document.createElement('button');b.type='button';b.className='ghost';const u=BT.used[id];
-    b.textContent=(u?'✕ ':'')+AC_DEFS[id].name+(NODES[id]?' · BR '+progBR(id).toFixed(1):'');b.disabled=!!u;
+    b.textContent=(u?'✕ ':'')+AC_DEFS[id].name+' · '+btCost(id)+' SP';b.disabled=!btAfford(id);
     b.addEventListener('click',()=>btRespawn(id));row.appendChild(b)}
   const n=document.createElement('button');n.type='button';n.className='ghost';n.textContent='Spectate next';n.addEventListener('click',()=>{BT.specI++});btPick.appendChild(n);
 }
 function btRespawn(id){
-  if(state!=='dead'||P.alive||BT.over||BT.used[id])return;
-  BT.used[id]=true;hideBtPick();
+  if(state!=='dead'||P.alive||BT.over||!btAfford(id))return;
+  BT.used[id]=true;BT.sp-=btCost(id);hideBtPick();
   AC=AC_DEFS[id];applyAC();
   resetPlayer();resetRadar();resetCM();
   P.pos.set(rand(-2500,2500),4000,-1500);P.alive=true;missionDone=false;lockTarget=null;lockT=0;hurtT=0;shake=0;
   playerJet.visible=true;playerJet.quaternion.identity();state='play';$('ctrls').hidden=false;camSnap=true;BT.diedT=0;
-  message('RESPAWNED · '+AC.name.toUpperCase(),2.2);
+  message('RESPAWNED · '+AC.name.toUpperCase(),2.2);sndSpawn();
 }

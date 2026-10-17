@@ -248,7 +248,7 @@ const QUALS={LOW:{dpr:1,seg:110,clouds:16,fx:0,trees:0},MED:{dpr:1.25,seg:150,cl
 let quality='MED'; try{const q=localStorage.getItem('viperQuality');if(QUALS[q])quality=q}catch(e){}
 let DPR=Math.min(window.devicePixelRatio||1,QUALS[quality].dpr);
 const renderer=new THREE.WebGLRenderer({canvas:glCanvas,antialias:true,powerPreference:'high-performance'});
-renderer.setPixelRatio(DPR); renderer.autoClear=false;
+renderer.setPixelRatio(DPR); renderer.autoClear=false; renderer.localClippingEnabled=true;
 // keep the r128 look on newer three.js: linear output, no colour management, legacy light units
 if(THREE.ColorManagement)THREE.ColorManagement.enabled=false; if('outputColorSpace' in renderer)renderer.outputColorSpace=THREE.LinearSRGBColorSpace; if('useLegacyLights' in renderer)renderer.useLegacyLights=true;
 // r165+ removed legacy lights: light intensities are pi times lower, so scale ours back up to keep the same look (LK is 1 on older builds)
@@ -495,7 +495,34 @@ const NAVM=[new THREE.MeshBasicMaterial({color:0xff2a2a}),new THREE.MeshBasicMat
 function withNav(root,type){const D=AC_DEFS[type];if(D&&D.fx&&D.fx.nav){const [sp,tl,tp]=D.fx.nav;[[sp,0,D.fx.navZ!=null?D.fx.navZ:-3.5,0],[-sp,0,D.fx.navZ!=null?D.fx.navZ:-3.5,1],[0,tp,tl,2]].forEach(([x,y,z,i])=>{const m=new THREE.Mesh(NAVG,NAVM[i]);m.position.set(x,y,z);m.name='nav';root.children[0].add(m)});return root}
   const f=type.startsWith('F16'), span=type.startsWith('MIG')||type.startsWith('SU')?5.7:type.startsWith('GRIPEN')?4.3:6.7,tail=type.startsWith('MIG')||type.startsWith('SU')?-8.6:type.startsWith('GRIPEN')?-6:-7.4;   // F-16 model is built in 0.75-scale units
   [[span,0,f?-2.2:-1.5,0],[-span,0,f?-2.2:-1.5,1],[0,f?3.6:2.6,tail,2]].forEach(([x,y,z,i])=>{const m=new THREE.Mesh(NAVG,NAVM[i]);m.position.set(x,y,z);m.name='nav';root.children[0].add(m)});return root}
-function buildJet(c,type){type=type||'F16';const r=withNav(buildJetBase(c,type),type);
+/* draw-call diet: unnamed static meshes that share a material inside one group (fuselage panels, strips, missile parts) become one mesh. Named parts
+   (control surfaces, gear, canopy, nozzles, flame, wingM, decals...) stay separate so animation, damage and level of detail still find them. */
+const MERGE_SKIP=new Set(['cs','gear','flame','nozG','canopyG','pilot']);
+function mergeGeos(ms){
+  const names=Object.keys(ms[0].geometry.attributes);let nv=0,ni=0;
+  for(const m of ms){const a=m.geometry.attributes.position.count;nv+=a;ni+=m.geometry.index?m.geometry.index.count:a}
+  const out={};for(const n of names)out[n]=new Float32Array(nv*ms[0].geometry.attributes[n].itemSize);
+  const idx=new Uint32Array(ni);let vo=0,io=0;
+  for(const m of ms){const g=m.geometry.clone();m.updateMatrix();g.applyMatrix4(m.matrix);const c=g.attributes.position.count;
+    for(const n of names)out[n].set(g.attributes[n].array,vo*g.attributes[n].itemSize);
+    if(g.index){for(let i=0;i<g.index.count;i++)idx[io+i]=g.index.array[i]+vo;io+=g.index.count}else{for(let i=0;i<c;i++)idx[io+i]=vo+i;io+=c}
+    vo+=c;g.dispose()}
+  const geo=new THREE.BufferGeometry();for(const n of names)geo.setAttribute(n,new THREE.BufferAttribute(out[n],ms[0].geometry.attributes[n].itemSize));
+  geo.setIndex(new THREE.BufferAttribute(idx,1));geo.computeBoundingSphere();geo.computeBoundingBox();return geo}
+function mergeStatic(root){
+  const groups=[];root.traverse(o=>{if(o.isGroup)groups.push(o)});
+  for(const g of groups){
+    let q=g,skip=false;while(q){if(MERGE_SKIP.has(q.name)){skip=true;break}q=q.parent}
+    if(skip)continue;
+    const by=new Map();
+    for(const m of g.children){
+      if(!m.isMesh||m.name||!m.geometry||!m.material||m.children.length||Array.isArray(m.material))continue;
+      const a=Object.keys(m.geometry.attributes);if(a.some(k=>k!=='position'&&k!=='normal'&&k!=='uv'))continue;
+      const key=m.material.uuid+'|'+a.join(',');let l=by.get(key);if(!l)by.set(key,l=[]);l.push(m)}
+    for(const l of by.values()){if(l.length<2)continue;const nm=new THREE.Mesh(mergeGeos(l),l[0].material);nm.castShadow=l[0].castShadow;nm.receiveShadow=l[0].receiveShadow;g.add(nm);for(const m of l)g.remove(m)}
+  }
+}
+function buildJet(c,type){type=type||'F16';const r=withNav(buildJetBase(c,type),type);mergeStatic(r);
   r.traverse(o=>{const m=o.material;if(m&&m.isMeshStandardMaterial&&!m.__ibl){m.__ibl=true;m.envMapIntensity=.75;if(m.roughness>.55){m.roughness=.48;m.metalness=Math.max(m.metalness,.22)}}});
   return dressFlames(r)}
 // per-aircraft size correction [across, up, along] so the lofted shapes match the real length and span; filled in the roster slice
@@ -894,7 +921,7 @@ function buildLoftJet(c,S,type){
   ws.forEach(o=>{o.kind=o===main?'main':o.span/o.ch<.5?'fix':o.r.zle<main.r.zte?'stab':'can'});
   const hasStab=ws.some(o=>o.kind==='stab');
   for(const o of ws){const mat=o.w.dark?dark:body;
-    if(o.kind==='main'||o.kind==='fix'){add(wingGeo(o.w.st),mat);
+    if(o.kind==='main'||o.kind==='fix'){const wm=add(wingGeo(o.w.st),mat);if(o.kind==='main')wm.name='wingM';
       if(o.kind==='main')for(const s of [1,-1]){
         if(hasStab){segStrips(o.w.st,.52,.94,.24,s,mat,'ail');segStrips(o.w.st,.1,.5,.26,s,mat,'flap')}
         else{segStrips(o.w.st,.12,.5,.2,s,mat,'elv');segStrips(o.w.st,.52,.95,.2,s,mat,'elv')}}}
@@ -2682,6 +2709,13 @@ const sndGun=()=>sndNoise(.07,AC.gunSnd,.3,'bandpass');
 const sndBoom=v=>sndNoise(1.4,520,.9*v);
 const sndMsl=()=>sndNoise(1.1,1400,.4,'bandpass');
 const sndHit=()=>sndNoise(.12,900,.5,'highpass');
+const sndSeq=(notes,dur,gain,type)=>notes.forEach((f,i)=>setTimeout(()=>sndBeep(f,dur,gain,type||'sine'),i*(dur*1000+30)));
+const sndTear=()=>{sndNoise(.7,1900,.8,'bandpass');sndNoise(.9,220,.9)};      // a wing ripping off
+const sndFire=()=>sndSeq([880,660,880,660],.12,.06,'square');                  // fire warning
+const sndKill=()=>sndSeq([880,1320],.09,.07);                                  // kill confirmed
+const sndCrit=()=>sndBeep(1600,.05,.05,'sine');
+const sndZone=up=>sndSeq(up?[660,880,1100]:[880,660,440],.1,.07);
+const sndSpawn=()=>sndSeq([520,780],.1,.06);
 function sndEngine(){
   if(!A.ctx)return; const t=A.ctx.currentTime;
   const live=(state==='play'||state==='menu')&&(P.thrK??1)>0;
@@ -3746,14 +3780,14 @@ function feed(text,kind){FEED.push({t:clock,text,kind:kind||(/^You (killed|destr
 /* War Thunder style scoring events: lines fade over a few seconds under the sight; hits coalesce, kills chain into multi-kill bonuses */
 const SC={list:[],streak:0,lastKill:-99};
 function scEvent(text,pts,col,key){
-  if(pts)score+=pts;
+  if(pts)score+=pts;if(col==='crit'&&key!=='ghit')sndCrit();
   const f=key&&SC.list.find(x=>x.key===key&&clock-x.t<1.6);
   if(f){f.n++;f.pts+=pts;f.t=clock;f.text=text+' ×'+f.n}
   else{SC.list.push({text,pts,col:col||'',key:key||'',n:1,t:clock});while(SC.list.length>5)SC.list.shift()}
 }
 function scKill(label,pts,assistOK){
   const chain=clock-SC.lastKill<25?SC.streak+1:1;SC.streak=chain;SC.lastKill=clock;
-  scEvent(label,pts,'kill');
+  scEvent(label,pts,'kill');sndKill();
   if(chain>1){const nm=['','','DOUBLE KILL','TRIPLE KILL','QUADRUPLE KILL'][chain]||'MULTI KILL ×'+chain;scEvent(nm,40*chain,'bonus')}
 }
 function message(t,dur){msgText=t;msgT=dur||1.6;if(srLive&&srLive.textContent!==t)srLive.textContent=t}   // mirrored to a screen-reader live region
@@ -3769,10 +3803,11 @@ function resetPlayer(){
   P.vel.set(0,0,230); P.onGround=false; P.onDeck=false; P.ejected=null; P.jetGhost=null; P.rescued=false; if(chute)chute.visible=false; P.scramble=false; P.stopT=0; if(typeof setGear==='function')setGear(false); P.n=1; P.hp=100; P.fuel=.75*(AC.intFuel||AC.fuelCap)+(AC.tankFuel||0); P.flamedOut=false; resetSystems(); P.gStress=0; P.gloc=0; P.gcas=false; P.maxG=1; axes(P); qPrev.copy(playerJet.quaternion); omega.set(0,0,0);
   rearm(); throttle=.8; setThr(.8);
 }
+const isBT=()=>mission==='BATTLE'||mission==='COMBINED';
 let friends=[], mission='WAVES', banditType='F16', missionT=0, missionDone=false, spawnQ=[];
 try{mission=localStorage.getItem('viperMission')||'WAVES';banditType=localStorage.getItem('viperBandit')||'F16'}catch(e){}
 const RUSH_KILLS=8, RUSH_TIME=300;   // time-attack: bandits keep arriving, four at a time
-const MISSIONS={WAVES:'Waves',STRIKE:'Strike / SEAD',INTERCEPT:'Intercept bombers',RUSH:'Bandit rush (8 in 5 min)',ESCORT:'Escort the C-130','2V4':'2 v 4 with wingman','4SHIP':'4-ship vs 6',CONVOY:'Convoy attack',GROUNDWAR:'Ground war (CAS)',BATTLE:'Air battle (domination)',ANTISHIP:'Anti-ship strike',CRUISE:'Cruise missile defence',CAMPAIGN:'Campaign',ONLINE:'Online dogfight',TRAINING:'Training'};
+const MISSIONS={WAVES:'Waves',STRIKE:'Strike / SEAD',INTERCEPT:'Intercept bombers',RUSH:'Bandit rush (8 in 5 min)',ESCORT:'Escort the C-130','2V4':'2 v 4 with wingman','4SHIP':'4-ship vs 6',CONVOY:'Convoy attack',GROUNDWAR:'Ground war (CAS)',BATTLE:'Air battle (domination)',COMBINED:'Combined arms battle',ANTISHIP:'Anti-ship strike',CRUISE:'Cruise missile defence',CAMPAIGN:'Campaign',ONLINE:'Online dogfight',TRAINING:'Training'};
 const LESSONS={BFM:'Dogfighting basics',DEFENSE:'Missile defense',BVR:'Long-range shot',LANDING:'Landing',REFUEL:'Air refueling'};
 let lesson='BFM'; try{if(LESSONS[localStorage.getItem('vsLesson')])lesson=localStorage.getItem('vsLesson')}catch(e){}
 let trainDefeated=0, trainConnT=0;
@@ -3801,7 +3836,7 @@ function tmpl(team,type){const k=team+type;
   if(!templates[k])templates[k]=type==='BOMBER'?buildBomber(RED_COLORS):type==='TRANSPORT'?buildTransport(BLUE_COLORS):buildJet(team==='red'?RED_COLORS:BLUE_COLORS,type);
   return templates[k]}
 function clearWorld(){
-  clearGround(); tankerStop(); clearWrecks(); clearIsles(); if(KC.t>0)endKillCam();
+  for(const d of DEBRIS)scene.remove(d.m);DEBRIS.length=0; clearGround(); tankerStop(); clearWrecks(); clearIsles(); if(KC.t>0)endKillCam();
   for(const e of enemies)scene.remove(e.obj); for(const f of friends)scene.remove(f.obj);
   enemies=[];friends=[];spawnQ=[];[...pBullets,...eBullets,...missiles,...eMissiles].forEach(kill);
 }
@@ -3858,6 +3893,7 @@ function setupMission(){
   if(mission==='CAMPAIGN'){setupCampaign();return}
   if(mission==='CONVOY'){P.pos.set(0,6000,0);P.vel.set(0,0,240);setupConvoy(rand(-4000,4000),34000);spawnPair(pickBanditType(),new V3(0,7000,52000),new V3(0,5000,0));message('CONVOY · STOP AT LEAST 4 OF THE 5 TRUCKS BEFORE THEY GET THROUGH',3);return}
   if(mission==='BATTLE'){setupBattle();return}
+  if(mission==='COMBINED'){setupGroundWar();const c=sortie.center.clone();setupBattle();BT.ground=true;BT.zones[0].x=c.x;BT.zones[0].z=c.z;btAssign();message('COMBINED ARMS · BLUE ARMOUR HOLDS ZONE A · SUPPORT IT FROM THE AIR',3.4);return}
   if(mission==='GROUNDWAR'){setupGroundWar();spawnPair(pickBanditType(),new V3(sortie.center.x,7000,sortie.center.z+16000),new V3(0,5000,0));message('GROUND WAR · SUPPORT THE BLUE ARMOUR (GEPARD COVERS IT) · DESTROY THE '+sortie.need+' RED VEHICLES · ZSU-23-4 AND ZSU-57-2 WILL SHOOT AT YOU',3.6);return}
   if(mission==='ANTISHIP'){P.pos.set(0,6000,0);P.vel.set(0,0,240);setupShip();spawnPair(pickBanditType(),new V3(19600,7000,36000),new V3(0,5000,0));message('ANTI-SHIP · SINK THE FRIGATE NE OF THE BASE · IT HAS SAMS',3);return}
   if(mission==='CRUISE'){P.pos.set(0,5000,6000);P.vel.set(0,0,240);setupCruise();message('CRUISE MISSILES INBOUND FROM THE NORTH · LOW AND FAST · PROTECT THE BASE',3.2);return}
@@ -4002,7 +4038,7 @@ function aiGunHit(t,amt,by){
   const s=t.sys||(t.sys={wL:0,wR:0,eng:0,fireT:0,fatal:false,pilot:0,ctl:1,spin:0,by:false});s.by=by||s.by;let label='';
   if(Math.random()<.03*amt*(1+3*s.pilot))return 'PILOT KILLED';
   const r=Math.random();
-  if(r<.3){const side=Math.random()<.5?'wL':'wR';if(s[side]<1){s[side]=Math.min(1,s[side]+.12*amt+.05);if(s[side]>=1){s.spin=1;label='WING TORN OFF'}else label='WING DAMAGE'}}
+  if(r<.3){const side=Math.random()<.5?'wL':'wR';if(s[side]<1){s[side]=Math.min(1,s[side]+.12*amt+.05);if(s[side]>=1){s.spin=1;label='WING TORN OFF';breakWing(t.obj,side,t.pos,t.vel)}else label='WING DAMAGE'}}
   else if(r<.42&&!s.eng){s.eng=1;s.fireT=9;s.fatal=Math.random()<.4;label='ENGINE FIRE'}
   else if(r<.5&&s.ctl>.6){s.ctl=.55;label='CONTROLS DAMAGED'}
   else if(r<.55&&s.pilot<1){s.pilot=Math.min(1,s.pilot+.5);label='PILOT WOUNDED'}
@@ -4025,7 +4061,7 @@ function hitAI(t,amt,how,byPlayer){
   if(t.kind==='fighter'&&!t.drone){   // (test drones keep the simple hit-point pool)
     if(amt>=5&&(amt>=50||Math.random()<.85)){if(byPlayer){t.hitBy=clock;scEvent('DIRECT HIT',20,'crit','dh')}aiKill(t,how,byPlayer);return}
     let label;
-    if(amt>=5){const s=t.sys||(t.sys={wL:0,wR:0,eng:0,fireT:0,fatal:false,pilot:0,ctl:1,spin:0,by:false});s.by=byPlayer||s.by;s[Math.random()<.5?'wL':'wR']=Math.min(1,.6+Math.random()*.4);if(!s.eng){s.eng=1;s.fireT=9;s.fatal=Math.random()<.4}if(s.wL>=1||s.wR>=1)s.spin=1;label='CRITICAL DAMAGE';t.hp=.6}
+    if(amt>=5){const s=t.sys||(t.sys={wL:0,wR:0,eng:0,fireT:0,fatal:false,pilot:0,ctl:1,spin:0,by:false});s.by=byPlayer||s.by;s[Math.random()<.5?'wL':'wR']=Math.min(1,.6+Math.random()*.4);if(!s.eng){s.eng=1;s.fireT=9;s.fatal=Math.random()<.4}if(s.wL>=1||s.wR>=1){s.spin=1;breakWing(t.obj,s.wL>=1?'wL':'wR',t.pos,t.vel)}label='CRITICAL DAMAGE';t.hp=.6}
     else{label=aiGunHit(t,amt,byPlayer);if(label==='PILOT KILLED'){if(byPlayer){t.hitBy=clock;scEvent('PILOT KILLED',30,'crit')}aiKill(t,how,byPlayer);return}}
     addHole(t.obj,amt>3?4:1);puff(t.pos.x,t.pos.y,t.pos.z,0,0,0,.3,.3,.3,.8,14,20,2);
     if(byPlayer){t.hitBy=clock;if(label)scEvent(label,25,'crit');else if(how==='GUNS')scEvent('HIT',3,'','hit');else scEvent('DIRECT HIT',20,'crit','dh')}
@@ -4038,7 +4074,7 @@ function hitAI(t,amt,how,byPlayer){
 }
 function killEnemy(e,how,byPlayer=true){
   if(!e.alive)return; e.alive=false; scene.remove(e.obj); explode(e.pos,true); spawnWreck(e);
-  if(mission==='BATTLE')btLoss('red');
+  if(isBT()){btLoss('red');if(byPlayer)BT.sp+=2}
   const nm=e.kind==='bomber'?'BOMBER':e.kind==='cruise'?'CRUISE MISSILE':'BANDIT';
   if(byPlayer)REC3.lastKill={t:clock,id:e.id};
   if(byPlayer)gciSplash();
@@ -4049,7 +4085,7 @@ function killEnemy(e,how,byPlayer=true){
 }
 function killFriend(f,how){
   if(!f.alive)return; f.alive=false; scene.remove(f.obj); explode(f.pos,true); spawnWreck(f);
-  if(mission==='BATTLE')btLoss('blue');
+  if(isBT())btLoss('blue');
   message(f.kind==='transport'?'C-130 DESTROYED':'WINGMAN DOWN',2.2); recEvent((f.kind==='transport'?'The C-130':'Your wingman')+' was shot down ('+how+')');
 }
 const WCMDS=['ENGAGE','COVER','REJOIN','SORT','GROUND'], WSHORT={ENGAGE:'ENG',COVER:'COVER',REJOIN:'REJN',SORT:'SORT',GROUND:'GRND'};
@@ -4107,7 +4143,7 @@ function updateMission(dt){
 }
 function die(cause){
   if(state!=='play')return; state='dead'; deathCause=cause; REC3.deathT=clock; if(mission==='ONLINE'&&NET.active)NET.deaths++; deadT=1.8; P.alive=false; missionDone=true; recEvent('You were '+({terrain:'killed hitting the ground',shot:'shot down by guns',missile:'killed by a missile',ejected:'out of the jet (ejected)',collision:'killed in a mid-air collision',landing:'killed crashing on landing',gearup:'killed landing gear-up',abort:'out (sortie aborted)',fuel:'down after running out of fuel'}[cause]||'down'));
-  CM.flrHeld=CM.chfHeld=false; if(mission==='BATTLE')btDied(); if(cause==='ejected'){deadT=7;playerJet.visible=false;$('ctrls').hidden=true;resetStick();gunHeld=false;brake=false;$('bEject').hidden=true;return}
+  CM.flrHeld=CM.chfHeld=false; if(isBT())btDied(); if(cause==='ejected'){deadT=7;playerJet.visible=false;$('ctrls').hidden=true;resetStick();gunHeld=false;brake=false;$('bEject').hidden=true;return}
   explode(P.pos,true); explode(P.pos.clone().addScaledVector(P.fwd,10),true);
   playerJet.visible=false; $('ctrls').hidden=true; resetStick(); gunHeld=false; brake=false;
 }
@@ -4387,9 +4423,24 @@ const fuelStr=kg=>AC.fuelUnit==='LB'?Math.round(kg*2.2046/10)*10+' LB':Math.roun
 const ENG_NAME=i=>AC.engines>1?(i===0?'LEFT ':'RIGHT '):'';
 /* damage is modular: there is no hit-point pool. A hit rolls the pilot, the wings and the systems; you are lost when the pilot is killed, the
    airframe is destroyed (missile), both wings are gone or a fuel fire takes hold. P.hp is only a summary of the modules for smoke, lights and the Arcade bar. */
+/* a torn wing: clip the outer half off the model (side: wL = +x, the left wing) and send a chunk tumbling away */
+const DEBRIS=[];
+function breakWing(root,side,pos,vel){
+  const s=side==='wL'?1:-1;let cut=0;
+  root.traverse(o=>{if(o.isMesh&&o.name==='wingM'){o.geometry.computeBoundingBox();cut=Math.max(cut,o.geometry.boundingBox.max.x*.5)}});
+  if(!cut)return;const pl=new THREE.Plane(new THREE.Vector3(-s,0,0),cut);
+  root.traverse(o=>{const cs=o.parent&&o.parent.name==='cs'&&o.parent.userData&&['ail','flap','elv'].includes(o.parent.userData.cs)&&Math.sign(o.parent.userData.s)===s;
+    if(o.isMesh&&(o.name==='wingM'||cs)){const m=o.material.clone();m.clippingPlanes=[pl];m.side=THREE.DoubleSide;o.material=m}});
+  const ch=new THREE.Mesh(new THREE.BoxGeometry(cut*1.2,.12,3.2),new THREE.MeshStandardMaterial({color:0x6c7178,roughness:.7}));
+  ch.position.copy(pos);scene.add(ch);DEBRIS.push({m:ch,v:vel.clone().add(new THREE.Vector3(s*8,5,0)),w:new THREE.Vector3(rand(-3,3),rand(-2,2),rand(4,9)),t:7});
+  puff(pos.x,pos.y,pos.z,0,0,0,1,.6,.2,1,6,14,.3);
+}
+function updateDebris(dt){for(let i=DEBRIS.length-1;i>=0;i--){const d=DEBRIS[i];d.t-=dt;d.v.y-=9.8*dt;d.m.position.addScaledVector(d.v,dt);d.m.rotation.x+=d.w.x*dt;d.m.rotation.y+=d.w.y*dt;d.m.rotation.z+=d.w.z*dt;
+  if(Math.random()<dt*14)puff(d.m.position.x,d.m.position.y,d.m.position.z,0,0,0,.2,.2,.2,.7,3,10,2);
+  if(d.t<=0||d.m.position.y<Math.max(groundH(d.m.position.x,d.m.position.z),0)){scene.remove(d.m);DEBRIS.splice(i,1)}}}
 function wingHit(side,amt){
   const sy=P.sys;if(sy[side]>=1)return;sy[side]=Math.min(1,sy[side]+amt);
-  if(sy[side]>=1){message((side==='wL'?'LEFT':'RIGHT')+' WING TORN OFF',2.4);recEvent((side==='wL'?'Left':'Right')+' wing torn off');shake=1;hurtT=.8;sy.torn=side==='wL'?-1:1;
+  if(sy[side]>=1){message((side==='wL'?'LEFT':'RIGHT')+' WING TORN OFF',2.4);recEvent((side==='wL'?'Left':'Right')+' wing torn off');shake=1;hurtT=.8;sndTear();sy.torn=side==='wL'?-1:1;breakWing(playerJet,side,P.pos,P.vel);
     if(sy.wL>=1&&sy.wR>=1){message('BOTH WINGS GONE',2);die('shot')}}
 }
 function playerGunHit(m){
@@ -4409,14 +4460,14 @@ function playerMissileHit(){
 function damageSystem(n){
   n*=PRESETS[preset].dmg;n=Math.floor(n)+(Math.random()<n%1?1:0);   // preset scales how many systems a hit takes out
   for(let i=0;i<n;i++){const r=Math.random();
-    if(r<.2){const ok=P.sys.eng.map((v,j)=>v===0?j:-1).filter(j=>j>=0);if(ok.length){const j=ok[Math.random()*ok.length|0];P.sys.eng[j]=1;P.sys.fireT[j]=7;message(ENG_NAME(j)+'ENGINE FIRE',1.8);recEvent(ENG_NAME(j).toLowerCase()+'engine fire');buzz([200,80,200])}}
+    if(r<.2){const ok=P.sys.eng.map((v,j)=>v===0?j:-1).filter(j=>j>=0);if(ok.length){const j=ok[Math.random()*ok.length|0];P.sys.eng[j]=1;P.sys.fireT[j]=7;message(ENG_NAME(j)+'ENGINE FIRE',1.8);sndFire();recEvent(ENG_NAME(j).toLowerCase()+'engine fire');buzz([200,80,200])}}
     else if(r<.34){if(!P.sys.hyd){P.sys.hyd=true;message('HYDRAULICS FAILED · G AND ROLL LIMITED',1.8);recEvent('Hydraulics failed')}}
     else if(r<.46){if(!P.sys.radar){P.sys.radar=true;if(R.stt&&R.sttSrc==='RDR')breakLock();R.tracks.clear();message('RADAR FAILED',1.6);recEvent('Radar failed')}}
     else if(r<.56){if(!P.sys.leak){P.sys.leak=true;message('FUEL LEAK',1.6);recEvent('Fuel leak')}}
     else if(r<.74){const side=Math.random()<.5?'wL':'wR';if(P.sys[side]<1){wingHit(side,.35+Math.random()*.2);if(P.sys[side]<1){message((side==='wL'?'LEFT':'RIGHT')+' WING DAMAGED',1.8);recEvent((side==='wL'?'Left':'Right')+' wing damaged')}}}
     else if(r<.82){if(P.sys.ctl>.6){P.sys.ctl=.55;message('ELEVATOR DAMAGED · PITCH LIMITED',1.8);recEvent('Elevator damaged')}}
     else if(r<.9){if(!P.sys.gun){P.sys.gun=true;message('GUNS JAMMED',1.6);recEvent('Guns jammed')}}
-    else if(P.sys.pilot<1){P.sys.pilot=Math.min(1,P.sys.pilot+.5);message('PILOT WOUNDED · G TOLERANCE REDUCED',1.8);recEvent('Pilot wounded')}
+    else if(P.sys.pilot<1){P.sys.pilot=Math.min(1,P.sys.pilot+.5);message('PILOT WOUNDED · G TOLERANCE REDUCED',1.8);sndHit();recEvent('Pilot wounded')}
   }
 }
 function updateSystems(dt,auto){
@@ -5390,7 +5441,7 @@ function warWreck(u){u.burnT=45;if(u.obj.userData.tur){u.obj.userData.tur.positi
 // the turret flies off when the ammunition goes up
 function warPop(u){const t=u.obj.userData.tur;if(!t||t.parent!==u.obj)return;u.obj.updateMatrixWorld(true);const wp=new V3();t.getWorldPosition(wp);u.obj.remove(t);t.position.copy(wp);t.rotation.set(0,u.heading,0);scene.add(t);
   WAR.debris.push({o:t,vel:new V3(rand(-4,4),rand(16,22),rand(-4,4)),spin:new V3(rand(-1.5,1.5),rand(-1,1),rand(-1.5,1.5)),t:0})}
-function warDie(u,by,why){if(!u.alive)return;u.alive=false;const big=why==='ammunition detonated';explode(new V3(u.pos.x,u.pos.y+2,u.pos.z),big);
+function warDie(u,by,why){if(!u.alive)return;u.alive=false;if(BT.on&&BT.ground&&!BT.over)BT.pts[u.team]=Math.max(0,BT.pts[u.team]-6);const big=why==='ammunition detonated';explode(new V3(u.pos.x,u.pos.y+2,u.pos.z),big);
   if(big)warPop(u);warWreck(u);
   if(by&&by.def)feed((by.team==='blue'?'Blue ':'Red ')+by.def.n+' destroyed '+u.def.n+(why?' ('+why+')':''),u.team==='red'?'kill':'loss');else if(why)feed(u.def.n+': '+why,u.team==='red'?'kill':'loss')}
 const warFlags=u=>{const m=u.mod,a=[];if(m.trk)a.push('TRK');if(m.eng)a.push('ENG');if(m.gun)a.push(m.gun>1?'GUN X':'GUN');if(m.tur)a.push('TUR');if(u.def.crew&&m.crew<u.def.crew)a.push('CREW '+m.crew+'/'+u.def.crew);if(m.fire)a.push('FIRE');return a.join(' ')};
@@ -5399,6 +5450,7 @@ function updateWar(dt){
   if(!WAR.on)return;
   if(state!=='play'){return}
   WAR.t+=dt;
+  {const R=quality==='LOW'?7000:quality==='MED'?12000:20000,cp=camera.position;for(const u of WAR.units){const dx=u.pos.x-cp.x,dz=u.pos.z-cp.z;u.obj.visible=dx*dx+dz*dz<R*R}}   // far vehicles are specks: skip their draw calls
   for(const x of WAR.debris){if(x.t>6)continue;x.t+=dt;x.vel.y-=9.81*dt;x.o.position.addScaledVector(x.vel,dt);x.o.rotation.x+=x.spin.x*dt;x.o.rotation.y+=x.spin.y*dt;x.o.rotation.z+=x.spin.z*dt;const gh=Math.max(groundH(x.o.position.x,x.o.position.z),0)+.8;if(x.o.position.y<gh){x.o.position.y=gh;x.t=7}}
   for(const u of WAR.units){
     if(!u.alive){if(u.burnT>0){u.burnT-=dt;u.dustT-=dt;if(u.dustT<=0){u.dustT=.35;puff(u.pos.x+rand(-1,1),u.pos.y+2.5,u.pos.z+rand(-1,1),rand(-1,1),rand(6,10),rand(-1,1),.14,.14,.14,.6,rand(5,9),rand(6,12),rand(3,5),-.3)}}continue}
@@ -5464,14 +5516,16 @@ function warCheck(dt){
 /* ---------------- air battle (Domination): two teams, three capture zones, points, and a lineup of jets to respawn into ----------------
    Hold more zones than the enemy and their points drain; every loss costs points too. When your jet is lost the battle keeps running:
    you spectate a team-mate and pick the next jet from your lineup. AI pilots fly to the zone they should take and fight what they meet. */
-const BT={on:false,over:false,pts:{blue:0,red:0},zones:[],lineup:[],used:{},pend:{blue:0,red:0},tm:{blue:0,red:0},wpT:0,diedT:0,specI:0,max:300};
+const BT={on:false,over:false,pts:{blue:0,red:0},zones:[],lineup:[],used:{},pend:{blue:0,red:0},tm:{blue:0,red:0},wpT:0,diedT:0,specI:0,max:300,sp:0};
+const btCost=id=>Math.max(2,Math.min(8,Math.round(2+(progBR(id)-1)*.5)));   // spawn points: stronger jets cost more
+const btAfford=id=>!BT.used[id]&&btCost(id)<=BT.sp;
 const BT_ZONES=[['A',0,14000],['B',-9000,25000],['C',9000,25000]], BT_R=4500, BT_AI={blue:3,red:4};
 function setupBattle(){
-  BT.on=true;BT.over=false;BT.pts.blue=BT.pts.red=BT.max;BT.pend.blue=BT.pend.red=0;BT.tm.blue=BT.tm.red=0;BT.wpT=0;BT.diedT=0;BT.specI=0;BT.used={};
+  BT.on=true;BT.over=false;BT.ground=false;BT.pts.blue=BT.pts.red=BT.max;BT.pend.blue=BT.pend.red=0;BT.tm.blue=BT.tm.red=0;BT.wpT=0;BT.diedT=0;BT.specI=0;BT.used={};BT.sp=20;
   BT.zones=BT_ZONES.map(([n,x,z])=>({n,x,z,prog:0,own:0}));
   const pool=banditPool().filter(id=>id!==AC.id&&unlocked(id));
-  BT.lineup=[AC.id];while(BT.lineup.length<3&&pool.length)BT.lineup.push(pool.splice(Math.random()*pool.length|0,1)[0]);
-  BT.used[AC.id]=true;
+  BT.lineup=[AC.id];while(BT.lineup.length<4&&pool.length)BT.lineup.push(pool.splice(Math.random()*pool.length|0,1)[0]);
+  BT.used[AC.id]=true;BT.sp=Math.max(0,BT.sp-btCost(AC.id));
   P.pos.set(0,4000,-1500);
   for(let i=0;i<BT_AI.blue;i++)btSpawn('blue',i);
   for(let i=0;i<BT_AI.red;i++)btSpawn('red',i);
@@ -5487,10 +5541,12 @@ function btSpawn(team,i){
 // each AI jet flies to the nearest zone its side does not hold yet (or the contested one)
 function btAssign(){
   for(const team of ['blue','red']){
-    const own=team==='blue'?1:-1;
+    const own=team==='blue'?1:-1,load=new Map();
     for(const e of team==='blue'?friends:enemies){
       if(!e.alive||e.kind!=='fighter')continue;
-      let best=null,bd=1e9;for(const z of BT.zones){const d=Math.hypot(z.x-e.pos.x,z.z-e.pos.z)+(z.own===own?9000:0);if(d<bd){bd=d;best=z}}
+      // nearest zone the side does not hold yet; each jet already sent there makes it less attractive, so the flight spreads out
+      let best=null,bd=1e9;for(const z of BT.zones){const d=Math.hypot(z.x-e.pos.x,z.z-e.pos.z)+(z.own===own?9000:0)+(load.get(z)||0)*7000;if(d<bd){bd=d;best=z}}
+      if(best)load.set(best,(load.get(best)||0)+1);
       e.wp=best?new V3(best.x,Math.max(2500,Math.min(5500,e.pos.y)),best.z):null;
     }
   }
@@ -5502,12 +5558,12 @@ function btLoss(team,pts){   // a jet of this side was lost: points off and a re
 }
 function btStatus(){
   const z=BT.zones.map(q=>q.n+(q.own>0?'+':q.own<0?'-':'·')).join(' ');
-  return 'BLUE '+Math.round(BT.pts.blue)+' · RED '+Math.round(BT.pts.red)+'  ZONES '+z;
+  return 'BLUE '+Math.round(BT.pts.blue)+' · RED '+Math.round(BT.pts.red)+'  ZONES '+z+'  SP '+BT.sp;
 }
 function btDied(){   // called from die(): the battle goes on, the sortie does not end
   if(BT.over)return;
   BT.pts.blue=Math.max(0,BT.pts.blue-12);BT.diedT=clock;
-  const left=BT.lineup.filter(id=>!BT.used[id]);
+  const left=BT.lineup.filter(btAfford);
   deadT=left.length?1e9:2.2;
 }
 function btSpecTarget(){
@@ -5515,16 +5571,17 @@ function btSpecTarget(){
   const r=enemies.filter(e=>e.alive&&e.kind==='fighter');return r.length?r[BT.specI%r.length]:null;
 }
 function btTick(dt){
-  if(!BT.on||mission!=='BATTLE'||BT.over||(state!=='play'&&state!=='dead'))return;
+  if(!BT.on||!isBT()||BT.over||(state!=='play'&&state!=='dead'))return;
   const live=state==='play'&&P.alive;
   for(const z of BT.zones){
     let b=0,r=0;
     if(live&&Math.hypot(P.pos.x-z.x,P.pos.z-z.z)<BT_R)b++;
     for(const f of friends)if(f.alive&&f.kind==='fighter'&&Math.hypot(f.pos.x-z.x,f.pos.z-z.z)<BT_R)b++;
     for(const e of enemies)if(e.alive&&e.kind==='fighter'&&Math.hypot(e.pos.x-z.x,e.pos.z-z.z)<BT_R)r++;
+    if(BT.ground&&WAR.on)for(const u of WAR.units)if(u.alive&&Math.hypot(u.pos.x-z.x,u.pos.z-z.z)<BT_R){if(u.team==='blue')b++;else r++}
     z.prog=clamp(z.prog+clamp(b-r,-2,2)*.045*dt,-1,1);
     const o=z.prog>.6?1:z.prog<-.6?-1:Math.abs(z.prog)<.12?0:z.own;
-    if(o!==z.own){z.own=o;if(state==='play')message(o>0?'ZONE '+z.n+' CAPTURED':o<0?'ZONE '+z.n+' LOST':'ZONE '+z.n+' NEUTRAL',1.8);if(o>0)scEvent('ZONE '+z.n+' CAPTURED',60,'bonus')}
+    if(o!==z.own){z.own=o;if(state==='play'){message(o>0?'ZONE '+z.n+' CAPTURED':o<0?'ZONE '+z.n+' LOST':'ZONE '+z.n+' NEUTRAL',1.8);if(o)sndZone(o>0)}if(o>0){scEvent('ZONE '+z.n+' CAPTURED',60,'bonus');BT.sp+=3}}
   }
   const bz=BT.zones.filter(z=>z.own>0).length, rz=BT.zones.filter(z=>z.own<0).length;
   BT.pts.red=Math.max(0,BT.pts.red-bz*.6*dt);BT.pts.blue=Math.max(0,BT.pts.blue-rz*.6*dt);
@@ -5542,25 +5599,25 @@ function btTick(dt){
 const btPick=document.createElement('div');btPick.id='btPick';btPick.hidden=true;document.body.appendChild(btPick);
 function hideBtPick(){btPick.hidden=true;btPick.dataset.k=''}
 function showBtPick(){
-  const left=BT.lineup.filter(id=>!BT.used[id]),key=left.join(',')+'|'+BT.over;
+  const key=BT.lineup.filter(btAfford).join(',')+'|'+BT.sp+'|'+BT.over;
   if(!btPick.hidden&&btPick.dataset.k===key)return;
   btPick.dataset.k=key;btPick.hidden=false;btPick.innerHTML='';
-  const h=document.createElement('p');h.className='eyebrow';h.textContent='Shot down · '+btStatus();btPick.appendChild(h);
+  const h=document.createElement('p');h.className='eyebrow';h.textContent='Shot down · '+btStatus()+' · spawn points are earned by kills and zone captures';btPick.appendChild(h);
   const row=document.createElement('div');row.className='btRow';btPick.appendChild(row);
   for(const id of BT.lineup){
     const b=document.createElement('button');b.type='button';b.className='ghost';const u=BT.used[id];
-    b.textContent=(u?'✕ ':'')+AC_DEFS[id].name+(NODES[id]?' · BR '+progBR(id).toFixed(1):'');b.disabled=!!u;
+    b.textContent=(u?'✕ ':'')+AC_DEFS[id].name+' · '+btCost(id)+' SP';b.disabled=!btAfford(id);
     b.addEventListener('click',()=>btRespawn(id));row.appendChild(b)}
   const n=document.createElement('button');n.type='button';n.className='ghost';n.textContent='Spectate next';n.addEventListener('click',()=>{BT.specI++});btPick.appendChild(n);
 }
 function btRespawn(id){
-  if(state!=='dead'||P.alive||BT.over||BT.used[id])return;
-  BT.used[id]=true;hideBtPick();
+  if(state!=='dead'||P.alive||BT.over||!btAfford(id))return;
+  BT.used[id]=true;BT.sp-=btCost(id);hideBtPick();
   AC=AC_DEFS[id];applyAC();
   resetPlayer();resetRadar();resetCM();
   P.pos.set(rand(-2500,2500),4000,-1500);P.alive=true;missionDone=false;lockTarget=null;lockT=0;hurtT=0;shake=0;
   playerJet.visible=true;playerJet.quaternion.identity();state='play';$('ctrls').hidden=false;camSnap=true;BT.diedT=0;
-  message('RESPAWNED · '+AC.name.toUpperCase(),2.2);
+  message('RESPAWNED · '+AC.name.toUpperCase(),2.2);sndSpawn();
 }
 
 /* ---------------- progression (War Thunder style): research points, silver lions, tech trees, modules, crew ----------------
@@ -6013,7 +6070,7 @@ const nm=d=>(d/1852).toFixed(d<18520?1:0);
 // tall phone screens lift the left/right tapes so the countermeasure column fits under them
 const tapeY=()=>W<H?H*.34:H*.42;
 function missionStatus(){
-  if(mission==='BATTLE'&&BT.on)return btStatus();
+  if(BT.on&&isBT())return btStatus();
   if(mission==='TRAINING')return 'TRAINING · '+LESSONS[lesson].toUpperCase();
   if(mission==='ONLINE')return NET.room?('ONLINE · '+(NET.count)+' PILOT'+(NET.count===1?'':'S')+' · '+NET.code.toUpperCase()):'ONLINE · OFFLINE';
   if(sortie)return sortieStatus();
@@ -6433,7 +6490,7 @@ function frame(now){
     for(const f of friends)if(f.kind==='fighter')jetFX(f,f.type,false);
     if(state==='play'||state==='dead'){dmgFX(P,AC.id,true);for(const e of enemies)dmgFX(e,e.type,false);for(const f of friends)dmgFX(f,f.type,false)}
     updateParticles(dt); updateRings(dt);
-    animJet(playerJet.children[0],P,dt,true); if(outside&&VIEWS[view]==='COCKPIT')animJet(outside,P,dt,true); animGear(dt); updateWrecks(dt);
+    animJet(playerJet.children[0],P,dt,true); if(outside&&VIEWS[view]==='COCKPIT')animJet(outside,P,dt,true); animGear(dt); updateWrecks(dt); updateDebris(dt);
     for(const L of [enemies,friends])for(const j of L)if(j.alive&&j.kind==='fighter'){const d=j.pos.distanceTo(camera.position);lodJet(j.obj,d);if(d<3500)animJet(j.obj,j,dt,false)}
   }
   HAZE_MAT.uniforms.t.value=clock; HAZE_MAT.uniforms.k.value=QUALS[quality].fx?1:0;
@@ -6571,7 +6628,7 @@ const _careerAward=careerAward;
 careerAward=function(){lbAdd();return _careerAward.apply(this,arguments)};
 
 /* ---------- test hook (only with ?test in the URL) ---------- */
-if(/[?&]test\b/.test(location.search))window.__vs={KB,kbRebuild,playerGunHit,wingHit,BT,die,btRespawn,TMAP,mapStep,KBM,SC,damageSystem,hitAI,killEnemy,setThr,HEAT,explode,puff,camera,LT,townLights,flashLt,P,fly,dlz,flyout,AC_DEFS,feed,WAR,WAR_V,warBuild,warSpawn,warModules,warDie,warFlags,updateWar,warAlive,buildJet,PLAYER_COLORS,M2,V3,atm,clamp,lbAdd,showOverlay:k=>showOverlay(k),setScore:(n,k)=>{score=n;kills=k},get state(){return state},get enemies(){return enemies},missiles:()=>missiles.filter(m=>m.on),setAC:id=>{AC=AC_DEFS[id];applyAC()},wt:{   // weapon-test hooks: a clean sky, one drone, scripted launches
+if(/[?&]test\b/.test(location.search))window.__vs={scene,rinfoReset:()=>{renderer.info.autoReset=false;renderer.info.reset()},rinfo:()=>({c:renderer.info.render.calls,t:renderer.info.render.triangles,g:renderer.info.memory.geometries,tx:renderer.info.memory.textures}),KB,kbRebuild,playerGunHit,wingHit,BT,die,btRespawn,TMAP,mapStep,KBM,SC,damageSystem,hitAI,killEnemy,setThr,HEAT,explode,puff,camera,LT,townLights,flashLt,P,fly,dlz,flyout,AC_DEFS,feed,WAR,WAR_V,warBuild,warSpawn,warModules,warDie,warFlags,updateWar,warAlive,buildJet,PLAYER_COLORS,M2,V3,atm,clamp,lbAdd,showOverlay:k=>showOverlay(k),setScore:(n,k)=>{score=n;kills=k},get state(){return state},get enemies(){return enemies},missiles:()=>missiles.filter(m=>m.on),setAC:id=>{AC=AC_DEFS[id];applyAC()},wt:{   // weapon-test hooks: a clean sky, one drone, scripted launches
   begin:id=>{AC=AC_DEFS[id];applyAC();startGame();return AC.id},
   clear:()=>{waveClearT=1e9;for(const e of enemies){e.alive=false;scene.remove(e.obj)}enemies.length=0;P.pos.set(0,6000,0);P.vel.set(0,0,250);throttle=.7;return state},
   target:(type,dz,away,speed)=>{const e=spawnFighter('red',type,new V3(0,P.pos.y,dz),new V3(0,P.pos.y,dz+(away?9999:-9999)),{ir:0,rdr:0,speed:speed||220});e.drone=true;return e.id},
@@ -6849,6 +6906,7 @@ const MIS_ART={
   ESCORT:['#2d5c3a','#0e2416','<path d="M48 10l8 22 22 10-22-2-8 12-8-12-22 2 22-10z"/><circle cx="14" cy="14" r="2" fill="'+RED+'" stroke="none"/><circle cx="84" cy="16" r="2" fill="'+RED+'" stroke="none"/>'],
   '2V4':['#3a3a5c','#14142a','<circle cx="22" cy="24" r="3.5" fill="'+GRN+'"/><circle cx="22" cy="38" r="3.5" fill="'+GRN+'"/><circle cx="66" cy="18" r="3.5" fill="'+RED+'" stroke="'+RED+'"/><circle cx="78" cy="30" r="3.5" fill="'+RED+'" stroke="'+RED+'"/><circle cx="66" cy="38" r="3.5" fill="'+RED+'" stroke="'+RED+'"/><circle cx="82" cy="46" r="3.5" fill="'+RED+'" stroke="'+RED+'"/>'],
   '4SHIP':['#2d5c5c','#0e2424','<path d="M48 12l6 12h-12zM30 28l6 12h-12zM66 28l6 12h-12zM48 40l6 12h-12z"/>'],
+  COMBINED:['#4a4a2d','#1c1c0e','<circle cx="48" cy="14" r="6"/><path d="M10 46h76"/><rect x="16" y="36" width="16" height="8"/><rect x="62" y="36" width="16" height="8"/><path d="M32 38h8M62 38h-8M48 20v8" stroke-dasharray="2 3"/>'],
   BATTLE:['#2d4c6a','#0e1c2c','<circle cx="48" cy="14" r="6"/><circle cx="24" cy="40" r="6"/><circle cx="72" cy="40" r="6"/><path d="M48 20v8M30 36l14-10M66 36L52 26" stroke-dasharray="2 3"/>'],
   GROUNDWAR:['#5a4e2d','#241f10','<path d="M6 46h84"/><rect x="10" y="34" width="16" height="8"/><path d="M26 36h12"/><rect x="58" y="34" width="16" height="8"/><path d="M58 36h-12"/><path d="M40 22l8 8M48 22l-8 8"/>'],
   CONVOY:['#5c5a2d','#242310','<path d="M8 44h80"/><rect x="12" y="34" width="14" height="9"/><rect x="34" y="34" width="14" height="9"/><rect x="56" y="34" width="14" height="9"/><path d="M76 40l8-4v8z"/>'],
@@ -6862,14 +6920,14 @@ const MAP_ART={
   DESERT:['#c9a566','#8a6a3a','<path d="M0 44q18-14 36-2t36-4 24 4" stroke="#f3dfb0"/><path d="M0 52q22-10 44-2t52-2" stroke="#6b4e24"/><circle cx="74" cy="14" r="6" stroke="#fff3c4"/>'],
   ALPINE:['#9fb4c6','#51647a','<path d="M4 50l20-30 12 16 12-22 16 26 8-10 20 20z" fill="#eef3f7" stroke="#cfd9e3"/>'],
   OCEAN:['#2a6a9a','#0f2f4c','<path d="M0 22q12-6 24 0t24 0t24 0t24 0M0 36q12-6 24 0t24 0t24 0t24 0M0 50q12-6 24 0t24 0t24 0t24 0" stroke="#9fd4ff"/>']};
-const MIS_DESC={BATTLE:'Team battle: capture three zones, drain the enemy points, respawn from a lineup of jets.',WAVES:'Endless bandit groups. Survive and rack up score.',STRIKE:'Take out the SAM and AAA site, then fly home.',INTERCEPT:'Four bombers inbound. Stop them before the release point.',
+const MIS_DESC={COMBINED:'Air and armour fight over the same zones; your tanks hold the front, you win the sky.',BATTLE:'Team battle: capture three zones, drain the enemy points, respawn from a lineup of jets.',WAVES:'Endless bandit groups. Survive and rack up score.',STRIKE:'Take out the SAM and AAA site, then fly home.',INTERCEPT:'Four bombers inbound. Stop them before the release point.',
   RUSH:'Bandit rush: 8 kills in 5 minutes.',ESCORT:'Protect a C-130 across the sector.','2V4':'You and your wingman against four bandits.','4SHIP':'Lead a four-ship against six, with a SAM belt.',
   GROUNDWAR:'Blue and red armour fight each other. Back the blue side from the air and destroy the red force.',CONVOY:'Stop at least 4 of 5 trucks before they escape.',ANTISHIP:'Sink the frigate NE of the base. It has SAMs.',CRUISE:'Cruise missiles inbound on the base. Shoot them down.',
   CAMPAIGN:'A moving front line. Losses stay lost.',ONLINE:'Dogfight other pilots in a shared room.',TRAINING:'Guided lessons: dogfighting, missile defence, landing, refuelling.'};
 const MAP_DESC={ISLANDS:'Green islands and sheltered bays.',DESERT:'Dry canyons and low valleys.',ALPINE:'Snowy peaks under heavy cloud.',OCEAN:'Open sea. Nothing to hide behind.'};
 const MAP_NAME=k=>({ISLANDS:'Islands',DESERT:'Desert canyons',ALPINE:'Snowy alps',OCEAN:'Open ocean'})[k]||k;
 const LES_DESC={BFM:'Basic fighter manoeuvres and gun shots',DEFENSE:'Defeat three inbound missiles',BVR:'Long-range radar missile shot',LANDING:'Land on the runway',REFUEL:'Take fuel from the tanker'};
-const MIS_BRIEF={BATTLE:'Two teams of four. Hold more of the three zones than the enemy and their points run down; every loss costs points too. When you are shot down you spectate a team-mate and pick the next jet from your lineup. First side to zero loses.',WAVES:'Bandit groups arrive in waves from every bearing. Each wave is bigger and meaner than the last. Stay alive, keep your energy up and push the score.',
+const MIS_BRIEF={COMBINED:'Combined arms: a tank battle rages around zone A while two more zones are contested in the air. Armour kills and zone control drain the enemy points; bomb the red vehicles, hold the sky and respawn from your lineup.',BATTLE:'Two teams of four. Hold more of the three zones than the enemy and their points run down; every loss costs points too. When you are shot down you spectate a team-mate and pick the next jet from your lineup. First side to zero loses.',WAVES:'Bandit groups arrive in waves from every bearing. Each wave is bigger and meaner than the last. Stay alive, keep your energy up and push the score.',
   STRIKE:'A SAM and AAA site covers the approach to the target. Suppress it, destroy the objective, then bring the jet home.',
   INTERCEPT:'Four bombers are inbound on the base. Kill them before they reach the release point; escorts will try to stop you.',
   RUSH:'Eight bandits, five minutes. Nothing to protect and nowhere to hide. Kill fast, keep the speed up.',

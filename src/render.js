@@ -4,7 +4,7 @@ const QUALS={LOW:{dpr:1,seg:110,clouds:16,fx:0,trees:0},MED:{dpr:1.25,seg:150,cl
 let quality='MED'; try{const q=localStorage.getItem('viperQuality');if(QUALS[q])quality=q}catch(e){}
 let DPR=Math.min(window.devicePixelRatio||1,QUALS[quality].dpr);
 const renderer=new THREE.WebGLRenderer({canvas:glCanvas,antialias:true,powerPreference:'high-performance'});
-renderer.setPixelRatio(DPR); renderer.autoClear=false;
+renderer.setPixelRatio(DPR); renderer.autoClear=false; renderer.localClippingEnabled=true;
 // keep the r128 look on newer three.js: linear output, no colour management, legacy light units
 if(THREE.ColorManagement)THREE.ColorManagement.enabled=false; if('outputColorSpace' in renderer)renderer.outputColorSpace=THREE.LinearSRGBColorSpace; if('useLegacyLights' in renderer)renderer.useLegacyLights=true;
 // r165+ removed legacy lights: light intensities are pi times lower, so scale ours back up to keep the same look (LK is 1 on older builds)
@@ -251,7 +251,34 @@ const NAVM=[new THREE.MeshBasicMaterial({color:0xff2a2a}),new THREE.MeshBasicMat
 function withNav(root,type){const D=AC_DEFS[type];if(D&&D.fx&&D.fx.nav){const [sp,tl,tp]=D.fx.nav;[[sp,0,D.fx.navZ!=null?D.fx.navZ:-3.5,0],[-sp,0,D.fx.navZ!=null?D.fx.navZ:-3.5,1],[0,tp,tl,2]].forEach(([x,y,z,i])=>{const m=new THREE.Mesh(NAVG,NAVM[i]);m.position.set(x,y,z);m.name='nav';root.children[0].add(m)});return root}
   const f=type.startsWith('F16'), span=type.startsWith('MIG')||type.startsWith('SU')?5.7:type.startsWith('GRIPEN')?4.3:6.7,tail=type.startsWith('MIG')||type.startsWith('SU')?-8.6:type.startsWith('GRIPEN')?-6:-7.4;   // F-16 model is built in 0.75-scale units
   [[span,0,f?-2.2:-1.5,0],[-span,0,f?-2.2:-1.5,1],[0,f?3.6:2.6,tail,2]].forEach(([x,y,z,i])=>{const m=new THREE.Mesh(NAVG,NAVM[i]);m.position.set(x,y,z);m.name='nav';root.children[0].add(m)});return root}
-function buildJet(c,type){type=type||'F16';const r=withNav(buildJetBase(c,type),type);
+/* draw-call diet: unnamed static meshes that share a material inside one group (fuselage panels, strips, missile parts) become one mesh. Named parts
+   (control surfaces, gear, canopy, nozzles, flame, wingM, decals...) stay separate so animation, damage and level of detail still find them. */
+const MERGE_SKIP=new Set(['cs','gear','flame','nozG','canopyG','pilot']);
+function mergeGeos(ms){
+  const names=Object.keys(ms[0].geometry.attributes);let nv=0,ni=0;
+  for(const m of ms){const a=m.geometry.attributes.position.count;nv+=a;ni+=m.geometry.index?m.geometry.index.count:a}
+  const out={};for(const n of names)out[n]=new Float32Array(nv*ms[0].geometry.attributes[n].itemSize);
+  const idx=new Uint32Array(ni);let vo=0,io=0;
+  for(const m of ms){const g=m.geometry.clone();m.updateMatrix();g.applyMatrix4(m.matrix);const c=g.attributes.position.count;
+    for(const n of names)out[n].set(g.attributes[n].array,vo*g.attributes[n].itemSize);
+    if(g.index){for(let i=0;i<g.index.count;i++)idx[io+i]=g.index.array[i]+vo;io+=g.index.count}else{for(let i=0;i<c;i++)idx[io+i]=vo+i;io+=c}
+    vo+=c;g.dispose()}
+  const geo=new THREE.BufferGeometry();for(const n of names)geo.setAttribute(n,new THREE.BufferAttribute(out[n],ms[0].geometry.attributes[n].itemSize));
+  geo.setIndex(new THREE.BufferAttribute(idx,1));geo.computeBoundingSphere();geo.computeBoundingBox();return geo}
+function mergeStatic(root){
+  const groups=[];root.traverse(o=>{if(o.isGroup)groups.push(o)});
+  for(const g of groups){
+    let q=g,skip=false;while(q){if(MERGE_SKIP.has(q.name)){skip=true;break}q=q.parent}
+    if(skip)continue;
+    const by=new Map();
+    for(const m of g.children){
+      if(!m.isMesh||m.name||!m.geometry||!m.material||m.children.length||Array.isArray(m.material))continue;
+      const a=Object.keys(m.geometry.attributes);if(a.some(k=>k!=='position'&&k!=='normal'&&k!=='uv'))continue;
+      const key=m.material.uuid+'|'+a.join(',');let l=by.get(key);if(!l)by.set(key,l=[]);l.push(m)}
+    for(const l of by.values()){if(l.length<2)continue;const nm=new THREE.Mesh(mergeGeos(l),l[0].material);nm.castShadow=l[0].castShadow;nm.receiveShadow=l[0].receiveShadow;g.add(nm);for(const m of l)g.remove(m)}
+  }
+}
+function buildJet(c,type){type=type||'F16';const r=withNav(buildJetBase(c,type),type);mergeStatic(r);
   r.traverse(o=>{const m=o.material;if(m&&m.isMeshStandardMaterial&&!m.__ibl){m.__ibl=true;m.envMapIntensity=.75;if(m.roughness>.55){m.roughness=.48;m.metalness=Math.max(m.metalness,.22)}}});
   return dressFlames(r)}
 // per-aircraft size correction [across, up, along] so the lofted shapes match the real length and span; filled in the roster slice
@@ -650,7 +677,7 @@ function buildLoftJet(c,S,type){
   ws.forEach(o=>{o.kind=o===main?'main':o.span/o.ch<.5?'fix':o.r.zle<main.r.zte?'stab':'can'});
   const hasStab=ws.some(o=>o.kind==='stab');
   for(const o of ws){const mat=o.w.dark?dark:body;
-    if(o.kind==='main'||o.kind==='fix'){add(wingGeo(o.w.st),mat);
+    if(o.kind==='main'||o.kind==='fix'){const wm=add(wingGeo(o.w.st),mat);if(o.kind==='main')wm.name='wingM';
       if(o.kind==='main')for(const s of [1,-1]){
         if(hasStab){segStrips(o.w.st,.52,.94,.24,s,mat,'ail');segStrips(o.w.st,.1,.5,.26,s,mat,'flap')}
         else{segStrips(o.w.st,.12,.5,.2,s,mat,'elv');segStrips(o.w.st,.52,.95,.2,s,mat,'elv')}}}

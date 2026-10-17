@@ -64,6 +64,9 @@ Settings > Controls > Input (`vsKbm`, `KBM` in state.js): the mouse is a relativ
 ## Air battle
 `src/battle.js` (slice after groundwar): the `BATTLE` mission (Air domination). `BT` holds points, three capture zones (`BT_ZONES`, radius `BT_R`), the lineup and respawn state; `btTick` (from the main loop, runs while dead too) captures zones, drains points, spawns replacements and ends the battle through `endMission`. AI jets get `e.wp` (the zone to fly to) which `updateAI` follows when they have no target. `die()` calls `btDied` (the sortie continues, `deadT` is held open), the `#btPick` panel lists the lineup, `btRespawn` swaps `AC` via `applyAC` + `resetPlayer`, and `updateCamera` spectates a team-mate meanwhile. The tactical map draws the zones. `tools/battle-test.js` covers it.
 
+## Performance notes
+`mergeStatic` (render.js, called from `buildJet`) merges unnamed static meshes that share a material into one mesh per group, cutting a jet from about 70 draw calls to about 25; named parts (`cs`, `gear`, `canopyG`, `nozG`, `flame`, `wingM`, decals) are never merged. Far ground-war vehicles are hidden beyond 7 / 12 / 20 km (Low / Medium / High). Bloom is off on Medium by default. `__vs.rinfoReset()` / `__vs.rinfo()` read draw calls and triangles (see the perf snippets in the transcript: reset, wait N frames, divide).
+
 ## Windows exe
 The `exe` job in `android.yml` (runs after the `apk` job, so the same dispatch and version number publish both) packs `www/` (from `tools/make-www.js`, plus `fonts/`) with Electron (`desktop/main.js`, electron-builder portable) into a single `viper-sortie.exe` and attaches it to the same release. F11 / Alt+Enter toggles full screen; Shift+Esc leaves it. Unsigned, so Windows SmartScreen shows a warning on first run. The sandbox cannot build it; only Actions can.
 
