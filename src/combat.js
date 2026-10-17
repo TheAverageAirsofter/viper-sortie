@@ -262,7 +262,7 @@ function updateWeapons(dt){
     else launch('120',rt)}
 
   // gun: real rate of fire for the selected jet
-  if(gunHeld&&P.rounds>0&&state==='play'){
+  if(gunHeld&&P.rounds>0&&state==='play'&&!(P.sys&&P.sys.gun)){
     gunAcc+=dt*AC.gunRate; gunSndT-=dt; if(gunSndT<=0){sndGun();gunSndT=.05;buzz(12)}
     while(gunAcc>=1&&P.rounds>0){gunAcc--;P.rounds--;gunShots++;
       _d.copy(P.fwd);_d.x+=rand(-.004,.004);_d.y+=rand(-.004,.004);_d.z+=rand(-.004,.004);_d.normalize();
@@ -273,7 +273,7 @@ function updateWeapons(dt){
     if(P.rounds===0)message('WINCHESTER · GUN EMPTY',1.4);
   } else gunAcc=0;
   for(const b of pBullets){ if(!b.on)continue;
-    if(ground.length)for(const g of ground)if(g.alive&&distSeg(_s1.copy(g.pos).setY(g.pos.y+2),b.prev,b.m.position)<9){kill(b);gunHits++;g.hp-=AC.gunDmg;puff(b.m.position.x,b.m.position.y,b.m.position.z,0,0,0,1,.8,.3,1,5,16,.25);if(g.hp<=0)killGround(g);break}
+    if(ground.length)for(const g of ground)if(g.alive&&distSeg(_s1.copy(g.pos).setY(g.pos.y+2),b.prev,b.m.position)<9){kill(b);gunHits++;g.hp-=AC.gunDmg;if(g.hp>0)scEvent('HIT',2,'','ghit');puff(b.m.position.x,b.m.position.y,b.m.position.z,0,0,0,1,.8,.3,1,5,16,.25);if(g.hp<=0)killGround(g);break}
     if(!b.on)continue;
     b.life-=dt; if(b.life<=0){kill(b);continue}
     b.prev.copy(b.m.position); b.vel.y-=G*dt; b.vel.multiplyScalar(gunDrag(b.vel.length(),atm(b.m.position.y).sig,dt)); b.m.position.addScaledVector(b.vel,dt);

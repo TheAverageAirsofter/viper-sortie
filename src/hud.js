@@ -103,7 +103,11 @@ function drawHUD(){
   if(hurtT>0){const g=c.createRadialGradient(W/2,H/2,Math.min(W,H)*.3,W/2,H/2,Math.max(W,H)*.7);g.addColorStop(0,'rgba(255,40,30,0)');g.addColorStop(1,`rgba(255,40,30,${hurtT*1.2})`);c.fillStyle=g;c.fillRect(0,0,W,H)}
   if(state!=='play')return;
   c.lineWidth=1.5;c.strokeStyle=HUD;c.textBaseline='middle';
+  if(SC.list.length){let y=H*(W<H?.5:.6);const cols={kill:'#ff8a5c',crit:'#ffd24a',bonus:'#8ee0ff'};c.save();c.textBaseline='middle';
+    for(const e of SC.list){const age=clock-e.t;if(age>4.5)continue;c.globalAlpha=Math.min(1,(4.5-age)*1.1);txt(c,e.text+(e.pts?'   +'+e.pts:''),W/2,y,'center',cols[e.col]||HUD,e.col==='kill'?15:12,e.col==='kill'?700:500);y+=e.col==='kill'?20:16}
+    c.restore();while(SC.list.length&&clock-SC.list[0].t>4.5)SC.list.shift()}
   const cp=camera.position, vName=VIEWS[view], sight=vName==='CHASE'||vName==='COCKPIT';
+  if(KBM.on&&KBM.aim&&sight){const ap=proj(_c.copy(cp).addScaledVector(KBM.ad,3000));if(ap.ok){c.save();c.strokeStyle='#ffd24a';c.shadowColor='rgba(255,210,74,.6)';c.shadowBlur=5;c.beginPath();c.arc(ap.x,ap.y,13,0,6.283);c.moveTo(ap.x-20,ap.y);c.lineTo(ap.x-13,ap.y);c.moveTo(ap.x+13,ap.y);c.lineTo(ap.x+20,ap.y);c.moveTo(ap.x,ap.y-20);c.lineTo(ap.x,ap.y-13);c.moveTo(ap.x,ap.y+13);c.lineTo(ap.x,ap.y+20);c.stroke();c.restore()}}
   const pit=vName==='COCKPIT', hr_=pit?combinerRect():null;
   if(sight&&(!pit||hr_)){
   if(hr_){c.save();c.beginPath();c.rect(hr_.x0,hr_.y0,hr_.x1-hr_.x0,hr_.y1-hr_.y0);c.clip();c.shadowColor='rgba(125,255,154,.6)';c.shadowBlur=4}
@@ -295,7 +299,7 @@ function drawHUD(){
   // fuel + damage readouts
   if(!pit){txt(c,'FUEL '+fuelStr(P.fuel||0),INS.l+16,tapeY()+78,'left',P.bingo?WARN:HUDD,11,700)}
   {const sy=P.sys,w=[];if(sy){sy.eng.forEach((v,i)=>{if(v===1)w.push(ENG_NAME(i)+'ENG FIRE');if(v===2)w.push(ENG_NAME(i)+'ENG OUT')});
-    if(sy.hyd)w.push('HYD');if(sy.radar)w.push('RDR FAIL');if(sy.leak)w.push('FUEL LEAK')}
+    if(sy.hyd)w.push('HYD');if(sy.radar)w.push('RDR FAIL');if(sy.leak)w.push('FUEL LEAK');if(sy.wL)w.push(sy.wL>=1?'L WING OFF':'L WING');if(sy.wR)w.push(sy.wR>=1?'R WING OFF':'R WING');if(sy.ctl<1)w.push('ELEV');if(sy.gun)w.push('GUN JAM');if(sy.pilot)w.push('WOUNDED')}
     if(P.flamedOut)w.push('FLAMEOUT'); else if(P.lowFuel)w.push('FUEL LOW'); else if(P.bingo)w.push('BINGO');
     if(w.length)txt(c,w.join(' · '),W/2,H*.74,'center',(clock*2%1)<.7?WARN:'rgba(255,179,71,.5)',12,700)}
   // warnings

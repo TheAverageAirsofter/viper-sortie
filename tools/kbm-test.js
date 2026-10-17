@@ -15,5 +15,10 @@ const assert = require('assert'), path = require('path');
   await p.evaluate(() => { __vs.KBM.x = .6; }); await p.waitForTimeout(1500);
   const x = await p.evaluate(() => __vs.KBM.x);
   assert(x < .6, 'virtual stick drifts home: ' + x);
+  // mouse aim: park the cursor 50 degrees to the left and 8 up of the nose; the flight computer should bring the nose round
+  const h0 = await p.evaluate(() => { const K = __vs.KBM, f = __vs.P.fwd; K.aim = true; K.last = performance.now(); K.az = Math.atan2(f.x, f.z) + .87; K.el = Math.asin(f.y) + .14; return Math.atan2(f.x, f.z); });
+  await p.waitForTimeout(6000);
+  const off = await p.evaluate(() => { const K = __vs.KBM; return __vs.P.fwd.angleTo(K.ad) });
+  assert(off < .5, 'nose comes round to the cursor, off by ' + off.toFixed(2) + ' rad');
   assert.deepEqual(errs, []); console.log('kbm ok'); await b.close();
 })().catch(e => { console.error(e); process.exit(1); });

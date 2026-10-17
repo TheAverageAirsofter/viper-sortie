@@ -53,7 +53,10 @@ Headless Chromium is at /opt/pw-browsers/chromium in the cloud sandbox (tools/la
 `.github/workflows/android.yml` builds the APK with Capacitor (debug-signed). Manual run or a `v*` tag publishes a GitHub Release. Release signing and the Play Store .aab need the four ANDROID_* secrets described in that file. The sandbox cannot build the APK (no Google Maven access); only GitHub Actions can.
 
 ## Keyboard + mouse
-Settings > Controls > Input (`vsKbm`, `KBM` in state.js): the mouse is a relative virtual stick (click captures the pointer, Esc releases and pauses), LMB gun, RMB AIM-9, MMB AIM-120, wheel / W,S throttle, A/D rudder. `tools/kbm-test.js` covers it.
+Settings > Controls > Input (`vsKbm`, `KBM` in state.js): the mouse is a relative virtual stick (click captures the pointer, Esc releases and pauses), LMB gun, RMB AIM-9, MMB AIM-120, wheel / W,S throttle, A/D rudder. Mouse aim (`KBM.aim`, default): the cursor is a world direction (`KBM.az/el/ad`) and `updatePlayer` rolls and pulls the nose onto it; the other option deflects the stick directly. `tools/kbm-test.js` covers it.
+
+## Scoring and damage
+`scEvent` / `scKill` (state.js) feed the War Thunder style score lines (`SC.list`, drawn in hud.js): hits coalesce, kills chain into double/triple kill bonuses, assists. Player damage (`damageSystem`, `updateSystems`): engine fire, hydraulics, radar, fuel leak, wings (`P.sys.wL/wR`: lower G limit, roll drift, smoke, can tear off under load), elevator, jammed guns, wounded pilot. `tools/score-test.js` and `tools/damage-test.js` cover them.
 
 ## Windows exe
 The `exe` job in `android.yml` (runs after the `apk` job, so the same dispatch and version number publish both) packs `www/` (from `tools/make-www.js`, plus `fonts/`) with Electron (`desktop/main.js`, electron-builder portable) into a single `viper-sortie.exe` and attaches it to the same release. F11 / Alt+Enter toggles full screen; Shift+Esc leaves it. Unsigned, so Windows SmartScreen shows a warning on first run. The sandbox cannot build it; only Actions can.

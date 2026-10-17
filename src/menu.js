@@ -119,7 +119,7 @@ const qr=$('qRows');
     mRow('Team',()=>[{v:'A',t:'Auto'},{v:'B',t:'Blue'},{v:'R',t:'Red'}],()=>NET.teamPref,v=>drive($('bTeam'),()=>NET.teamPref,v,3),{hidden:()=>NET.mode!=='TEAMS'}))}
 
 /* ---- SETTINGS: tabs, rows and a description area ---- */
-const SDESC={'Input':'Keyboard + mouse: the mouse flies (click to capture, Esc to release), left button guns, right button AIM-9, middle button AIM-120, wheel or W/S throttle, A/D rudder.','Stick':'Fly with the on-screen stick, or tilt the phone.','Pull back':'Whether pulling the stick back raises the nose (flight-sim) or lowers it.','Sensitivity':'How far the jet turns for a given stick movement.','Dead zone':'Ignore small stick movements near the centre.',
+const SDESC={'Mouse':'Aim: the cursor is a point in the world and the flight computer rolls and pulls onto it. Stick: the mouse deflects the stick directly.','Input':'Keyboard + mouse: the mouse flies (click to capture, Esc to release), left button guns, right button AIM-9, middle button AIM-120, wheel or W/S throttle, A/D rudder.','Stick':'Fly with the on-screen stick, or tilt the phone.','Pull back':'Whether pulling the stick back raises the nose (flight-sim) or lowers it.','Sensitivity':'How far the jet turns for a given stick movement.','Dead zone':'Ignore small stick movements near the centre.',
   'Vibration':'Haptic feedback for guns, hits and warnings.','Move buttons':'Drag the on-screen buttons where you want them, then save.','Controls guide':'Launch a sortie and show the controls guide on top.',
   'Graphics':'Lower this if the frame rate drops. Auto-adjusts when the game is struggling.','Cinematic menu':'Film grain, letterbox bars, light flare and the slow camera drift behind the menu.','Kill cam':'A short replay when you shoot something down.',
   'Sound':'All game sound.','Voice warnings':'Spoken cockpit warnings: pull up, missile, bingo fuel.','UI sounds':'Quiet clicks as you move through the menu.',
@@ -132,6 +132,7 @@ let sTab='ctl';
     const c=mk('div','col');c.dataset.tab=k;pane[k]=c;sr.appendChild(c)}
   pane.ctl.append(
     mRow('Input',()=>[{v:'touch',t:'Touch / pad'},{v:'kbm',t:'Keyboard + mouse'}],()=>KBM.on?'kbm':'touch',v=>kbmSet(v==='kbm')),
+    mRow('Mouse',()=>[{v:'aim',t:'Aim (cursor)'},{v:'stick',t:'Stick'}],()=>KBM.aim?'aim':'stick',v=>kbmAim(v==='aim')),
     mRow('Stick',()=>[{v:'stick',t:'Touch stick'},{v:'tilt',t:'Tilt'}],()=>tilt.on?'tilt':'stick',v=>{if((v==='tilt')!==tilt.on)$('bTilt').click()}),
     mRow('Pull back',()=>[{v:'up',t:'Climbs'},{v:'dn',t:'Dives'}],()=>invert?'dn':'up',v=>{if((v==='dn')!==invert)$('bInvert').click()}),
     mSlide('Sensitivity',Object.keys(SENS).length,()=>Object.keys(SENS).indexOf(sens),i=>drive($('bSens'),()=>sens,Object.keys(SENS)[i],4),i=>Object.keys(SENS)[i]),

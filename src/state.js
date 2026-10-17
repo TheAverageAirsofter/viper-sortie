@@ -15,6 +15,19 @@ const srLive=document.getElementById('srLive');
 // kill feed (War Thunder style): short lines in the top-right corner that fade after a few seconds; kind picks the colour
 const FEED=[], FEED_LIFE=7;
 function feed(text,kind){FEED.push({t:clock,text,kind:kind||(/^You (killed|destroyed)/.test(text)?'kill':/^(Wingman|Your wingman|The C-130)/.test(text)?'loss':'info')});while(FEED.length>6)FEED.shift()}
+/* War Thunder style scoring events: lines fade over a few seconds under the sight; hits coalesce, kills chain into multi-kill bonuses */
+const SC={list:[],streak:0,lastKill:-99};
+function scEvent(text,pts,col,key){
+  if(pts)score+=pts;
+  const f=key&&SC.list.find(x=>x.key===key&&clock-x.t<1.6);
+  if(f){f.n++;f.pts+=pts;f.t=clock;f.text=text+' ×'+f.n}
+  else{SC.list.push({text,pts,col:col||'',key:key||'',n:1,t:clock});while(SC.list.length>5)SC.list.shift()}
+}
+function scKill(label,pts,assistOK){
+  const chain=clock-SC.lastKill<25?SC.streak+1:1;SC.streak=chain;SC.lastKill=clock;
+  scEvent(label,pts,'kill');
+  if(chain>1){const nm=['','','DOUBLE KILL','TRIPLE KILL','QUADRUPLE KILL'][chain]||'MULTI KILL ×'+chain;scEvent(nm,40*chain,'bonus')}
+}
 function message(t,dur){msgText=t;msgT=dur||1.6;if(srLive&&srLive.textContent!==t)srLive.textContent=t}   // mirrored to a screen-reader live region
 
 function rearm(){
@@ -65,7 +78,7 @@ function clearWorld(){
   enemies=[];friends=[];spawnQ=[];[...pBullets,...eBullets,...missiles,...eMissiles].forEach(kill);
 }
 let gunShots=0,gunHits=0;
-function startGame(){
+function startGame(){SC.list.length=0;SC.streak=0;SC.lastKill=-99;
   gunShots=0;gunHits=0;clearWorld(); resetPlayer(); resetRadar(); resetCM(); recReset(); rec3Reset(); P.alive=true;
   if(mission!=='ONLINE'){netStop();$('bSb').hidden=true;$('sbBox').hidden=true}
   trainHook=null;
@@ -256,6 +269,7 @@ function nextWave(){
 }
 function hitAI(t,amt,how,byPlayer){
   if(!t.alive)return;
+  if(byPlayer&&!t.remote){t.hitBy=clock;if(t.hp-amt>0&&t.hp-amt<=35&&t.hp>35)scEvent('CRITICAL DAMAGE',30,'crit');else if(how==='GUNS')scEvent('HIT',3,'','hit');else scEvent('DIRECT HIT',20,'crit','dh')}
   if(t.remote){if(byPlayer)netClaimHit(t,how==='GUNS'?4*amt:75,how);puff(t.pos.x,t.pos.y,t.pos.z,0,0,0,.3,.3,.3,.8,14,20,2);return} t.hp-=amt;
   if(t.hp>0){addHole(t.obj,amt>3?4:1);puff(t.pos.x,t.pos.y,t.pos.z,0,0,0,.3,.3,.3,.8,14,20,2);if(t.kind==='fighter'){t.gLim=Math.max(4,(t.gLim||7)*.8);t.rollK=(t.rollK??1)*.85}if(byPlayer&&t.kind==='bomber')message('BOMBER HIT',.8);if(byPlayer&&clock-(t.fdT||-9)>1.5){t.fdT=clock;feed((t.hp<=1?'Critical hit: ':'Hit: ')+(AC_DEFS[t.type]?AC_DEFS[t.type].name:t.kind==='bomber'?'bomber':'target')+' ('+how.replace(' (WINGMAN)','').toLowerCase()+')','hit')}return}
   if(t.team==='red')killEnemy(t,how,byPlayer); else killFriend(t,how);
@@ -265,7 +279,8 @@ function killEnemy(e,how,byPlayer=true){
   const nm=e.kind==='bomber'?'BOMBER':e.kind==='cruise'?'CRUISE MISSILE':'BANDIT';
   if(byPlayer)REC3.lastKill={t:clock,id:e.id};
   if(byPlayer)gciSplash();
-  if(byPlayer){kills++;score+=(e.kind==='bomber'?150:e.kind==='cruise'?120:100)*Math.max(1,wave)+(how==='GUNS'?50:0);message(e.kind==='cruise'?'CRUISE MISSILE DOWN':how==='GUNS'?'GUNS KILL':'SPLASH · '+how,1.4)}
+  if(!byPlayer&&e.hitBy&&clock-e.hitBy<12)scEvent('ASSIST',40,'bonus');
+  if(byPlayer){kills++;const kp=(e.kind==='bomber'?150:e.kind==='cruise'?120:100)*Math.max(1,wave)+(how==='GUNS'?50:0);score+=kp;scKill((e.kind==='bomber'?'BOMBER':e.kind==='cruise'?'CRUISE MISSILE':(AC_DEFS[e.type]?AC_DEFS[e.type].name.toUpperCase():'AIRCRAFT'))+' DESTROYED',0);SC.list[SC.list.length-1].pts=kp;message(e.kind==='cruise'?'CRUISE MISSILE DOWN':how==='GUNS'?'GUNS KILL':'SPLASH · '+how,1.4)}
   else message(nm+' DOWN · '+how,1.4);
   recEvent((byPlayer?'You killed ':'Wingman killed ')+(e.kind==='bomber'?'a bomber':e.kind==='cruise'?'a cruise missile':'a '+(AC_DEFS[e.type]?AC_DEFS[e.type].name:'bandit'))+' ('+how+')');
 }
@@ -338,13 +353,15 @@ const stick={id:null,ox:0,oy:0,x:0,y:0};
 const look={id:null,ox:0,oy:0,y0:0,p0:0,yaw:0,pitch:0};
 /* keyboard + mouse mode (Settings > Controls > Input): the mouse is a relative stick (click to capture it, Esc to release and pause),
    left button guns, right button short-range missile, middle button long-range missile, wheel or W/S throttle, A/D rudder */
-const KBM={on:false,x:0,y:0,idle:0};
-try{KBM.on=localStorage.getItem('vsKbm')==='1'}catch(e){}
+const _kv=new THREE.Vector3(),_kq=new THREE.Quaternion();
+const KBM={on:false,aim:true,x:0,y:0,idle:0,az:0,el:0,last:0,ad:new THREE.Vector3(0,0,1),ar:0,ap:0};
+try{KBM.on=localStorage.getItem('vsKbm')==='1';KBM.aim=localStorage.getItem('vsKbmAim')!=='0'}catch(e){}
+function kbmAim(v){KBM.aim=!!v;KBM.last=0;KBM.x=KBM.y=0;try{localStorage.setItem('vsKbmAim',v?'1':'0')}catch(e){}}
 function kbmSet(v){KBM.on=!!v;KBM.x=KBM.y=0;try{localStorage.setItem('vsKbm',v?'1':'0')}catch(e){}if(!v&&document.pointerLockElement)document.exitPointerLock()}
 const kbmLock=()=>{if(KBM.on&&document.pointerLockElement!==glCanvas)try{const r=glCanvas.requestPointerLock();if(r&&r.catch)r.catch(()=>{})}catch(e){}};
 glCanvas.addEventListener('contextmenu',e=>{if(KBM.on)e.preventDefault()});
 glCanvas.addEventListener('wheel',e=>{if(KBM.on&&state==='play'){e.preventDefault();setThr(thrSet-Math.sign(e.deltaY)*.05)}},{passive:false});
-document.addEventListener('mousemove',e=>{if(KBM.on&&state==='play'&&document.pointerLockElement===glCanvas){const k=.0032*(SENS[sens]||1);KBM.x=clamp(KBM.x+e.movementX*k,-1,1);KBM.y=clamp(KBM.y+e.movementY*k,-1,1);KBM.idle=0}});
+document.addEventListener('mousemove',e=>{if(KBM.on&&state==='play'&&document.pointerLockElement===glCanvas){const k=.0032*(SENS[sens]||1);if(KBM.aim){KBM.az-=e.movementX*k*1.1;KBM.el=clamp(KBM.el-e.movementY*k*1.1,-1.2,1.2);KBM.idle=0;return}KBM.x=clamp(KBM.x+e.movementX*k,-1,1);KBM.y=clamp(KBM.y+e.movementY*k,-1,1);KBM.idle=0}});
 document.addEventListener('pointerlockchange',()=>{if(KBM.on&&!document.pointerLockElement&&state==='play')pause()});
 const stickBase=$('stickBase'),stickKnob=$('stickKnob'),stickHint=$('stickHint');
 function resetStick(){stick.id=null;stick.x=0;stick.y=0;stickBase.hidden=true;stickKnob.style.transform=''}
@@ -587,17 +604,21 @@ const qTmp=new THREE.Quaternion();
 
 /* ---------------- fuel and system damage ---------------- */
 // fuel: thrust × specific fuel consumption; jet gets lighter as it burns. Starts at 75 % of internal.
-function resetSystems(){P.sys={eng:Array(AC.engines).fill(0),fireT:Array(AC.engines).fill(0),hyd:false,radar:false,leak:false};P.thrK=1;P.rollK=1;P.gLim=AC.gmax;P.bingo=false;P.lowFuel=false}
+function resetSystems(){P.sys={eng:Array(AC.engines).fill(0),fireT:Array(AC.engines).fill(0),hyd:false,radar:false,leak:false,wL:0,wR:0,ctl:1,gun:false,pilot:0,torn:0};P.thrK=1;P.rollK=1;P.gLim=AC.gmax;P.bingo=false;P.lowFuel=false}
 function refuel(){P.fuel=Math.max(P.fuel||0,.75*AC.fuelCap);resetSystems();P.bingo=false;P.lowFuel=false}
 const fuelStr=kg=>AC.fuelUnit==='LB'?Math.round(kg*2.2046/10)*10+' LB':Math.round(kg/10)*10+' KG';
 const ENG_NAME=i=>AC.engines>1?(i===0?'LEFT ':'RIGHT '):'';
 function damageSystem(n){
   n*=PRESETS[preset].dmg;n=Math.floor(n)+(Math.random()<n%1?1:0);   // preset scales how many systems a hit takes out
   for(let i=0;i<n;i++){const r=Math.random();
-    if(r<.32){const ok=P.sys.eng.map((v,j)=>v===0?j:-1).filter(j=>j>=0);if(ok.length){const j=ok[Math.random()*ok.length|0];P.sys.eng[j]=1;P.sys.fireT[j]=7;message(ENG_NAME(j)+'ENGINE FIRE',1.8);recEvent(ENG_NAME(j).toLowerCase()+'engine fire');buzz([200,80,200])}}
-    else if(r<.52){if(!P.sys.hyd){P.sys.hyd=true;message('HYDRAULICS FAILED · G AND ROLL LIMITED',1.8);recEvent('Hydraulics failed')}}
-    else if(r<.72){if(!P.sys.radar){P.sys.radar=true;if(R.stt&&R.sttSrc==='RDR')breakLock();R.tracks.clear();message('RADAR FAILED',1.6);recEvent('Radar failed')}}
-    else if(r<.9){if(!P.sys.leak){P.sys.leak=true;message('FUEL LEAK',1.6);recEvent('Fuel leak')}}
+    if(r<.2){const ok=P.sys.eng.map((v,j)=>v===0?j:-1).filter(j=>j>=0);if(ok.length){const j=ok[Math.random()*ok.length|0];P.sys.eng[j]=1;P.sys.fireT[j]=7;message(ENG_NAME(j)+'ENGINE FIRE',1.8);recEvent(ENG_NAME(j).toLowerCase()+'engine fire');buzz([200,80,200])}}
+    else if(r<.34){if(!P.sys.hyd){P.sys.hyd=true;message('HYDRAULICS FAILED · G AND ROLL LIMITED',1.8);recEvent('Hydraulics failed')}}
+    else if(r<.46){if(!P.sys.radar){P.sys.radar=true;if(R.stt&&R.sttSrc==='RDR')breakLock();R.tracks.clear();message('RADAR FAILED',1.6);recEvent('Radar failed')}}
+    else if(r<.56){if(!P.sys.leak){P.sys.leak=true;message('FUEL LEAK',1.6);recEvent('Fuel leak')}}
+    else if(r<.74){const side=Math.random()<.5?'wL':'wR';if(P.sys[side]<1){P.sys[side]=Math.min(1,P.sys[side]+.35+Math.random()*.2);message((side==='wL'?'LEFT':'RIGHT')+' WING DAMAGED',1.8);recEvent((side==='wL'?'Left':'Right')+' wing damaged')}}
+    else if(r<.82){if(P.sys.ctl>.6){P.sys.ctl=.55;message('ELEVATOR DAMAGED · PITCH LIMITED',1.8);recEvent('Elevator damaged')}}
+    else if(r<.9){if(!P.sys.gun){P.sys.gun=true;message('GUNS JAMMED',1.6);recEvent('Guns jammed')}}
+    else if(P.sys.pilot<1){P.sys.pilot=Math.min(1,P.sys.pilot+.5);message('PILOT WOUNDED · G TOLERANCE REDUCED',1.8);recEvent('Pilot wounded')}
   }
 }
 function updateSystems(dt,auto){
@@ -609,7 +630,10 @@ function updateSystems(dt,auto){
   }
   k/=sy.eng.length;
   if(P.fuel<=0)k=0;
-  P.thrK=k; P.rollK=sy.hyd?.45:1; P.gLim=sy.hyd?Math.min(5,AC.gmax):AC.gmax;
+  const wd=Math.max(sy.wL,sy.wR);
+  P.thrK=k; P.rollK=(sy.hyd?.45:1)*(1-.3*wd); P.gLim=(sy.hyd?Math.min(5,AC.gmax):AC.gmax)*(1-.5*wd);
+  for(const [side,sgn] of [['wL',-1],['wR',1]])if(sy[side]>.25&&state==='play'&&Math.random()<dt*14*sy[side]){_d.copy(P.pos).addScaledVector(P.right,sgn*(AC.span||8)*.3);puff(_d.x,_d.y,_d.z,P.vel.x*.3,P.vel.y*.3,P.vel.z*.3,.2,.2,.2,.7,3.5,12,2)}   // smoke streams off a damaged wing
+  if(wd>=.7&&!sy.torn&&P.n>4&&Math.random()<dt*(P.n-3)*.25){sy.torn=sy.wL>=sy.wR?-1:1;sy[sy.torn<0?'wL':'wR']=1;P.hp-=45;shake=1;hurtT=.8;message((sy.torn<0?'LEFT':'RIGHT')+' WING TORN OFF',2.4);recEvent('A wing failed under load');if(P.hp<=0)die('shot')}
   if(!auto){
     const sfc=throttle<=.8?AC.sfcDry:AC.sfcDry+(AC.sfcAB-AC.sfcDry)*(throttle-.8)/.2;
     P.fuelFlow=(P.lastT||0)*sfc*2.832e-5;                      // kg/s
@@ -634,11 +658,21 @@ function updatePlayer(dt,auto){
     const km=KBM.on;
     const kx=km?(keys.ArrowRight?1:0)-(keys.ArrowLeft?1:0):(keys.KeyD||keys.ArrowRight?1:0)-(keys.KeyA||keys.ArrowLeft?1:0);
     const ky=km?(keys.ArrowDown?1:0)-(keys.ArrowUp?1:0):(keys.KeyS||keys.ArrowDown?1:0)-(keys.KeyW||keys.ArrowUp?1:0);
+    if(km&&KBM.aim){   // mouse aim: the cursor is a point in the world and the flight computer rolls and pulls the nose onto it (War Thunder's mouse-aim mode)
+      const now=performance.now();if(now-KBM.last>500){KBM.az=Math.atan2(P.fwd.x,P.fwd.z);KBM.el=Math.asin(clamp(P.fwd.y,-1,1))}KBM.last=now;
+      KBM.ad.set(Math.sin(KBM.az)*Math.cos(KBM.el),Math.sin(KBM.el),Math.cos(KBM.az)*Math.cos(KBM.el));
+      if(KBM.ad.dot(P.fwd)<Math.cos(1.45)){KBM.ad.lerp(P.fwd,.12).normalize();KBM.az=Math.atan2(KBM.ad.x,KBM.ad.z);KBM.el=Math.asin(clamp(KBM.ad.y,-1,1))}   // the cursor cannot run far behind the nose
+      const l=_kv.copy(KBM.ad).applyQuaternion(_kq.copy(P.obj.quaternion).invert()), rt=-l.x, up=l.y, a=Math.acos(clamp(l.z,-1,1)), rc=Math.atan2(rt,up);
+      const sm=clamp((a-.15)/.35,0,1), s2=sm*sm*(3-2*sm);
+      KBM.ar=clamp(rt*3,-1,1)*(1-s2)+clamp(rc*2.2,-1,1)*s2;
+      KBM.ap=clamp(up*3,-1,1)*(1-s2)+clamp(a*2.5,0,1)*clamp(Math.cos(rc)*1.5,0,1)*s2;
+    } else KBM.ar=KBM.ap=0;
     if(km){KBM.idle+=dt;if(KBM.idle>.4){const d=.5*dt;KBM.x=Math.abs(KBM.x)<d?0:KBM.x-Math.sign(KBM.x)*d;KBM.y=Math.abs(KBM.y)<d?0:KBM.y-Math.sign(KBM.y)*d}   // the virtual stick drifts home once the mouse rests
       if(keys.KeyW)setThr(thrSet+.5*dt);if(keys.KeyS)setThr(thrSet-.5*dt)}
     const tx=tilt.on&&stick.id===null?tilt.x:0, ty=tilt.on&&stick.id===null?tilt.y:0;
-    rollIn=clamp(shape(stick.x)+kx+tx+shape(GP.x)+(km?KBM.x:0),-1,1);
-    const sy=clamp(shape(stick.y)+ky+ty-shape(GP.y)*-1+(km?KBM.y:0),-1,1); pitchIn=invert?-sy:sy;
+    rollIn=clamp(shape(stick.x)+kx+tx+shape(GP.x)+(km&&!KBM.aim?KBM.x:0),-1,1);
+    const sy=clamp(shape(stick.y)+ky+ty-shape(GP.y)*-1+(km&&!KBM.aim?KBM.y:0),-1,1); pitchIn=invert?-sy:sy;
+    if(km&&KBM.aim){rollIn=clamp(rollIn+KBM.ar,-1,1);pitchIn=clamp(pitchIn+KBM.ap,-1,1)}
     yawIn=clamp((keys.KeyE?1:0)-(keys.KeyQ?1:0)+(km?(keys.KeyD?1:0)-(keys.KeyA?1:0):0),-1,1);
     // keyboard throttle: Shift/= up, Ctrl/- down
     if(keys.ShiftLeft||keys.ShiftRight||keys.Equal)setThr(thrSet+.5*dt);
@@ -646,6 +680,7 @@ function updatePlayer(dt,auto){
     // engine spool: ~3 s idle→MIL, afterburner lights faster
     let cmd=thrSet;
     // G-LOC: pilot is out, hands off the stick
+    if(P.sys){pitchIn*=pitchIn>0?P.sys.ctl:1;rollIn=clamp(rollIn+(P.sys.wR-P.sys.wL)*.5,-1,1)}   // damaged wing drags the jet round; a damaged elevator limits the pull
     if(P.gloc>0){rollIn=0;pitchIn=0;yawIn=0}
     // Auto-GCAS: predicts ground impact, rolls wings level and pulls 5 g
     const gh=Math.max(groundH(P.pos.x,P.pos.z),0), agl=P.pos.y-gh;
@@ -682,7 +717,7 @@ function updatePlayer(dt,auto){
   // pilot g tolerance
   if(!auto){
     P.maxG=Math.max(P.maxG,P.n);
-    const over=Math.max(0,P.n-6-.25*crewLvl('g')), under=Math.max(0,-P.n-2);
+    const over=Math.max(0,P.n-6-.25*crewLvl('g')+3*((P.sys&&P.sys.pilot)||0)), under=Math.max(0,-P.n-2);
     if(over>0||under>0)P.gStress+=(Math.pow(over,1.6)*.035+under*.08)*dt; else if(P.n<4.5)P.gStress=Math.max(0,P.gStress-.3*dt);
     if(P.gloc>0){P.gloc-=dt;if(P.gloc<=0)P.gStress=.6}
     else if(P.gStress>=1){P.gloc=5;message('G-LOC',2)}
