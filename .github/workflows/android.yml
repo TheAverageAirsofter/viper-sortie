@@ -1,5 +1,5 @@
 name: Android APK
-# Builds the game as an Android app with Capacitor.
+# Builds the game as an Android app with Capacitor, plus a Windows portable exe (job "exe").
 #  - every push: a debug-signed viper-sortie.apk is attached to the run (Actions > run > Artifacts)
 #  - run manually (Actions > Android APK > Run workflow) or push a tag like v1.0: published as a public GitHub Release
 #  - Play Store: add the four secrets below and the same run also builds a signed release APK and an .aab bundle
@@ -75,3 +75,28 @@ jobs:
             viper-sortie-release.apk
             viper-sortie-release.aab
           body: Android build. viper-sortie.apk is debug-signed and installs directly (allow "install unknown apps" for your browser). The release APK and .aab only appear when signing secrets are configured.
+  exe:
+    # Windows portable exe (Electron) built from the same web files; attached to the same release as the APK
+    needs: apk
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: node tools/make-www.js
+      - run: node -e "require('fs').cpSync('www','desktop/www',{recursive:true});require('fs').cpSync('fonts','desktop/www/fonts',{recursive:true})"
+      - run: npm install --no-save electron@33 electron-builder@25
+        working-directory: desktop
+      - run: npx electron-builder --win portable --publish never
+        working-directory: desktop
+      - run: Copy-Item desktop/dist/viper-sortie.exe viper-sortie.exe
+        shell: pwsh
+      - uses: actions/upload-artifact@v4
+        with: { name: viper-sortie-windows, path: viper-sortie.exe, if-no-files-found: error }
+      - name: Publish release
+        if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+        uses: softprops/action-gh-release@v2
+        with:
+          target_commitish: ${{ github.sha }}
+          tag_name: ${{ inputs.version || (startsWith(github.ref, 'refs/tags/v') && github.ref_name || format('apk-{0}', github.run_number)) }}
+          files: viper-sortie.exe
