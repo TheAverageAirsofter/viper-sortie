@@ -2225,6 +2225,9 @@ Object.assign(PAINT,{
 
 /* size corrections measured against public length and span (tools/real-dims.json); [across, up, along] */
 Object.assign(M2K,{MIG21F13:[1,1,.955],MIRAGE3C:[1,1,.96],SU57:[1.156,1.03,.93],TORNADO3:[1,1,.88],J7G:[1.165,1,1],FA18C:[.94,.97,.928],J10C:[1,1,1.073],MIG21:[1,1,1.065],F22A:[1,1,.955],F16:[1.03,1,.975],F16B70:[1.03,1,.975],F16BARAK:[1.03,1,.975],F16I:[1.03,1,.975],FA18E:[1.04,1,1],MIG35:[1.056,1,.978],SU27:[1.035,1,.99],SU35:[1.08,1,.99],SU30SM:[1.035,1,.99],J11B:[1.035,1,.99],J16:[1.035,1,.99],J15:[1.035,1,.957],SU33:[1.035,1,.957],PHANTOM2:[1,1,.917]});
+
+// Balance pass: sustained turn and climb brought toward the War Thunder wiki figures (see WTREF in progress.js)
+for(const [id,o] of [['A10A',{MASS:19200}],['A7E',{MASS:15300}],['A4E',{MASS:8200}],['ALPHAJET',{MASS:6410}],['JAGUAR',{MASS:12700}],['G91Y',{MASS:6745}],['F4C',{MASS:18011}],['J35D',{KIND:0.22}],['J29F',{MASS:8100}],['J6A',{KIND:0.247}],['MIG21MF',{MASS:8136,KIND:0.222}],['F100D',{KIND:0.28}],['MIG19PT',{KIND:0.247}],['MIG21F13',{MASS:8600}],['HUNTER',{MASS:9226}],['MIRAGE3C',{MASS:10030}],['MIG21',{KIND:0.265}],['F4F',{KIND:0.173}],['KFIR',{KIND:0.197}],['J35F',{KIND:0.22}],['LIGHTNING',{MASS:20090}],['M2000',{KIND:0.213}],['MIG23ML',{KIND:0.192}],['MIG25PD',{MASS:40404}]])if(AC_DEFS[id])Object.assign(AC_DEFS[id],o);
 /* ---------------- cockpit: its own scene in seat coordinates (eye at origin, forward −Z) ---------------- */
 const cockScene=new THREE.Scene();
 const cockCam=new THREE.PerspectiveCamera(66,1,.02,80);
