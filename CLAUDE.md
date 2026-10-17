@@ -52,6 +52,9 @@ Headless Chromium is at /opt/pw-browsers/chromium in the cloud sandbox (tools/la
 **Standing instruction from the owner: after every change that ships (anything under src/, css/, js/, index.html, tools that feed the build), push the branch and then run the "Android APK" workflow (`android.yml`, workflow_dispatch) with the next version number, so the public release APK is always current.** Find the latest release (v44 as of Oct 2026), use the next `vNN` as the `version` input and the working branch as the ref. Docs-only changes don't need a release. Tell the owner the run link and that it was queued.
 `.github/workflows/android.yml` builds the APK with Capacitor (debug-signed). Manual run or a `v*` tag publishes a GitHub Release. Release signing and the Play Store .aab need the four ANDROID_* secrets described in that file. The sandbox cannot build the APK (no Google Maven access); only GitHub Actions can.
 
+## Keyboard + mouse
+Settings > Controls > Input (`vsKbm`, `KBM` in state.js): the mouse is a relative virtual stick (click captures the pointer, Esc releases and pauses), LMB gun, RMB AIM-9, MMB AIM-120, wheel / W,S throttle, A/D rudder. `tools/kbm-test.js` covers it.
+
 ## Windows exe
 `.github/workflows/windows.yml` (workflow_dispatch, `version` input = same tag as the Android run) packs `www/` (from `tools/make-www.js`, plus `fonts/`) with Electron (`desktop/main.js`, electron-builder portable) into a single `viper-sortie.exe` and adds it to that release. Run it right after the Android run with the same version number. F11 / Alt+Enter toggles full screen; Shift+Esc leaves it. Unsigned, so Windows SmartScreen shows a warning on first run. The sandbox cannot build it; only Actions can.
 

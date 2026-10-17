@@ -336,10 +336,21 @@ function die(cause){
 /* ---------------- input ---------------- */
 const stick={id:null,ox:0,oy:0,x:0,y:0};
 const look={id:null,ox:0,oy:0,y0:0,p0:0,yaw:0,pitch:0};
+/* keyboard + mouse mode (Settings > Controls > Input): the mouse is a relative stick (click to capture it, Esc to release and pause),
+   left button guns, right button short-range missile, middle button long-range missile, wheel or W/S throttle, A/D rudder */
+const KBM={on:false,x:0,y:0,idle:0};
+try{KBM.on=localStorage.getItem('vsKbm')==='1'}catch(e){}
+function kbmSet(v){KBM.on=!!v;KBM.x=KBM.y=0;try{localStorage.setItem('vsKbm',v?'1':'0')}catch(e){}if(!v&&document.pointerLockElement)document.exitPointerLock()}
+const kbmLock=()=>{if(KBM.on&&document.pointerLockElement!==glCanvas)try{const r=glCanvas.requestPointerLock();if(r&&r.catch)r.catch(()=>{})}catch(e){}};
+glCanvas.addEventListener('contextmenu',e=>{if(KBM.on)e.preventDefault()});
+glCanvas.addEventListener('wheel',e=>{if(KBM.on&&state==='play'){e.preventDefault();setThr(thrSet-Math.sign(e.deltaY)*.05)}},{passive:false});
+document.addEventListener('mousemove',e=>{if(KBM.on&&state==='play'&&document.pointerLockElement===glCanvas){const k=.0032*(SENS[sens]||1);KBM.x=clamp(KBM.x+e.movementX*k,-1,1);KBM.y=clamp(KBM.y+e.movementY*k,-1,1);KBM.idle=0}});
+document.addEventListener('pointerlockchange',()=>{if(KBM.on&&!document.pointerLockElement&&state==='play')pause()});
 const stickBase=$('stickBase'),stickKnob=$('stickKnob'),stickHint=$('stickHint');
 function resetStick(){stick.id=null;stick.x=0;stick.y=0;stickBase.hidden=true;stickKnob.style.transform=''}
 glCanvas.addEventListener('pointerdown',e=>{
   if(state!=='play')return;
+  if(KBM.on&&e.pointerType==='mouse'){e.preventDefault();audioInit();kbmLock();if(e.button===0)gunHeld=true;else if(e.button===2)fire9=true;else if(e.button===1)fire120=true;return}
   if(e.clientX>W*.62){ // right side of the screen: look around (cockpit head / chase orbit)
     if(look.id!==null)return; e.preventDefault();
     look.id=e.pointerId;look.ox=e.clientX;look.oy=e.clientY;look.y0=look.yaw;look.p0=look.pitch;
@@ -363,7 +374,7 @@ glCanvas.addEventListener('pointermove',e=>{
   if(l>R){dx*=R/l;dy*=R/l}
   stick.x=dx/R;stick.y=dy/R; stickKnob.style.transform=`translate(${dx}px,${dy}px)`;
 });
-['pointerup','pointercancel'].forEach(t=>glCanvas.addEventListener(t,e=>{if(e.pointerId===stick.id)resetStick();if(e.pointerId===look.id)look.id=null}));
+['pointerup','pointercancel'].forEach(t=>glCanvas.addEventListener(t,e=>{if(KBM.on&&e.pointerType==='mouse'&&e.button===0)gunHeld=false;if(e.pointerId===stick.id)resetStick();if(e.pointerId===look.id)look.id=null}));
 function holdBtn(el,on,off){
   el.addEventListener('pointerdown',e=>{e.preventDefault();audioInit();try{el.setPointerCapture(e.pointerId)}catch(_){};el.classList.add('on');on()});
   ['pointerup','pointercancel','lostpointercapture'].forEach(t=>el.addEventListener(t,()=>{el.classList.remove('on');off&&off()}));
@@ -437,7 +448,7 @@ $('bInvert').addEventListener('click',()=>{invert=!invert;setInvertLabel();try{l
 $('bLoad').addEventListener('click',()=>{cmLoad=(cmLoad+1)%CM_LOADS.length;setLoadLabel();
   try{localStorage.setItem('viperCmLoad',cmLoad)}catch(e){}});
 $('bSound').addEventListener('click',()=>{A.on=!A.on;setSoundLabel();if(A.master)A.master.gain.value=A.on?.55:0});
-$('bStart').addEventListener('click',()=>{audioInit();if(state==='paused')resume();else startGame()});
+$('bStart').addEventListener('click',()=>{audioInit();kbmLock();if(state==='paused')resume();else startGame()});
 $('bQuit').addEventListener('click',()=>{state='play';die('abort');deadT=0.01});
 function showOverlay(kind){
   const ov=$('ov'); if(!kind){ov.hidden=true;return}
@@ -620,12 +631,15 @@ function updatePlayer(dt,auto){
     pitchIn=nNeed>=1?(nNeed-1)/(G_MAX-1):(nNeed-1)/4;
     throttle=.8;
   } else {
-    const kx=(keys.KeyD||keys.ArrowRight?1:0)-(keys.KeyA||keys.ArrowLeft?1:0);
-    const ky=(keys.KeyS||keys.ArrowDown?1:0)-(keys.KeyW||keys.ArrowUp?1:0);
+    const km=KBM.on;
+    const kx=km?(keys.ArrowRight?1:0)-(keys.ArrowLeft?1:0):(keys.KeyD||keys.ArrowRight?1:0)-(keys.KeyA||keys.ArrowLeft?1:0);
+    const ky=km?(keys.ArrowDown?1:0)-(keys.ArrowUp?1:0):(keys.KeyS||keys.ArrowDown?1:0)-(keys.KeyW||keys.ArrowUp?1:0);
+    if(km){KBM.idle+=dt;if(KBM.idle>.4){const d=.5*dt;KBM.x=Math.abs(KBM.x)<d?0:KBM.x-Math.sign(KBM.x)*d;KBM.y=Math.abs(KBM.y)<d?0:KBM.y-Math.sign(KBM.y)*d}   // the virtual stick drifts home once the mouse rests
+      if(keys.KeyW)setThr(thrSet+.5*dt);if(keys.KeyS)setThr(thrSet-.5*dt)}
     const tx=tilt.on&&stick.id===null?tilt.x:0, ty=tilt.on&&stick.id===null?tilt.y:0;
-    rollIn=clamp(shape(stick.x)+kx+tx+shape(GP.x),-1,1);
-    const sy=clamp(shape(stick.y)+ky+ty-shape(GP.y)*-1,-1,1); pitchIn=invert?-sy:sy;
-    yawIn=(keys.KeyE?1:0)-(keys.KeyQ?1:0);
+    rollIn=clamp(shape(stick.x)+kx+tx+shape(GP.x)+(km?KBM.x:0),-1,1);
+    const sy=clamp(shape(stick.y)+ky+ty-shape(GP.y)*-1+(km?KBM.y:0),-1,1); pitchIn=invert?-sy:sy;
+    yawIn=clamp((keys.KeyE?1:0)-(keys.KeyQ?1:0)+(km?(keys.KeyD?1:0)-(keys.KeyA?1:0):0),-1,1);
     // keyboard throttle: Shift/= up, Ctrl/- down
     if(keys.ShiftLeft||keys.ShiftRight||keys.Equal)setThr(thrSet+.5*dt);
     if(keys.ControlLeft||keys.ControlRight||keys.Minus)setThr(thrSet-.5*dt);
