@@ -131,9 +131,10 @@ const missiles=makePool(8,mslGeo,new THREE.MeshStandardMaterial({color:0xf2f2ee,
    build the glow and one composite pass adds it with a gentle S-curve, split-tone grade, a touch of edge fringing and a vignette. Needs WebGL2 and float targets;
    anything else (and Low quality) keeps the plain direct render. Tests skip it unless the page has &post. */
 const POST={ok:false,fail:false,w:0,h:0,rt:null,mips:[],scene:null,cam:null,quad:null,on:true};
-try{POST.on=localStorage.getItem('vsPost')!=='0'}catch(e){}
+POST.pref=null;try{POST.pref=localStorage.getItem('vsPost')}catch(e){}
+POST.on=POST.pref!=='0';   // unset: only High quality runs it (the full-screen passes cost a lot on phones); '1' forces it on Medium too
 const POST_TEST=/[?&]test\b/.test(location.search)&&!/[?&]post\b/.test(location.search);
-const postActive=()=>POST.on&&!POST_TEST&&!POST.fail&&QUALS[quality].fx>0;
+const postActive=()=>POST.on&&!POST_TEST&&!POST.fail&&QUALS[quality].fx>0&&(QUALS[quality].fx>1||POST.pref==='1');
 function postInit(){
   if(POST.scene)return true;
   try{
@@ -163,7 +164,7 @@ function postSize(){
   const sz=renderer.getDrawingBufferSize(new THREE.Vector2()),w=Math.max(2,sz.x|0),h=Math.max(2,sz.y|0);
   if(POST.rt&&w===POST.w&&h===POST.h)return;
   POST.w=w;POST.h=h;if(POST.rt)POST.rt.dispose();POST.mips.forEach(m=>m.dispose());POST.mips=[];
-  POST.rt=new THREE.WebGLRenderTarget(w,h,{type:THREE.HalfFloatType,samples:QUALS[quality].fx>1?4:2,depthBuffer:true,minFilter:THREE.LinearFilter,magFilter:THREE.LinearFilter});
+  POST.rt=new THREE.WebGLRenderTarget(w,h,{type:THREE.HalfFloatType,samples:QUALS[quality].fx>1?4:0,depthBuffer:true,minFilter:THREE.LinearFilter,magFilter:THREE.LinearFilter});
   const n=QUALS[quality].fx>1?5:4;let mw=w>>1,mh=h>>1;
   for(let i=0;i<n;i++){POST.mips.push(new THREE.WebGLRenderTarget(Math.max(2,mw),Math.max(2,mh),{type:THREE.HalfFloatType,depthBuffer:false,minFilter:THREE.LinearFilter,magFilter:THREE.LinearFilter}));mw>>=1;mh>>=1}}
 const postPass=(mat,src,dst)=>{mat.uniforms.tex.value=src.texture;if(mat.uniforms.px)mat.uniforms.px.value.set(1/src.width,1/src.height);POST.quad.material=mat;renderer.setRenderTarget(dst);renderer.render(POST.scene,POST.cam)};

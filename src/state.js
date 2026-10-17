@@ -520,7 +520,8 @@ function autoQuality(ms){
   if(NO_AQ)return;
   if(state!=='play'||!(ms>0)||ms>250){aqSlow=0;return}   // ignore pauses and tab switches
   aqAvg+=(ms-aqAvg)*.05; aqCool=Math.max(0,aqCool-ms);
-  if(aqAvg>28.5&&aqCool<=0){aqSlow+=ms;if(aqSlow>3000){const k=Object.keys(QUALS),i=k.indexOf(quality);aqSlow=0;aqCool=20000;if(i>0){setQuality(k[i-1],true);aqAvg=16;message('GRAPHICS LOWERED FOR FRAME RATE',2.5)}}}
+  if(aqAvg>28.5&&aqCool<=0){aqSlow+=ms;if(aqSlow>3000){const k=Object.keys(QUALS),i=k.indexOf(quality);aqSlow=0;aqCool=20000;if(postActive()){POST.on=false;aqAvg=16;message('BLOOM OFF FOR FRAME RATE',2.5)}
+    else if(i>0){setQuality(k[i-1],true);aqAvg=16;message('GRAPHICS LOWERED FOR FRAME RATE',2.5)}}}
   else aqSlow=0;
 }
 function setQuality(q,auto){quality=q;if(!auto)try{localStorage.setItem('viperQuality',q)}catch(e){}

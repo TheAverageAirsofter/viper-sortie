@@ -1,6 +1,6 @@
 /* ---------------- renderer / scene ---------------- */
 const glCanvas=$('gl'), hud=$('hud'), hctx=hud.getContext('2d');
-const QUALS={LOW:{dpr:1,seg:110,clouds:16,fx:0,trees:0},MED:{dpr:1.5,seg:150,clouds:30,fx:1,trees:2200},HIGH:{dpr:2,seg:190,clouds:44,fx:2,trees:4500}};
+const QUALS={LOW:{dpr:1,seg:110,clouds:16,fx:0,trees:0},MED:{dpr:1.25,seg:150,clouds:30,fx:1,trees:2200},HIGH:{dpr:2,seg:190,clouds:44,fx:2,trees:4500}};
 let quality='MED'; try{const q=localStorage.getItem('viperQuality');if(QUALS[q])quality=q}catch(e){}
 let DPR=Math.min(window.devicePixelRatio||1,QUALS[quality].dpr);
 const renderer=new THREE.WebGLRenderer({canvas:glCanvas,antialias:true,powerPreference:'high-performance'});
