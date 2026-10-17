@@ -98,10 +98,39 @@ function drawDLZ(c,x,y0,y1){
   if(inNE)txt(c,'RNE',x-17,yc+13,'right',HUD,9,700);
   c.restore();
 }
+/* tactical map (MAP button in the radar panel, or Tab): north-up, centred on you; each press steps the scale 20 / 50 / 120 km then closes */
+const TMAP={z:0,KM:[0,20,50,120]};
+function mapStep(){TMAP.z=(TMAP.z+1)%TMAP.KM.length}
+$('rMap').addEventListener('click',mapStep);
+function drawMap(c){
+  const km=TMAP.KM[TMAP.z]*1000, R=Math.min(W,H)*.46, cx=W/2, cy=H/2, k=R/km;
+  const X=x=>cx+(x-P.pos.x)*k, Y=z=>cy-(z-P.pos.z)*k;
+  c.save();c.fillStyle='rgba(4,10,6,.82)';c.fillRect(0,0,W,H);
+  c.strokeStyle='rgba(125,255,154,.16)';c.lineWidth=1;c.font='10px '+FONT;c.fillStyle='rgba(125,255,154,.5)';c.textAlign='left';
+  const step=km>60000?20000:km>30000?10000:5000, gx=Math.floor((P.pos.x-km*1.8)/step)*step, gz=Math.floor((P.pos.z-km*1.8)/step)*step;
+  for(let x=gx;x<P.pos.x+km*1.8;x+=step){const sx=X(x);if(sx<0||sx>W)continue;c.beginPath();c.moveTo(sx,0);c.lineTo(sx,H);c.stroke()}
+  for(let z=gz;z<P.pos.z+km*1.8;z+=step){const sy=Y(z);if(sy<0||sy>H)continue;c.beginPath();c.moveTo(0,sy);c.lineTo(W,sy);c.stroke()}
+  c.beginPath();c.arc(cx,cy,R,0,6.283);c.stroke();c.beginPath();c.arc(cx,cy,R/2,0,6.283);c.stroke();
+  c.fillText(Math.round(km/2000)+' KM',cx+R/2+4,cy-4);c.fillText(Math.round(km/1000)+' KM',cx+R+4,cy-4);
+  // airfield
+  c.strokeStyle='#cfd8cf';c.lineWidth=3;c.beginPath();c.moveTo(X(RWY.x),Y(RWY.z0));c.lineTo(X(RWY.x),Y(RWY.z1));c.stroke();
+  const dot=(x,y,col,r,sq)=>{c.fillStyle=col;if(sq)c.fillRect(x-r,y-r,r*2,r*2);else{c.beginPath();c.arc(x,y,r,0,6.283);c.fill()}};
+  const head=o=>{const f=_a.set(0,0,1).applyQuaternion(o.obj.quaternion);return Math.atan2(f.x,f.z)};
+  const tri=(x,y,h,col,s)=>{c.save();c.translate(x,y);c.rotate(h);c.fillStyle=col;c.beginPath();c.moveTo(0,-s);c.lineTo(s*.7,s*.8);c.lineTo(0,s*.4);c.lineTo(-s*.7,s*.8);c.closePath();c.fill();c.restore()};   // heading h: 0 = north (+z up the screen)
+  for(const g of ground)if(g.alive){const x=X(g.pos.x),y=Y(g.pos.z);if(g.kind==='sam'){c.strokeStyle='rgba(255,90,78,.45)';c.setLineDash([4,4]);c.lineWidth=1;c.beginPath();c.arc(x,y,(g.range||15000)*k,0,6.283);c.stroke();c.setLineDash([])}dot(x,y,'#ff5a4e',4,true)}
+  if(typeof WAR!=='undefined'&&WAR.on)for(const u of WAR.units)if(u.alive&&u.team==='blue')dot(X(u.pos.x),Y(u.pos.z),'#5aa8ff',4,true);
+  for(const f of friends)if(f.alive)tri(X(f.pos.x),Y(f.pos.z),head(f),'#5aa8ff',7);
+  for(const e of enemies)if(e.alive)tri(X(e.pos.x),Y(e.pos.z),head(e),'#ff5a4e',7);
+  if(typeof NET!=='undefined'&&NET.remotes)for(const r of NET.remotes.values())if(r.alive)tri(X(r.pos.x),Y(r.pos.z),head(r),r.mate?'#5aa8ff':'#ff5a4e',7);
+  const ph=Math.atan2(P.fwd.x,P.fwd.z);c.strokeStyle='rgba(255,255,255,.35)';c.lineWidth=1;c.beginPath();c.moveTo(cx,cy);c.lineTo(cx+Math.sin(ph)*R,cy-Math.cos(ph)*R);c.stroke();
+  tri(cx,cy,ph,'#ffffff',9);
+  txt(c,'TACTICAL MAP · '+TMAP.KM[TMAP.z]+' KM · TAP MAP TO ZOOM / CLOSE',W/2,INS.t+22,'center',HUD,12,700);
+  c.restore()}
 function drawHUD(){
   const c=hctx; c.clearRect(0,0,W,H); drawNVG(c);
   if(hurtT>0){const g=c.createRadialGradient(W/2,H/2,Math.min(W,H)*.3,W/2,H/2,Math.max(W,H)*.7);g.addColorStop(0,'rgba(255,40,30,0)');g.addColorStop(1,`rgba(255,40,30,${hurtT*1.2})`);c.fillStyle=g;c.fillRect(0,0,W,H)}
   if(state!=='play')return;
+  if(TMAP.z){drawMap(c);return}
   c.lineWidth=1.5;c.strokeStyle=HUD;c.textBaseline='middle';
   if(SC.list.length){let y=H*(W<H?.5:.6);const cols={kill:'#ff8a5c',crit:'#ffd24a',bonus:'#8ee0ff'};c.save();c.textBaseline='middle';
     for(const e of SC.list){const age=clock-e.t;if(age>4.5)continue;c.globalAlpha=Math.min(1,(4.5-age)*1.1);txt(c,e.text+(e.pts?'   +'+e.pts:''),W/2,y,'center',cols[e.col]||HUD,e.col==='kill'?15:12,e.col==='kill'?700:500);y+=e.col==='kill'?20:16}

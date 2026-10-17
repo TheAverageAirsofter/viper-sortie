@@ -273,13 +273,13 @@ function updateWeapons(dt){
     if(P.rounds===0)message('WINCHESTER · GUN EMPTY',1.4);
   } else gunAcc=0;
   for(const b of pBullets){ if(!b.on)continue;
-    if(ground.length)for(const g of ground)if(g.alive&&distSeg(_s1.copy(g.pos).setY(g.pos.y+2),b.prev,b.m.position)<9){kill(b);gunHits++;g.hp-=AC.gunDmg;if(g.hp>0)scEvent('HIT',2,'','ghit');puff(b.m.position.x,b.m.position.y,b.m.position.z,0,0,0,1,.8,.3,1,5,16,.25);if(g.hp<=0)killGround(g);break}
+    if(ground.length)for(const g of ground)if(g.alive&&distSeg(_s1.copy(g.pos).setY(g.pos.y+2),b.prev,b.m.position)<9){kill(b);gunHits++;g.hp-=AC.gunDmg*BELT().gnd;if(g.hp>0)scEvent('HIT',2,'','ghit');puff(b.m.position.x,b.m.position.y,b.m.position.z,0,0,0,1,.8,.3,1,5,16,.25);if(g.hp<=0)killGround(g);break}
     if(!b.on)continue;
     b.life-=dt; if(b.life<=0){kill(b);continue}
     b.prev.copy(b.m.position); b.vel.y-=G*dt; b.vel.multiplyScalar(gunDrag(b.vel.length(),atm(b.m.position.y).sig,dt)); b.m.position.addScaledVector(b.vel,dt);
     for(const e of enemies){ if(!e.alive)continue;
       if(distSeg(e.pos,b.prev,b.m.position)<(e.kind==='fighter'?7:14)){kill(b);gunHits++;const p=b.m.position;puff(p.x,p.y,p.z,0,0,0,1,.8,.3,1,5,16,.25);
-        hitAI(e,AC.gunDmg,'GUNS',true);break}}
+        hitAI(e,AC.gunDmg*BELT().air,'GUNS',true);break}}
   }
   // missiles: proportional navigation, g-limited by airspeed
   for(const m of missiles){ if(!m.on)continue;

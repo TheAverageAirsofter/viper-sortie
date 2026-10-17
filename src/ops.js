@@ -206,9 +206,18 @@ function agRelease(){
   if(t&&W.kind==='gps'&&Math.hypot(t.pos.x-P.pos.x,t.pos.z-P.pos.z)>w.reach)w.short=true;
   AG.w.push(w); recEvent('You released '+W.name+(t?' at the '+agName(t).toLowerCase():''));
   message(W.kind==='arm'?'MAGNUM':W.kind==='dumb'?'BOMBS AWAY':'PICKLE · '+W.sh,1); if(W.kind==='arm')sndMsl(); agSync()}
+/* ammunition choices: the gun belt trades damage against aircraft for damage against armour; the bomb fuse trades blast on soft targets for penetration of hard ones */
+const BELTS=[{id:'MIX',n:'universal',air:1,gnd:1,d:'Balanced mix of AP, HE and tracer.'},{id:'AP',n:'armour piercing',air:.8,gnd:1.7,d:'Armour-piercing rounds: weak against aircraft, much better against vehicles.'},{id:'HEI',n:'high explosive',air:1.3,gnd:.5,d:'High-explosive incendiary: strong against aircraft, poor against armour.'}];
+const FUSES=[{id:'INST',n:'instant',hard:.8,soft:1.15,d:'Bursts on contact: wider damage on soft targets.'},{id:'DELAY',n:'delayed',hard:1.7,soft:.7,d:'Penetrates before it bursts: bunkers, tanks and ships take far more, soft targets less.'}];
+var beltI=0,fuseI=0;try{beltI=Math.max(0,BELTS.findIndex(b=>b.id===localStorage.getItem('vsBelt')));fuseI=Math.max(0,FUSES.findIndex(b=>b.id===localStorage.getItem('vsFuse')))}catch(e){}
+const BELT=()=>BELTS[beltI], FUSE=()=>FUSES[fuseI], HARD={bunker:1,tank:1,ifv:1,ship:1,spaa:1,radar:1};
+function ammoLabels(){$('bBelt').textContent='Gun belt: '+BELT().n;$('bBelt').title=BELT().d;$('bFuse').textContent='Bomb fuse: '+FUSE().n;$('bFuse').title=FUSE().d}
+$('bBelt').addEventListener('click',()=>{beltI=(beltI+1)%BELTS.length;try{localStorage.setItem('vsBelt',BELT().id)}catch(e){};ammoLabels()});
+$('bFuse').addEventListener('click',()=>{fuseI=(fuseI+1)%FUSES.length;try{localStorage.setItem('vsFuse',FUSE().id)}catch(e){};ammoLabels()});
+ammoLabels();
 function agDetonate(w){
   const p=w.pos; explode(p.clone().setY(Math.max(p.y,Math.max(groundH(p.x,p.z),0)+2)),w.W.blast>20);
-  let hit=false; for(const g of ground){if(!g.alive)continue;const d=g.pos.distanceTo(p);if(d<w.W.blast){g.hp-=d<w.W.blast*.5?20:8;hit=true;if(g.hp<=0)killGround(g)}}
+  let hit=false; for(const g of ground){if(!g.alive)continue;const d=g.pos.distanceTo(p);if(d<w.W.blast){g.hp-=(d<w.W.blast*.5?20:8)*(HARD[g.kind]?FUSE().hard:FUSE().soft);hit=true;if(g.hp<=0)killGround(g)}}
   if(!hit)message(w.short?'MISS · FELL SHORT':'MISS',1); scene.remove(w.m); w.dead=true}
 function updateAG(dt){
   if(AG.load.length&&state==='play'){AG.tgtT-=dt;

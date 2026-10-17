@@ -18,6 +18,11 @@ const assert = require('assert'), path = require('path');
   });
   assert(r.hits.some(t => /HIT ×2/.test(t)), 'hits coalesce: ' + r.hits);
   assert(r.after.some(t => /DESTROYED/.test(t)) && r.after.some(t => /DOUBLE KILL/.test(t)), 'kill and double kill: ' + r.after);
-  await p.waitForTimeout(500);
+  // tactical map: steps through the scales, draws without errors, then closes
+  for (let i = 0; i < 3; i++) { await p.evaluate(() => __vs.mapStep()); await p.waitForTimeout(400); }
+  assert.equal(await p.evaluate(() => __vs.TMAP.z), 3);
+  await p.click('#rMap', { force: true }).catch(() => {}); await p.waitForTimeout(300);
+  await p.evaluate(() => __vs.mapStep()); await p.waitForTimeout(300);
+  assert.equal(await p.evaluate(() => __vs.TMAP.z), 0, 'map closes');
   assert.deepEqual(errs, []); console.log('score ok'); await b.close();
 })().catch(e => { console.error(e); process.exit(1); });

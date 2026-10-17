@@ -16,6 +16,9 @@ const assert = require('assert'), path = require('path');
   assert(r.g1 < r.g0 * .8, 'wing damage lowers the G limit: ' + JSON.stringify(r));
   assert(r.roll < 0, 'left wing damage rolls left: ' + r.roll);
   const n = await p.evaluate(() => { __vs.P.sys.wL = 0; __vs.P.sys.wR = 0; const seen = new Set(); for (let i = 0; i < 200; i++) { const S = __vs.P.sys; const before = JSON.stringify(S); __vs.damageSystem(1); if (JSON.stringify(S) !== before) seen.add(1); } return seen.size });
+  // ammunition choices cycle and persist
+  await p.evaluate(() => { document.getElementById('bBelt').click(); document.getElementById('bFuse').click(); });
+  assert.equal(await p.evaluate(() => localStorage.getItem('vsBelt') + '/' + localStorage.getItem('vsFuse')), 'AP/DELAY');
   await p.waitForTimeout(500);
   assert.deepEqual(errs, []); console.log('damage ok'); await b.close();
 })().catch(e => { console.error(e); process.exit(1); });

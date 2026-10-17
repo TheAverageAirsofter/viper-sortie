@@ -78,7 +78,7 @@ function clearWorld(){
   enemies=[];friends=[];spawnQ=[];[...pBullets,...eBullets,...missiles,...eMissiles].forEach(kill);
 }
 let gunShots=0,gunHits=0;
-function startGame(){SC.list.length=0;SC.streak=0;SC.lastKill=-99;
+function startGame(){TMAP.z=0;SC.list.length=0;SC.streak=0;SC.lastKill=-99;
   gunShots=0;gunHits=0;clearWorld(); resetPlayer(); resetRadar(); resetCM(); recReset(); rec3Reset(); P.alive=true;
   if(mission!=='ONLINE'){netStop();$('bSb').hidden=true;$('sbBox').hidden=true}
   trainHook=null;
@@ -437,6 +437,7 @@ addEventListener('keydown',e=>{
     if(e.code==='BracketRight')$('rUp').click();
     if(e.code==='BracketLeft')$('rDn').click();
     if(e.code==='KeyX')$('bRdr').click();
+    if(e.code==='Tab'){e.preventDefault();mapStep()}
     if(e.code==='KeyZ'&&!CM.flrHeld){CM.flrHeld=true;CM.flrT=0}
     if(e.code==='KeyC'&&!CM.chfHeld){CM.chfHeld=true;CM.chfT=0}
     if(e.code==='KeyJ')toggleECM();

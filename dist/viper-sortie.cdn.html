@@ -697,7 +697,7 @@ button:disabled{opacity:.4;cursor:not-allowed}
     <button class="cmb" id="cWing" type="button" aria-label="Wingman command" hidden>WING<small id="nWing">ENG</small></button>
   </div>
   <div id="rdr" hidden>
-    <div class="rTop"><button id="rMode" type="button">RWS</button><button id="rAz" type="button">A6</button><button id="rAcm" type="button">ACM</button></div>
+    <div class="rTop"><button id="rMap" type="button" aria-label="Tactical map">MAP</button><button id="rMode" type="button">RWS</button><button id="rAz" type="button">A6</button><button id="rAcm" type="button">ACM</button></div>
     <div class="rBody">
       <div class="rSide"><button id="rUp" type="button" aria-label="Increase range">▲</button><span id="rRng">20</span><button id="rDn" type="button" aria-label="Decrease range">▼</button><button id="rStep" type="button" aria-label="Next target">STEP</button></div>
       <canvas id="rScope" aria-label="Radar scope, tap a contact to lock"></canvas>
@@ -732,6 +732,8 @@ button:disabled{opacity:.4;cursor:not-allowed}
         <div class="row">
       <button class="ghost" id="bAC" type="button">Aircraft: F-16C Block 50</button>
       <button class="ghost" id="b120D" type="button" hidden>Missiles: AIM-120C</button>
+      <button class="ghost" id="bBelt" type="button">Gun belt: universal</button>
+      <button class="ghost" id="bFuse" type="button">Bomb fuse: instant</button>
       <button class="ghost" id="bTVC" type="button" hidden>Thrust vectoring: off</button>
       <button class="ghost" id="bR37" type="button" hidden>Missiles: 8× R-77-1</button>
         </div>
@@ -4206,9 +4208,18 @@ function agRelease(){
   if(t&&W.kind==='gps'&&Math.hypot(t.pos.x-P.pos.x,t.pos.z-P.pos.z)>w.reach)w.short=true;
   AG.w.push(w); recEvent('You released '+W.name+(t?' at the '+agName(t).toLowerCase():''));
   message(W.kind==='arm'?'MAGNUM':W.kind==='dumb'?'BOMBS AWAY':'PICKLE · '+W.sh,1); if(W.kind==='arm')sndMsl(); agSync()}
+/* ammunition choices: the gun belt trades damage against aircraft for damage against armour; the bomb fuse trades blast on soft targets for penetration of hard ones */
+const BELTS=[{id:'MIX',n:'universal',air:1,gnd:1,d:'Balanced mix of AP, HE and tracer.'},{id:'AP',n:'armour piercing',air:.8,gnd:1.7,d:'Armour-piercing rounds: weak against aircraft, much better against vehicles.'},{id:'HEI',n:'high explosive',air:1.3,gnd:.5,d:'High-explosive incendiary: strong against aircraft, poor against armour.'}];
+const FUSES=[{id:'INST',n:'instant',hard:.8,soft:1.15,d:'Bursts on contact: wider damage on soft targets.'},{id:'DELAY',n:'delayed',hard:1.7,soft:.7,d:'Penetrates before it bursts: bunkers, tanks and ships take far more, soft targets less.'}];
+var beltI=0,fuseI=0;try{beltI=Math.max(0,BELTS.findIndex(b=>b.id===localStorage.getItem('vsBelt')));fuseI=Math.max(0,FUSES.findIndex(b=>b.id===localStorage.getItem('vsFuse')))}catch(e){}
+const BELT=()=>BELTS[beltI], FUSE=()=>FUSES[fuseI], HARD={bunker:1,tank:1,ifv:1,ship:1,spaa:1,radar:1};
+function ammoLabels(){$('bBelt').textContent='Gun belt: '+BELT().n;$('bBelt').title=BELT().d;$('bFuse').textContent='Bomb fuse: '+FUSE().n;$('bFuse').title=FUSE().d}
+$('bBelt').addEventListener('click',()=>{beltI=(beltI+1)%BELTS.length;try{localStorage.setItem('vsBelt',BELT().id)}catch(e){};ammoLabels()});
+$('bFuse').addEventListener('click',()=>{fuseI=(fuseI+1)%FUSES.length;try{localStorage.setItem('vsFuse',FUSE().id)}catch(e){};ammoLabels()});
+ammoLabels();
 function agDetonate(w){
   const p=w.pos; explode(p.clone().setY(Math.max(p.y,Math.max(groundH(p.x,p.z),0)+2)),w.W.blast>20);
-  let hit=false; for(const g of ground){if(!g.alive)continue;const d=g.pos.distanceTo(p);if(d<w.W.blast){g.hp-=d<w.W.blast*.5?20:8;hit=true;if(g.hp<=0)killGround(g)}}
+  let hit=false; for(const g of ground){if(!g.alive)continue;const d=g.pos.distanceTo(p);if(d<w.W.blast){g.hp-=(d<w.W.blast*.5?20:8)*(HARD[g.kind]?FUSE().hard:FUSE().soft);hit=true;if(g.hp<=0)killGround(g)}}
   if(!hit)message(w.short?'MISS · FELL SHORT':'MISS',1); scene.remove(w.m); w.dead=true}
 function updateAG(dt){
   if(AG.load.length&&state==='play'){AG.tgtT-=dt;
@@ -4729,7 +4740,7 @@ function clearWorld(){
   enemies=[];friends=[];spawnQ=[];[...pBullets,...eBullets,...missiles,...eMissiles].forEach(kill);
 }
 let gunShots=0,gunHits=0;
-function startGame(){SC.list.length=0;SC.streak=0;SC.lastKill=-99;
+function startGame(){TMAP.z=0;SC.list.length=0;SC.streak=0;SC.lastKill=-99;
   gunShots=0;gunHits=0;clearWorld(); resetPlayer(); resetRadar(); resetCM(); recReset(); rec3Reset(); P.alive=true;
   if(mission!=='ONLINE'){netStop();$('bSb').hidden=true;$('sbBox').hidden=true}
   trainHook=null;
@@ -5088,6 +5099,7 @@ addEventListener('keydown',e=>{
     if(e.code==='BracketRight')$('rUp').click();
     if(e.code==='BracketLeft')$('rDn').click();
     if(e.code==='KeyX')$('bRdr').click();
+    if(e.code==='Tab'){e.preventDefault();mapStep()}
     if(e.code==='KeyZ'&&!CM.flrHeld){CM.flrHeld=true;CM.flrT=0}
     if(e.code==='KeyC'&&!CM.chfHeld){CM.chfHeld=true;CM.chfT=0}
     if(e.code==='KeyJ')toggleECM();
@@ -5809,13 +5821,13 @@ function updateWeapons(dt){
     if(P.rounds===0)message('WINCHESTER · GUN EMPTY',1.4);
   } else gunAcc=0;
   for(const b of pBullets){ if(!b.on)continue;
-    if(ground.length)for(const g of ground)if(g.alive&&distSeg(_s1.copy(g.pos).setY(g.pos.y+2),b.prev,b.m.position)<9){kill(b);gunHits++;g.hp-=AC.gunDmg;if(g.hp>0)scEvent('HIT',2,'','ghit');puff(b.m.position.x,b.m.position.y,b.m.position.z,0,0,0,1,.8,.3,1,5,16,.25);if(g.hp<=0)killGround(g);break}
+    if(ground.length)for(const g of ground)if(g.alive&&distSeg(_s1.copy(g.pos).setY(g.pos.y+2),b.prev,b.m.position)<9){kill(b);gunHits++;g.hp-=AC.gunDmg*BELT().gnd;if(g.hp>0)scEvent('HIT',2,'','ghit');puff(b.m.position.x,b.m.position.y,b.m.position.z,0,0,0,1,.8,.3,1,5,16,.25);if(g.hp<=0)killGround(g);break}
     if(!b.on)continue;
     b.life-=dt; if(b.life<=0){kill(b);continue}
     b.prev.copy(b.m.position); b.vel.y-=G*dt; b.vel.multiplyScalar(gunDrag(b.vel.length(),atm(b.m.position.y).sig,dt)); b.m.position.addScaledVector(b.vel,dt);
     for(const e of enemies){ if(!e.alive)continue;
       if(distSeg(e.pos,b.prev,b.m.position)<(e.kind==='fighter'?7:14)){kill(b);gunHits++;const p=b.m.position;puff(p.x,p.y,p.z,0,0,0,1,.8,.3,1,5,16,.25);
-        hitAI(e,AC.gunDmg,'GUNS',true);break}}
+        hitAI(e,AC.gunDmg*BELT().air,'GUNS',true);break}}
   }
   // missiles: proportional navigation, g-limited by airspeed
   for(const m of missiles){ if(!m.on)continue;
@@ -6787,10 +6799,39 @@ function drawDLZ(c,x,y0,y1){
   if(inNE)txt(c,'RNE',x-17,yc+13,'right',HUD,9,700);
   c.restore();
 }
+/* tactical map (MAP button in the radar panel, or Tab): north-up, centred on you; each press steps the scale 20 / 50 / 120 km then closes */
+const TMAP={z:0,KM:[0,20,50,120]};
+function mapStep(){TMAP.z=(TMAP.z+1)%TMAP.KM.length}
+$('rMap').addEventListener('click',mapStep);
+function drawMap(c){
+  const km=TMAP.KM[TMAP.z]*1000, R=Math.min(W,H)*.46, cx=W/2, cy=H/2, k=R/km;
+  const X=x=>cx+(x-P.pos.x)*k, Y=z=>cy-(z-P.pos.z)*k;
+  c.save();c.fillStyle='rgba(4,10,6,.82)';c.fillRect(0,0,W,H);
+  c.strokeStyle='rgba(125,255,154,.16)';c.lineWidth=1;c.font='10px '+FONT;c.fillStyle='rgba(125,255,154,.5)';c.textAlign='left';
+  const step=km>60000?20000:km>30000?10000:5000, gx=Math.floor((P.pos.x-km*1.8)/step)*step, gz=Math.floor((P.pos.z-km*1.8)/step)*step;
+  for(let x=gx;x<P.pos.x+km*1.8;x+=step){const sx=X(x);if(sx<0||sx>W)continue;c.beginPath();c.moveTo(sx,0);c.lineTo(sx,H);c.stroke()}
+  for(let z=gz;z<P.pos.z+km*1.8;z+=step){const sy=Y(z);if(sy<0||sy>H)continue;c.beginPath();c.moveTo(0,sy);c.lineTo(W,sy);c.stroke()}
+  c.beginPath();c.arc(cx,cy,R,0,6.283);c.stroke();c.beginPath();c.arc(cx,cy,R/2,0,6.283);c.stroke();
+  c.fillText(Math.round(km/2000)+' KM',cx+R/2+4,cy-4);c.fillText(Math.round(km/1000)+' KM',cx+R+4,cy-4);
+  // airfield
+  c.strokeStyle='#cfd8cf';c.lineWidth=3;c.beginPath();c.moveTo(X(RWY.x),Y(RWY.z0));c.lineTo(X(RWY.x),Y(RWY.z1));c.stroke();
+  const dot=(x,y,col,r,sq)=>{c.fillStyle=col;if(sq)c.fillRect(x-r,y-r,r*2,r*2);else{c.beginPath();c.arc(x,y,r,0,6.283);c.fill()}};
+  const head=o=>{const f=_a.set(0,0,1).applyQuaternion(o.obj.quaternion);return Math.atan2(f.x,f.z)};
+  const tri=(x,y,h,col,s)=>{c.save();c.translate(x,y);c.rotate(h);c.fillStyle=col;c.beginPath();c.moveTo(0,-s);c.lineTo(s*.7,s*.8);c.lineTo(0,s*.4);c.lineTo(-s*.7,s*.8);c.closePath();c.fill();c.restore()};   // heading h: 0 = north (+z up the screen)
+  for(const g of ground)if(g.alive){const x=X(g.pos.x),y=Y(g.pos.z);if(g.kind==='sam'){c.strokeStyle='rgba(255,90,78,.45)';c.setLineDash([4,4]);c.lineWidth=1;c.beginPath();c.arc(x,y,(g.range||15000)*k,0,6.283);c.stroke();c.setLineDash([])}dot(x,y,'#ff5a4e',4,true)}
+  if(typeof WAR!=='undefined'&&WAR.on)for(const u of WAR.units)if(u.alive&&u.team==='blue')dot(X(u.pos.x),Y(u.pos.z),'#5aa8ff',4,true);
+  for(const f of friends)if(f.alive)tri(X(f.pos.x),Y(f.pos.z),head(f),'#5aa8ff',7);
+  for(const e of enemies)if(e.alive)tri(X(e.pos.x),Y(e.pos.z),head(e),'#ff5a4e',7);
+  if(typeof NET!=='undefined'&&NET.remotes)for(const r of NET.remotes.values())if(r.alive)tri(X(r.pos.x),Y(r.pos.z),head(r),r.mate?'#5aa8ff':'#ff5a4e',7);
+  const ph=Math.atan2(P.fwd.x,P.fwd.z);c.strokeStyle='rgba(255,255,255,.35)';c.lineWidth=1;c.beginPath();c.moveTo(cx,cy);c.lineTo(cx+Math.sin(ph)*R,cy-Math.cos(ph)*R);c.stroke();
+  tri(cx,cy,ph,'#ffffff',9);
+  txt(c,'TACTICAL MAP · '+TMAP.KM[TMAP.z]+' KM · TAP MAP TO ZOOM / CLOSE',W/2,INS.t+22,'center',HUD,12,700);
+  c.restore()}
 function drawHUD(){
   const c=hctx; c.clearRect(0,0,W,H); drawNVG(c);
   if(hurtT>0){const g=c.createRadialGradient(W/2,H/2,Math.min(W,H)*.3,W/2,H/2,Math.max(W,H)*.7);g.addColorStop(0,'rgba(255,40,30,0)');g.addColorStop(1,`rgba(255,40,30,${hurtT*1.2})`);c.fillStyle=g;c.fillRect(0,0,W,H)}
   if(state!=='play')return;
+  if(TMAP.z){drawMap(c);return}
   c.lineWidth=1.5;c.strokeStyle=HUD;c.textBaseline='middle';
   if(SC.list.length){let y=H*(W<H?.5:.6);const cols={kill:'#ff8a5c',crit:'#ffd24a',bonus:'#8ee0ff'};c.save();c.textBaseline='middle';
     for(const e of SC.list){const age=clock-e.t;if(age>4.5)continue;c.globalAlpha=Math.min(1,(4.5-age)*1.1);txt(c,e.text+(e.pts?'   +'+e.pts:''),W/2,y,'center',cols[e.col]||HUD,e.col==='kill'?15:12,e.col==='kill'?700:500);y+=e.col==='kill'?20:16}
@@ -7287,7 +7328,7 @@ const _careerAward=careerAward;
 careerAward=function(){lbAdd();return _careerAward.apply(this,arguments)};
 
 /* ---------- test hook (only with ?test in the URL) ---------- */
-if(/[?&]test\b/.test(location.search))window.__vs={KBM,SC,damageSystem,hitAI,killEnemy,setThr,HEAT,explode,puff,camera,LT,townLights,flashLt,P,fly,dlz,flyout,AC_DEFS,feed,WAR,WAR_V,warBuild,warSpawn,warModules,warDie,warFlags,updateWar,warAlive,buildJet,PLAYER_COLORS,M2,V3,atm,clamp,lbAdd,showOverlay:k=>showOverlay(k),setScore:(n,k)=>{score=n;kills=k},get state(){return state},get enemies(){return enemies},missiles:()=>missiles.filter(m=>m.on),setAC:id=>{AC=AC_DEFS[id];applyAC()},wt:{   // weapon-test hooks: a clean sky, one drone, scripted launches
+if(/[?&]test\b/.test(location.search))window.__vs={TMAP,mapStep,KBM,SC,damageSystem,hitAI,killEnemy,setThr,HEAT,explode,puff,camera,LT,townLights,flashLt,P,fly,dlz,flyout,AC_DEFS,feed,WAR,WAR_V,warBuild,warSpawn,warModules,warDie,warFlags,updateWar,warAlive,buildJet,PLAYER_COLORS,M2,V3,atm,clamp,lbAdd,showOverlay:k=>showOverlay(k),setScore:(n,k)=>{score=n;kills=k},get state(){return state},get enemies(){return enemies},missiles:()=>missiles.filter(m=>m.on),setAC:id=>{AC=AC_DEFS[id];applyAC()},wt:{   // weapon-test hooks: a clean sky, one drone, scripted launches
   begin:id=>{AC=AC_DEFS[id];applyAC();startGame();return AC.id},
   clear:()=>{waveClearT=1e9;for(const e of enemies){e.alive=false;scene.remove(e.obj)}enemies.length=0;P.pos.set(0,6000,0);P.vel.set(0,0,250);throttle=.7;return state},
   target:(type,dz,away,speed)=>{const e=spawnFighter('red',type,new V3(0,6000,dz),new V3(0,6000,dz+(away?9999:-9999)),{ir:0,rdr:0,speed:speed||220});e.drone=true;return e.id},
