@@ -24,5 +24,10 @@ const assert = require('assert'), path = require('path');
   await p.click('#rMap', { force: true }).catch(() => {}); await p.waitForTimeout(300);
   await p.evaluate(() => __vs.mapStep()); await p.waitForTimeout(300);
   assert.equal(await p.evaluate(() => __vs.TMAP.z), 0, 'map closes');
+  // online team match: squadron tags on the scoreboard and the first team to 20 kills wins
+  const o = await p.evaluate(() => { const V = __vs, N = V.NET; N.mode = 'TEAMS'; N.me = 'me'; N.won = null; N.names = N.names || new Map();
+    N.roster.clear(); N.roster.set('me', { ac: 'F16', md: 'TEAMS', tm: 'B', sk: 12, sd: 1, a: 1, sq: 'VAL' }); N.roster.set('p2', { ac: 'F4E', md: 'TEAMS', tm: 'B', sk: 9, sd: 2, a: 1, sq: 'va<l>!' }); N.roster.set('p3', { ac: 'MIG21', md: 'TEAMS', tm: 'R', sk: 5, sd: 3, a: 1 });
+    V.netScoreCheck(); return { won: N.won, html: V.sbHtml(), s: V.netTeamScore() }; });
+  assert.equal(o.won, 'B', 'blue reaches 20: ' + JSON.stringify(o.s)); assert(o.html.includes('[VAL] ') && o.html.includes('[VAL] ') && !o.html.includes('<l>'), 'squadron tags, sanitised');
   assert.deepEqual(errs, []); console.log('score ok'); await b.close();
 })().catch(e => { console.error(e); process.exit(1); });

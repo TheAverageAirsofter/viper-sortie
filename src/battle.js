@@ -6,7 +6,7 @@ const btCost=id=>Math.max(2,Math.min(8,Math.round(2+(progBR(id)-1)*.5)));   // s
 const btAfford=id=>!BT.used[id]&&btCost(id)<=BT.sp;
 const BT_ZONES=[['A',0,14000],['B',-9000,25000],['C',9000,25000]], BT_R=4500, BT_AI={blue:3,red:4};
 function setupBattle(){
-  BT.on=true;BT.over=false;BT.ground=false;BT.pts.blue=BT.pts.red=BT.max;BT.pend.blue=BT.pend.red=0;BT.tm.blue=BT.tm.red=0;BT.wpT=0;BT.diedT=0;BT.specI=0;BT.used={};BT.sp=20;
+  BT.on=true;BT.over=false;BT.ground=false;BT.naval=false;BT.ships=null;BT.pts.blue=BT.pts.red=BT.max;BT.pend.blue=BT.pend.red=0;BT.tm.blue=BT.tm.red=0;BT.wpT=0;BT.diedT=0;BT.specI=0;BT.used={};BT.sp=20;
   BT.zones=BT_ZONES.map(([n,x,z])=>({n,x,z,prog:0,own:0}));
   const pool=banditPool().filter(id=>id!==AC.id&&unlocked(id));
   BT.lineup=[AC.id];while(BT.lineup.length<4&&pool.length)BT.lineup.push(pool.splice(Math.random()*pool.length|0,1)[0]);
@@ -17,6 +17,14 @@ function setupBattle(){
   btAssign();sortie=null;
   message('AIR BATTLE · HOLD MORE ZONES THAN THE ENEMY · '+BT.max+' POINTS EACH',3.2);
 }
+/* naval battle: three enemy frigates (SAMs and guns) on the sea; each one alive drains your points, each one sunk drains theirs */
+function findSea(cx,cz){for(let r=0;r<20000;r+=700)for(let k=0;k<14;k++){const x=cx+Math.cos(k*.45)*r,z=cz+Math.sin(k*.45)*r;if(groundH(x,z)<-4)return [x,z]}return [cx,cz]}
+function setupNaval(){
+  setupBattle();BT.naval=true;BT.zones=[];BT.ships=[];
+  [[-8000,26000],[0,32000],[8000,26000]].forEach(([x,z],i)=>{const [sx,sz]=findSea(x,z),g=spawnGround('ship',sx,sz,true);g.orbit={c:new V3(sx,0,sz),r:700+i*200,a:Math.random()*6.28};g.spd=7;BT.ships.push(g)});
+  btAssign();message('NAVAL BATTLE · SINK THE FRIGATES · EACH ONE AFLOAT BLEEDS YOUR POINTS',3.4);
+}
+const btShipsLeft=()=>BT.ships?BT.ships.filter(g=>g.alive).length:0;
 function btSpawn(team,i){
   const pool=banditPool(),type=pool[Math.random()*pool.length|0],s=team==='blue'?-1:1;
   const pos=new V3((i-1)*1800+rand(-600,600),rand(3800,5200),team==='blue'?-1500-i*500:36000+i*500);
@@ -25,6 +33,10 @@ function btSpawn(team,i){
 }
 // each AI jet flies to the nearest zone its side does not hold yet (or the contested one)
 function btAssign(){
+  if(BT.naval){
+    for(const e of friends){if(!e.alive||e.kind!=='fighter')continue;let best=null,bd=1e9;for(const g of BT.ships||[]){if(!g.alive)continue;const d=Math.hypot(g.pos.x-e.pos.x,g.pos.z-e.pos.z);if(d<bd){bd=d;best=g}}e.wp=best?new V3(best.pos.x,4500,best.pos.z):null}
+    for(const e of enemies){if(e.alive&&e.kind==='fighter')e.wp=new V3(0,4500,0)}   // the red jets press on to your base
+    return}
   for(const team of ['blue','red']){
     const own=team==='blue'?1:-1,load=new Map();
     for(const e of team==='blue'?friends:enemies){
@@ -42,8 +54,8 @@ function btLoss(team,pts){   // a jet of this side was lost: points off and a re
   BT.pts[team]=Math.max(0,BT.pts[team]-(pts||12));BT.pend[team]++;if(BT.tm[team]<=0)BT.tm[team]=16;
 }
 function btStatus(){
-  const z=BT.zones.map(q=>q.n+(q.own>0?'+':q.own<0?'-':'·')).join(' ');
-  return 'BLUE '+Math.round(BT.pts.blue)+' · RED '+Math.round(BT.pts.red)+'  ZONES '+z+'  SP '+BT.sp;
+  const z=BT.naval?'SHIPS '+btShipsLeft():'ZONES '+BT.zones.map(q=>q.n+(q.own>0?'+':q.own<0?'-':'·')).join(' ');
+  return 'BLUE '+Math.round(BT.pts.blue)+' · RED '+Math.round(BT.pts.red)+'  '+z+'  SP '+BT.sp;
 }
 function btDied(){   // called from die(): the battle goes on, the sortie does not end
   if(BT.over)return;
@@ -68,6 +80,7 @@ function btTick(dt){
     const o=z.prog>.6?1:z.prog<-.6?-1:Math.abs(z.prog)<.12?0:z.own;
     if(o!==z.own){z.own=o;if(state==='play'){message(o>0?'ZONE '+z.n+' CAPTURED':o<0?'ZONE '+z.n+' LOST':'ZONE '+z.n+' NEUTRAL',1.8);if(o)sndZone(o>0)}if(o>0){scEvent('ZONE '+z.n+' CAPTURED',60,'bonus');BT.sp+=3}}
   }
+  if(BT.naval)BT.pts.blue=Math.max(0,BT.pts.blue-btShipsLeft()*.35*dt);
   const bz=BT.zones.filter(z=>z.own>0).length, rz=BT.zones.filter(z=>z.own<0).length;
   BT.pts.red=Math.max(0,BT.pts.red-bz*.6*dt);BT.pts.blue=Math.max(0,BT.pts.blue-rz*.6*dt);
   for(const team of ['blue','red']){   // reinforcements

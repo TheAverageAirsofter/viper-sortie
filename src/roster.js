@@ -1081,5 +1081,53 @@ Object.assign(PAINT,{
 /* size corrections measured against public length and span (tools/real-dims.json); [across, up, along] */
 Object.assign(M2K,{MIG21F13:[1,1,.955],MIRAGE3C:[1,1,.96],SU57:[1.156,1.03,.93],TORNADO3:[1,1,.88],J7G:[1.165,1,1],FA18C:[.94,.97,.928],J10C:[1,1,1.073],MIG21:[1,1,1.065],F22A:[1,1,.955],F16:[1.03,1,.975],F16B70:[1.03,1,.975],F16BARAK:[1.03,1,.975],F16I:[1.03,1,.975],FA18E:[1.04,1,1],MIG35:[1.056,1,.978],SU27:[1.035,1,.99],SU35:[1.08,1,.99],SU30SM:[1.035,1,.99],J11B:[1.035,1,.99],J16:[1.035,1,.99],J15:[1.035,1,.957],SU33:[1.035,1,.957],PHANTOM2:[1,1,.917]});
 
+/* ===== Late additions (BR and figures est. unless the wiki is cited): A-10C, MiG-27M, Su-24M, AJS 37, JA 37DI ===== */
+// A-10C: the A-10A rebuilt with precision engagement, ALQ-131 pod, AIM-9M, AGM-65D/H, JDAM
+dv('A10A','A10C','A-10C Thunderbolt II','Hog',{
+  MASS:15100,cm:cmo(120,60,0,true,'ECM','ALQ-131','ALE-47',stn([['L','9L'],['R','9L']],[])),
+  spec:'<span><b>+6.5 g</b> · armoured tub</span><span><b>Mach 0.56</b></span><span>2× TF34 <b>80.6 kN</b></span><span>GAU-8/A · <b>1,174 rds</b></span><span>AGM-65 · JDAM</span><span>2× AIM-9M</span>',
+  radar:{modes:['RWS'],name:'None (Litening pod)',range:2000},rwrName:'AN/ALR-69A',cmDesc:'ALE-47 + ALQ-131 pod'});
+// MiG-27M: the ground-attack Flogger, R-29B-300 (112 kN AB), GSh-6-23 (260 rds), Kh-25, FAB bombs
+dv('MIG23ML','MIG27M','MiG-27M Flogger-D','Flogger',{corner:420,
+  MASS:15300,T_AB:112000,T_MIL:78000,gmax:7,
+  gunRate:100,gunRounds:260,muzzle:715,gunDmg:2,gunSnd:1600,ammo:'23MM',
+  srN:2,mrN:0,mrFull:'none',mrName:'-',
+  radar:{modes:['RWS'],name:'Klen laser ranger',range:12000},
+  cm:cmo(0,0,0,false,null,'','none',stn([['1','R60'],['2','R60']],[])),
+  spec:'<span><b>+7 g</b> · variable sweep</span><span><b>Mach 1.7</b></span><span>R-29B <b>112 kN</b></span><span>GSh-6-23 · <b>260 rds</b></span><span>Kh-25 · FAB bombs</span><span>2× R-60M</span>',
+  mrDesc:'No radar missiles'});
+// Su-24M: swing-wing deep-strike bomber, 2× AL-21F-3 (110 kN AB each), GSh-6-23 (500 rds), Kh-25/Kh-29, KAB bombs
+dv('SU22M3','SU24M','Su-24M Fencer','Fencer',{corner:430,
+  MASS:21500,T_AB:220000,T_MIL:150000,S:55,gmax:6.5,vne:800,
+  gunRate:100,gunRounds:500,muzzle:715,gunDmg:2,gunSnd:1600,ammo:'23MM',fuelCap:11000,engines:2,
+  radar:{modes:['RWS'],name:'Orion-A terrain radar',range:20000},
+  spec:'<span><b>+6.5 g</b> · variable sweep</span><span><b>Mach 1.35</b></span><span>2× AL-21F-3 <b>220 kN</b></span><span>GSh-6-23 · <b>500 rds</b></span><span>Kh-29 · KAB-500</span><span>2× R-60M</span>'});
+// AJS 37 Viggen: the Swedish attacker, RM8A, ranging radar, Rb 05 / Rb 75, no cannon in the nose fit
+dv('JA37','AJS37','AJS 37 Viggen','Viggen',{corner:430,
+  MASS:15000,T_AB:118000,T_MIL:68000,
+  gunRate:0,gunRounds:0,
+  srName:'RB74',srFull:'Rb 74',srN:2,mrN:0,mrName:'-',mrFull:'none',
+  radar:{modes:['RWS'],name:'PS-37/A',range:30000},
+  cm:cmo(60,120,0,false,'ECM','BOZ-100 pod','BOZ',stn([['6A','Rb74'],['6B','Rb74']],[])),
+  spec:'<span><b>+7 g</b></span><span><b>Mach 2</b></span><span>RM8A <b>118 kN</b></span><span>Rb 05 · Rb 75 · bombs</span><span>Canard-delta</span><span>2× Rb 74</span>',
+  mrDesc:'No radar missiles'});
+// JA 37DI: the Viggen's final fighter update, upgraded PS-46/A, Rb 99 AMRAAM era avionics
+dv('JA37','JA37DI','JA 37DI Viggen','Viggen',{
+  MASS:15700,T_AB:127000,radar:{modes:['RWS','TWS'],name:'PS-46/A (upgraded)',range:90000},
+  spec:'<span><b>+7 g</b></span><span><b>Mach 2</b></span><span>RM8B <b>127 kN</b></span><span>PS-46/A <b>look-down</b></span><span>Rb 71 · Rb 74</span><span>Canard-delta</span>'});
+for(const id of ['A10C','MIG27M','SU24M','AJS37','JA37DI'])delete AC_DEFS[id].model;
+for(const id of ['A10C','MIG27M','SU24M','AJS37','JA37DI'])AC_DEFS[id].cut=AC_DEFS[({A10C:'A10A',MIG27M:'MIG23ML',SU24M:'SU22M3',AJS37:'JA37',JA37DI:'JA37'})[id]].cut;
+m2Alias('A10C','A10A');m2Alias('MIG27M','MIG23ML',{r9:M2.MIG23ML.r9.slice(0,2),r120:[]});m2Alias('SU24M','SU22M3');
+m2Alias('AJS37','JA37',{r9:M2.JA37.r9.slice(0,2),r120:[]});m2Alias('JA37DI','JA37');
+for(const id of ['A10C','MIG27M','SU24M','AJS37','JA37DI'])m2Fit(id);
+ROSTER_IDS.push('A10C','MIG27M','SU24M','AJS37','JA37DI');
+Object.assign(ROSTER_LIKE,{A10C:'A10A',MIG27M:'MIG23ML',SU24M:'SU22M3',AJS37:'JA37',JA37DI:'JA37'});
+Object.assign(PITS,{A10C:'TEEN',MIG27M:'RUS',SU24M:'RUS',AJS37:'TEEN',JA37DI:'TEEN'});
+Object.assign(PAINT,{
+  A10C:{p:1,c:['#5f6a55','#4d5a4a','#717a6c'],b:'#8c928c',nat:'usaf',num:'AF 80-0282',lowvis:1},
+  MIG27M:{p:2,c:['#808a6a','#9a9c80','#7a8a99'],b:'#b0b5ba',nat:'rus',num:'27',nose:'27'},
+  SU24M:{p:2,c:['#8a929a','#707a84','#9aa2a9'],b:'#b0b5ba',nat:'rus',num:'24',nose:'24'},
+  AJS37:{p:2,c:['#5c6a4c','#757d63','#6a7480'],b:'#aab0b5',nat:'swe',num:'37-21'},
+  JA37DI:{p:2,c:['#6a737a','#7d868d','#8d969d'],b:'#aab0b5',nat:'swe',num:'37-62'}});
 // Balance pass: sustained turn and climb brought toward the War Thunder wiki figures (see WTREF in progress.js)
 for(const [id,o] of [['A10A',{MASS:19200}],['A7E',{MASS:15300}],['A4E',{MASS:8200}],['ALPHAJET',{MASS:6410}],['JAGUAR',{MASS:12700}],['G91Y',{MASS:6745}],['F4C',{MASS:18011}],['J35D',{KIND:0.22}],['J29F',{MASS:8100}],['J6A',{KIND:0.247}],['MIG21MF',{MASS:8136,KIND:0.222}],['F100D',{KIND:0.28}],['MIG19PT',{KIND:0.247}],['MIG21F13',{MASS:8600}],['HUNTER',{MASS:9226}],['MIRAGE3C',{MASS:10030}],['MIG21',{KIND:0.265}],['F4F',{KIND:0.173}],['KFIR',{KIND:0.197}],['J35F',{KIND:0.22}],['LIGHTNING',{MASS:20090}],['M2000',{KIND:0.213}],['MIG23ML',{KIND:0.192}],['MIG25PD',{MASS:40404}]])if(AC_DEFS[id])Object.assign(AC_DEFS[id],o);

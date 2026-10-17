@@ -32,5 +32,14 @@ const assert = require('assert'), path = require('path');
   await p2.sortie(); await p2.waitForTimeout(3000);
   const c = await p2.evaluate(() => { const V = __vs, red = V.WAR.units.find(u => u.team === 'red' && u.alive); const z = V.BT.zones[0], d = Math.hypot(red.pos.x - z.x, red.pos.z - z.z); const before = V.BT.pts.red; V.warDie(red, null, 'test'); return { on: V.BT.on, g: V.BT.ground, war: V.WAR.on, d, drop: before - V.BT.pts.red }; });
   assert(c.on && c.g && c.war && c.d < 4500 && c.drop >= 6, 'combined arms: ' + JSON.stringify(c));
+  // naval battle: three frigates, sinking one costs the enemy 100 points, a frigate afloat bleeds yours
+  const p3 = await b.newPage({ viewport: { width: 900, height: 420 } });
+  await p3.addInitScript(() => { try { localStorage.setItem('vsTips', '1'); localStorage.setItem('viperMission', 'NAVAL'); } catch (e) {} });
+  p3.on('pageerror', e => errs.push(e.message)); await p3.route(/fonts\.(googleapis|gstatic)\.com/, r => r.abort());
+  await p3.goto('file://' + path.resolve(__dirname, '../index.html') + '?test'); await p3.waitForTimeout(1500);
+  await p3.sortie(); await p3.waitForTimeout(3000);
+  const n = await p3.evaluate(() => { const V = __vs, g = V.BT.ships; const b0 = V.BT.pts.blue, r0 = V.BT.pts.red; V.killGround(V.BT.ships[0]); return { n: g.length, naval: V.BT.naval, drop: r0 - V.BT.pts.red, left: g.filter(x => x.alive).length }; });
+  assert(n.naval && n.n === 3 && n.drop >= 100 && n.left === 2, 'naval setup and a sinking: ' + JSON.stringify(n));
+  await p3.waitForTimeout(1500);
   assert.deepEqual(errs, []); console.log('battle ok'); await b.close();
 })().catch(e => { console.error(e); process.exit(1); });

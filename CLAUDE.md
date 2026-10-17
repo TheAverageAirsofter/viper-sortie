@@ -67,6 +67,9 @@ Settings > Controls > Input (`vsKbm`, `KBM` in state.js): the mouse is a relativ
 ## Guns, flaps, stall
 Player gun rounds start at the off-centre barrel and are harmonised on `AC.gunConv` (default 650 m); the pattern opens up with the burst (`gunHeat`, `AC.gunDisp`), one round in four is a visible tracer, and the tracer colour follows the belt (`TRACER_COL`). `fly()` in flight.js handles the player's flaps (`P.flaps` 0/1/2, gear forces landing flaps, `FLAP_CL` / `FLAP_CD` / `FLAP_VMAX`) and stall and spin: jets not matching `SPIN_SAFE` depart below stall speed with the nose high and roll or rudder held (`P.spin`), and recover once the controls are centred and speed returns. `tools/stall-test.js` covers it.
 
+## Naval battle, roster additions, online
+`NAVAL` mission (battle.js `setupNaval`): three frigates on the sea (`findSea`), each afloat bleeds blue points, each sunk costs red 100 (`killGround` hook); the BT framework is shared (`BT.naval`). Carrier-deck spawns are not done. New late jets (A-10C, MiG-27M, Su-24M, AJS 37, JA 37DI) are aliases of existing hulls (end of roster.js). Online: squadron tag in presence (`sqTag`), first team to `NET_WIN` kills wins (`netScoreCheck`); the room API only exists inside the Claude app so only the scoring and scoreboard logic is covered by `tools/score-test.js`.
+
 ## Tasks, pass, accessibility
 progress.js: `WEEKLY` tasks (Monday reset, `weeklyAdd`) and the monthly season pass (`PASS_TIERS` x `PASS_PTS`, `passAdd`, `passReward`, `passClaim`; stored as vsWeekly / vsPass); `careerAward` feeds them and the Pilot pane shows them (`weeklyPassUI` in menu.js). Accessibility: `PALS` / `PAL_ORDER` in main.js (green, blue/orange, cyan/magenta, red/teal, white/amber, high contrast), the Reduce motion setting (`REDUCED`, vsReduce), kills and critical hits mirrored to the screen-reader live region.
 

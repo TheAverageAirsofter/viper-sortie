@@ -75,7 +75,7 @@ const tapeY=()=>W<H?H*.34:H*.42;
 function missionStatus(){
   if(BT.on&&isBT())return btStatus();
   if(mission==='TRAINING')return 'TRAINING · '+LESSONS[lesson].toUpperCase();
-  if(mission==='ONLINE')return NET.room?('ONLINE · '+(NET.count)+' PILOT'+(NET.count===1?'':'S')+' · '+NET.code.toUpperCase()):'ONLINE · OFFLINE';
+  if(mission==='ONLINE'){if(!NET.room)return 'ONLINE · OFFLINE';let t='';if(NET.mode==='TEAMS'){const s=netTeamScore();t=' · BLUE '+s.B+' - '+s.R+' RED · FIRST TO '+NET_WIN}return 'ONLINE · '+(NET.count)+' PILOT'+(NET.count===1?'':'S')+' · '+NET.code.toUpperCase()+t}
   if(sortie)return sortieStatus();
   if(mission==='WAVES')return 'WAVE '+wave;
   if(mission==='STRIKE'){const o=ground.filter(g=>g.objective&&g.alive).length;return 'TARGETS LEFT '+o}
