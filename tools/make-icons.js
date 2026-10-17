@@ -12,8 +12,8 @@ const PRE = '/opt/pw-browsers/chromium';
   };
   await shot(512, path.join(root, 'assets/icon-512.png'));
   for (const [d, s] of [['mdpi', 48], ['hdpi', 72], ['xhdpi', 96], ['xxhdpi', 144], ['xxxhdpi', 192]]) {
-    await shot(s, path.join(root, 'assets/android/mipmap-' + d + '/ic_launcher.png'));
-    await shot(s, path.join(root, 'assets/android/mipmap-' + d + '/ic_launcher_round.png'), true);
+    await shot(s, path.join(root, 'assets/launcher/mipmap-' + d + '/ic_launcher.png'));
+    await shot(s, path.join(root, 'assets/launcher/mipmap-' + d + '/ic_launcher_round.png'), true);
   }
   await b.close(); console.log('icons written to assets/');
 })();

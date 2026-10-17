@@ -15,6 +15,6 @@ s=re.sub(r'(<style name="AppTheme.NoActionBar"[^>]*>)',r'\1\n'+extra,s,count=1)
 open(p,'w').write(s)
 PY
 # app icon: the generated launcher PNGs replace Capacitor's default (the adaptive-icon XMLs go so the PNGs are used)
-cp -r assets/android/mipmap-* android/app/src/main/res/
+cp -r assets/launcher/mipmap-* android/app/src/main/res/
 rm -rf android/app/src/main/res/mipmap-anydpi-v26
 grep -q sensorLandscape "$M" && grep -q windowFullscreen "$S"
