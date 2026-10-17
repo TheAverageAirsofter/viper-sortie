@@ -2,7 +2,7 @@
 // The files share one scope on purpose (they are slices of the original script), so they are not standalone modules.
 // Also writes js/game.min.js (minified), which index.html loads. usage: node tools/build.js [--check]   (--check fails if either is stale)
 const fs = require('fs'), path = require('path');
-const ORDER = ['data', 'render', 'roster', 'cockpit', 'effects', 'audio', 'flight', 'ops', 'state', 'ai', 'combat', 'groundwar', 'progress', 'net', 'hud', 'main', 'hangar', 'hangar3d', 'progressui', 'menu'];
+const ORDER = ['data', 'render', 'roster', 'cockpit', 'effects', 'audio', 'flight', 'ops', 'state', 'ai', 'combat', 'groundwar', 'battle', 'progress', 'net', 'hud', 'main', 'hangar', 'hangar3d', 'progressui', 'menu'];
 const root = path.resolve(__dirname, '..');
 const out = "(function(){\n'use strict';\n" + ORDER.map(n => fs.readFileSync(path.join(root, 'src', n + '.js'), 'utf8')).join('') + '})();\n';
 const dest = path.join(root, 'js', 'game.js'), destMin = path.join(root, 'js', 'game.min.js');

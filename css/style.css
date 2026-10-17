@@ -662,3 +662,6 @@ button:disabled{opacity:.4;cursor:not-allowed}
 .mod.own{border-color:rgba(125,255,154,.5)}.mod.res{border-color:rgba(255,200,90,.55)}.mod.lock{opacity:.55}
 .mod .ok{color:var(--hud);font-size:11px}
 .mod button{font-size:11px;padding:6px 8px}
+#btPick{position:fixed;left:50%;bottom:calc(14px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:30;background:var(--panel);border:1px solid var(--hud-dim);border-radius:var(--r-md);padding:10px 14px;max-width:min(96vw,640px);text-align:center;backdrop-filter:blur(6px)}
+#btPick .btRow{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin:8px 0}
+#btPick button:disabled{opacity:.4}

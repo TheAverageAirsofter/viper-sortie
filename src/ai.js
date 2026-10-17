@@ -11,7 +11,7 @@ function pickTarget(e){
     if(e.kind!=='fighter')return null;
     const tr=friends.find(f=>f.alive&&f.kind==='transport');
     if(tr&&e.escortPref)return tr;
-    let best=null,bd=60000;for(const b of blueJets()){const d=b.pos.distanceTo(e.pos);if(d<bd){bd=d;best=b}}return best;
+    let best=null,bd=e.wp?22000:60000;for(const b of blueJets()){const d=b.pos.distanceTo(e.pos);if(d<bd){bd=d;best=b}}return best;
   }
   // blue wingman / flight
   if(e.cmd==='REJOIN')return null;
@@ -19,7 +19,7 @@ function pickTarget(e){
   if(e.cmd==='SORT'){const taken=new Set(friends.filter(f=>f!==e&&f.alive&&f.cmd==='SORT'&&f.tgt).map(f=>f.tgt));if(lockTarget)taken.add(lockTarget);
     let best=null,bd=60000;for(const r of enemies){if(!r.alive||taken.has(r))continue;const d=r.pos.distanceTo(e.pos);if(d<bd){bd=d;best=r}}if(best)return best}
   if(e.cmd==='COVER'){let best=null,bd=20000;for(const r of enemies){if(!r.alive||r.tgt!==P)continue;const d=r.pos.distanceTo(P.pos);if(d<bd){bd=d;best=r}}return best}
-  let best=null,bd=60000;for(const r of enemies){if(!r.alive)continue;const d=r.pos.distanceTo(e.pos);if(d<bd){bd=d;best=r}}return best;
+  let best=null,bd=e.wp?22000:60000;for(const r of enemies){if(!r.alive)continue;const d=r.pos.distanceTo(e.pos);if(d<bd){bd=d;best=r}}return best;
 }
 // which missile coming at this jet does it know about? radar shots via RWR, heat-seekers only by eye (<3.5 km) or a MAW
 function threatTo(e){
@@ -103,6 +103,7 @@ function updateAI(e,dt){
     e.mode='FORM';
     if(lead){_s5.copy(lead.pos).addScaledVector(lead.right,1400*e.side).addScaledVector(lead.fwd,-300).addScaledVector(lead.vel,3);
       dir.subVectors(_s5,e.pos).normalize(); const behind=_s3.subVectors(_s5,e.pos).dot(lead.fwd)>0; thr=behind?1:.72}
+    else if(e.wp){dir.subVectors(e.wp,e.pos);dir.y*=.3;dir.normalize();thr=.9}   // air battle: fly to the zone
     else dir.copy(e.fwd);
   } else {
     // attack: pure pursuit long range (stay high), lead pursuit in the fight, unload when slow

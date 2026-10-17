@@ -22,6 +22,7 @@ function updateCamera(dt){
   const pt=v==='PADLOCK'?padTarget():null;
   if(v==='PADLOCK'&&!pt)v='CHASE';
   playerJet.visible=(alive||(state!=='menu'&&P.alive))&&v!=='COCKPIT';
+  if(!alive&&BT.on&&state==='dead'&&!P.alive){const st=btSpecTarget();if(st){_a.set(0,6,-30).applyQuaternion(st.obj.quaternion).add(st.pos);camera.position.lerp(_a,1-Math.exp(-dt*4));camera.up.set(0,1,0);camera.lookAt(st.pos);return}}
   if(!alive){camera.up.set(0,1,0);if(P.ejected&&chute&&state!=='replay')camera.position.lerp(_a.copy(chute.position).add(_b.set(16,5,16)),1-Math.exp(-dt*3));camera.lookAt(P.pos);return}
 
   const q=playerJet.quaternion, k=camSnap?1:1-Math.exp(-dt*8); camSnap=false;
@@ -72,6 +73,7 @@ const nm=d=>(d/1852).toFixed(d<18520?1:0);
 // tall phone screens lift the left/right tapes so the countermeasure column fits under them
 const tapeY=()=>W<H?H*.34:H*.42;
 function missionStatus(){
+  if(mission==='BATTLE'&&BT.on)return btStatus();
   if(mission==='TRAINING')return 'TRAINING · '+LESSONS[lesson].toUpperCase();
   if(mission==='ONLINE')return NET.room?('ONLINE · '+(NET.count)+' PILOT'+(NET.count===1?'':'S')+' · '+NET.code.toUpperCase()):'ONLINE · OFFLINE';
   if(sortie)return sortieStatus();
@@ -112,6 +114,7 @@ function drawMap(c){
   for(let z=gz;z<P.pos.z+km*1.8;z+=step){const sy=Y(z);if(sy<0||sy>H)continue;c.beginPath();c.moveTo(0,sy);c.lineTo(W,sy);c.stroke()}
   c.beginPath();c.arc(cx,cy,R,0,6.283);c.stroke();c.beginPath();c.arc(cx,cy,R/2,0,6.283);c.stroke();
   c.fillText(Math.round(km/2000)+' KM',cx+R/2+4,cy-4);c.fillText(Math.round(km/1000)+' KM',cx+R+4,cy-4);
+  if(BT.on)for(const z of BT.zones){const x=X(z.x),y=Y(z.z),col=z.own>0?'#5aa8ff':z.own<0?'#ff5a4e':'#cfd8cf';c.strokeStyle=col;c.lineWidth=2;c.setLineDash([6,5]);c.beginPath();c.arc(x,y,BT_R*k,0,6.283);c.stroke();c.setLineDash([]);txt(c,z.n,x,y,'center',col,14,700)}
   // airfield
   c.strokeStyle='#cfd8cf';c.lineWidth=3;c.beginPath();c.moveTo(X(RWY.x),Y(RWY.z0));c.lineTo(X(RWY.x),Y(RWY.z1));c.stroke();
   const dot=(x,y,col,r,sq)=>{c.fillStyle=col;if(sq)c.fillRect(x-r,y-r,r*2,r*2);else{c.beginPath();c.arc(x,y,r,0,6.283);c.fill()}};
