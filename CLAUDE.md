@@ -67,6 +67,9 @@ Settings > Controls > Input (`vsKbm`, `KBM` in state.js): the mouse is a relativ
 ## Guns, flaps, stall
 Player gun rounds start at the off-centre barrel and are harmonised on `AC.gunConv` (default 650 m); the pattern opens up with the burst (`gunHeat`, `AC.gunDisp`), one round in four is a visible tracer, and the tracer colour follows the belt (`TRACER_COL`). `fly()` in flight.js handles the player's flaps (`P.flaps` 0/1/2, gear forces landing flaps, `FLAP_CL` / `FLAP_CD` / `FLAP_VMAX`) and stall and spin: jets not matching `SPIN_SAFE` depart below stall speed with the nose high and roll or rudder held (`P.spin`), and recover once the controls are centred and speed returns. `tools/stall-test.js` covers it.
 
+## Tasks, pass, accessibility
+progress.js: `WEEKLY` tasks (Monday reset, `weeklyAdd`) and the monthly season pass (`PASS_TIERS` x `PASS_PTS`, `passAdd`, `passReward`, `passClaim`; stored as vsWeekly / vsPass); `careerAward` feeds them and the Pilot pane shows them (`weeklyPassUI` in menu.js). Accessibility: `PALS` / `PAL_ORDER` in main.js (green, blue/orange, cyan/magenta, red/teal, white/amber, high contrast), the Reduce motion setting (`REDUCED`, vsReduce), kills and critical hits mirrored to the screen-reader live region.
+
 ## Performance notes
 `mergeStatic` (render.js, called from `buildJet`) merges unnamed static meshes that share a material into one mesh per group, cutting a jet from about 70 draw calls to about 25; named parts (`cs`, `gear`, `canopyG`, `nozG`, `flame`, `wingM`, decals) are never merged. Far ground-war vehicles are hidden beyond 7 / 12 / 20 km (Low / Medium / High). Bloom is off on Medium by default. `__vs.rinfoReset()` / `__vs.rinfo()` read draw calls and triangles (see the perf snippets in the transcript: reset, wait N frames, divide).
 

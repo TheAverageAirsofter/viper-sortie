@@ -123,7 +123,7 @@ function drawMap(c){
   for(const g of ground)if(g.alive){const x=X(g.pos.x),y=Y(g.pos.z);if(g.kind==='sam'){c.strokeStyle='rgba(255,90,78,.45)';c.setLineDash([4,4]);c.lineWidth=1;c.beginPath();c.arc(x,y,(g.range||15000)*k,0,6.283);c.stroke();c.setLineDash([])}dot(x,y,'#ff5a4e',4,true)}
   if(typeof WAR!=='undefined'&&WAR.on)for(const u of WAR.units)if(u.alive&&u.team==='blue')dot(X(u.pos.x),Y(u.pos.z),'#5aa8ff',4,true);
   for(const f of friends)if(f.alive)tri(X(f.pos.x),Y(f.pos.z),head(f),'#5aa8ff',7);
-  for(const e of enemies)if(e.alive)tri(X(e.pos.x),Y(e.pos.z),head(e),'#ff5a4e',7);
+  for(const e of enemies)if(e.alive)tri(X(e.pos.x),Y(e.pos.z),head(e),THREAT,7);
   if(typeof NET!=='undefined'&&NET.remotes)for(const r of NET.remotes.values())if(r.alive)tri(X(r.pos.x),Y(r.pos.z),head(r),r.mate?'#5aa8ff':'#ff5a4e',7);
   const ph=Math.atan2(P.fwd.x,P.fwd.z);c.strokeStyle='rgba(255,255,255,.35)';c.lineWidth=1;c.beginPath();c.moveTo(cx,cy);c.lineTo(cx+Math.sin(ph)*R,cy-Math.cos(ph)*R);c.stroke();
   tri(cx,cy,ph,'#ffffff',9);

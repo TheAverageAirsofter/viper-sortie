@@ -53,7 +53,10 @@ const path = require('path'), assert = require('assert');
     assert(r.n >= 1 && r.worst <= 1.0 + 1e-6, id + (mixed ? ' mixed' : ' fixed') + ' stays within 1.0 BR: ' + JSON.stringify(r));
   } await p.close();
   // persistence
-  p = await open({ viperMode: 'career' }); await p.evaluate(() => { __vs.prog.res.SU27 = true; __vs.prog.own.SU27 = true; localStorage.setItem('vsProg', JSON.stringify(__vs.prog)); }); await p.waitForTimeout(1500); await p.reload(); await p.waitForTimeout(1200);
-  assert(await p.evaluate(() => __vs.prog.own.SU27), 'ownership persists'); await p.close();
+  p = await open({ viperMode: 'career' }); await p.evaluate(() => { __vs.prog.res.SU27 = true; __vs.prog.own.SU27 = true; localStorage.setItem('vsProg', JSON.stringify(__vs.prog)); }); await p.waitForTimeout(1500); await p.reload(); await p.waitForFunction(() => window.__vs && window.__vs.prog, null, { timeout: 20000 }); await p.waitForTimeout(500);
+  assert(await p.evaluate(() => __vs.prog.own.SU27), 'ownership persists');
+  { const r = await p.evaluate(() => { const V = __vs; V.prog.sl = 0; V.prog.frp = 0; const before = V.pass.pts; V.passAdd(250); const mid = V.pass.pts; const ok = V.passClaim(1), again = V.passClaim(1), locked = V.passClaim(5);
+      const w = V.weeklyAdd('w', 3); return { gained: mid - before, ok, again, locked, rewarded: V.prog.sl + V.prog.frp > 0, w }; });   // season pass: points, a claimable tier, a finished weekly task
+    assert(r.gained === 250 && r.ok && !r.again && !r.locked && r.rewarded && /Weekly/.test(r.w || ''), 'pass and weekly: ' + JSON.stringify(r)); }
   assert.deepEqual(errs, []); console.log('progress ok'); await b.close();
 })().catch(e => { console.error(e); process.exit(1); });

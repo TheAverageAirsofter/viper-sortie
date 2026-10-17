@@ -125,7 +125,7 @@ const SDESC={'Key bindings':'Rebind every keyboard key and mouse button, set mou
   'Vibration':'Haptic feedback for guns, hits and warnings.','Move buttons':'Drag the on-screen buttons where you want them, then save.','Controls guide':'Launch a sortie and show the controls guide on top.',
   'Graphics':'Lower this if the frame rate drops. Auto-adjusts when the game is struggling.','Cinematic menu':'Film grain, letterbox bars, light flare and the slow camera drift behind the menu.','Kill cam':'A short replay when you shoot something down.',
   'Sound':'All game sound.','Voice warnings':'Spoken cockpit warnings: pull up, missile, bingo fuel.','UI sounds':'Quiet clicks as you move through the menu.',
-  'Colours':'Switch the HUD to a colour-blind friendly blue and orange.','Text size':'Scale the HUD text.',
+  'Colours':'HUD colours: green, blue/orange, cyan/magenta (red-green colour blindness), red/teal (blue-yellow), white/amber, or high contrast.','Reduce motion':'Less camera shake and no strobing warnings. Follows the system setting until you change it.','Text size':'Scale the HUD text.',
   'Difficulty':'How smart and how deadly the bandits are.','Range':'How far away the fight starts. Longer ranges give you room to notch and use radar missiles.','Mode':'Career keeps your XP, rank and unlocks.'};
 const STABS=[['ctl','Controls'],['dsp','Display'],['aud','Audio'],['hud','HUD'],['gp','Gameplay']];
 let sTab='ctl';
@@ -148,7 +148,8 @@ let sTab='ctl';
     onoff('Kill cam',()=>KC.on,()=>$('bKc').click()));
   pane.aud.append(onoff('Sound',()=>A.on,()=>$('bSound').click()),onoff('Voice warnings',()=>VOICE.on,()=>$('bVoice').click()),onoff('UI sounds',()=>UIS.on,()=>{UIS.on=!UIS.on;lsSet('vsUiSnd',UIS.on?'1':'0');if(UIS.on){audioInit();uiSnd('sel')}}));
   pane.hud.append(
-    mRow('Colours',()=>[{v:'green',t:'Green'},{v:'cb',t:'Blue / orange'}],()=>palKey,v=>drive($('bPal'),()=>palKey,v,3)),
+    mRow('Colours',()=>PAL_ORDER.map(k=>({v:k,t:PALS[k].n[0].toUpperCase()+PALS[k].n.slice(1)})),()=>palKey,v=>drive($('bPal'),()=>palKey,v,8)),
+    onoff('Reduce motion',()=>REDUCED,()=>setReduced(!REDUCED)),
     mRow('Text size',()=>TXT_SIZES.map(k=>({v:k,t:Math.round(k*100)+'%'})),()=>txtK,v=>drive($('bText'),()=>txtK,v,4)));
   pane.gp.append(
     mRow('Difficulty',()=>Object.keys(DIFF).map(k=>({v:k,t:DIFF[k].name})),()=>difficulty,v=>drive($('bDiff'),()=>difficulty,v),{hidden:()=>$('bDiff').hidden}),
@@ -320,7 +321,7 @@ new MutationObserver(uiSoon).observe($('legacy'),{subtree:true,childList:true,ch
 function uiSync(){
   for(const c of mCtls)c.sync();
   if(quickList().indexOf(mission)>=0)lastQuick=mission;
-  wallet();dailyUI();crewUI();bnavSync();
+  wallet();dailyUI();weeklyPassUI();crewUI();bnavSync();
   // main screen: current aircraft
   {const n=NODES[AC.id];$('acName').textContent=AC.name;$('acBr').textContent='BR '+progBR(AC.id).toFixed(1)+(careerOn?' · Career':' · Free play');$('hNat').textContent=n?NATIONS[n.n].n+' · Rank '+ROMAN[n.r]:'Aircraft';
    $('hLoad').textContent=$('bRole').textContent.replace(/^Loadout:\s*/,'').replace(/\s*▸$/,'')}
@@ -346,6 +347,15 @@ function bnavSync(){const p=ovEl.dataset.pane;for(const b of $('bNav').querySele
 function dailyUI(){if(ovEl.dataset.pane!=='pilot')return;const d=$('pgDaily');
   d.innerHTML=(careerOn?'':'<p class="txt">Daily tasks count in Career mode.</p>')+DAILY.map(t=>{const v=Math.min(t[2],Math.floor(daily[t[0]]||0)),done=!!daily.done[t[0]];
     return '<div class="dt'+(done?' done':'')+'"><span class="tk" aria-hidden="true">'+(done?'<svg viewBox="0 0 16 12"><path d="M1 6l5 5L15 1"/></svg>':'')+'</span><span class="nm">'+t[1]+'<small>'+v+' / '+t[2]+' · +'+t[3]+' RP</small></span></div>'}).join('')}
+function weeklyPassUI(){if(ovEl.dataset.pane!=='pilot')return;weeklyRoll();passRoll();
+  $('pgWeekly').innerHTML=(careerOn?'':'<p class="txt">Weekly tasks count in Career mode.</p>')+WEEKLY.map(t=>{const v=Math.min(t[2],Math.floor(weekly.c[t[0]]||0)),done=!!weekly.done[t[0]];
+    return '<div class="dt'+(done?' done':'')+'"><span class="tk" aria-hidden="true">'+(done?'<svg viewBox="0 0 16 12"><path d="M1 6l5 5L15 1"/></svg>':'')+'</span><span class="nm">'+t[1]+'<small>'+v+' / '+t[2]+' · +'+t[3]+' RP, +'+t[4]+' SL</small></span></div>'}).join('');
+  const tier=Math.min(PASS_TIERS,Math.floor(pass.pts/PASS_PTS));
+  let h='<p class="txt">'+(careerOn?'':'Pass points count in Career mode. ')+'Tier '+tier+' / '+PASS_TIERS+' · '+pass.pts+' pass points · '+PASS_PTS+' per tier. Points come from sorties, kills, wins and finished tasks.</p><div class="passRow">';
+  for(let i=0;i<PASS_TIERS;i++){const r=passReward(i),open=pass.pts>=(i+1)*PASS_PTS,got=!!pass.claimed[i];
+    h+='<button type="button" class="pt'+(got?' got':open?' open':'')+'" data-act="pass" data-i="'+i+'"'+(open&&!got?'':' disabled')+'><b>'+(i+1)+'</b><span>'+(r.sl?'+'+r.sl.toLocaleString()+' SL':'')+(r.sl&&r.rp?'<br>':'')+(r.rp?'+'+r.rp.toLocaleString()+' RP':'')+'</span><i>'+(got?'✓':open?'Claim':'')+'</i></button>'}
+  $('pgPass').innerHTML=h+'</div>'}
+$('pgPass').addEventListener('click',e=>{const t=e.target.closest('[data-act=pass]');if(!t||t.disabled)return;if(passClaim(+t.dataset.i)){uiSnd('sel');syncCareerUI();weeklyPassUI()}});
 function crewUI(){if(ovEl.dataset.pane==='pilot')$('pgCrew').innerHTML=crewCards()}
 $('pgCrew').addEventListener('click',e=>{const t=e.target.closest('[data-act=crew]');if(!t||t.disabled)return;if(progCrew(t.dataset.k)){uiSnd('sel');applyAC();syncCareerUI();uiSync();if(typeof progRender==='function')progRender()}});
 setInterval(()=>{if(daily.d!==dayKey())uiSoon()},30000);

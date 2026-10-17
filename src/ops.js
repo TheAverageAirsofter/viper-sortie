@@ -80,7 +80,8 @@ function launchSAM(g){
   recLaunch(m,'SAM site',P); message('SAM LAUNCH',1.8); buzz([60,50,60,50,60]); for(let i=0;i<5;i++)setTimeout(()=>sndBeep(1300,.06,.05),i*100);
 }
 function clearGround(){for(const g of ground)scene.remove(g.obj);ground=[];warClear()}
-function killGround(g){if(!g.alive)return;g.alive=false;explode(g.pos.clone().setY(g.pos.y+3),true);g.obj.rotation.z=.3;g.obj.position.y-=1;
+let sortieGround=0;
+function killGround(g){if(!g.alive)return;g.alive=false;sortieGround++;explode(g.pos.clone().setY(g.pos.y+3),true);g.obj.rotation.z=.3;g.obj.position.y-=1;
   kills++;score+=200*Math.max(1,wave);scKill(({sam:'SAM',aaa:'AAA',radar:'RADAR',bunker:'BUNKER',truck:'TRUCK',ship:'FRIGATE',tank:'TANK',ifv:'IFV',spaa:'AA VEHICLE'})[g.kind]+' DESTROYED',0);SC.list[SC.list.length-1].pts=200*Math.max(1,wave);message(({sam:'SAM SITE DESTROYED',aaa:'AAA DESTROYED',radar:'EW RADAR DESTROYED',bunker:'BUNKER DESTROYED',truck:'TRUCK DESTROYED',ship:'FRIGATE SUNK',tank:'TANK DESTROYED',ifv:'IFV DESTROYED',spaa:'AA VEHICLE DESTROYED'})[g.kind],1.6);recEvent('You destroyed '+({sam:'a SAM launcher',aaa:'an AAA gun',radar:'the early-warning radar',bunker:'the command bunker',truck:'a convoy truck',ship:'the frigate',tank:'a '+g.type,ifv:'a '+g.type,spaa:'a '+g.type})[g.kind]);if(g.war)warWreck(g);if(g.kind==='ship'){g.obj.rotation.z=.25;g.obj.position.y=-4}if(typeof campaignKill==='function')campaignKill(g)}
 
 

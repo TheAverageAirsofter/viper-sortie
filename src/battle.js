@@ -81,7 +81,7 @@ function btTick(dt){
   if(state==='dead'&&!P.alive&&BT.diedT&&clock-BT.diedT>2.4)showBtPick();
 }
 // respawn picker: lineup buttons plus a next-spectate button; the camera follows a team-mate meanwhile
-const btPick=document.createElement('div');btPick.id='btPick';btPick.hidden=true;document.body.appendChild(btPick);
+const btPick=document.createElement('div');btPick.id='btPick';btPick.hidden=true;btPick.setAttribute('role','dialog');btPick.setAttribute('aria-label','Choose your next jet');document.body.appendChild(btPick);
 function hideBtPick(){btPick.hidden=true;btPick.dataset.k=''}
 function showBtPick(){
   const key=BT.lineup.filter(btAfford).join(',')+'|'+BT.sp+'|'+BT.over;

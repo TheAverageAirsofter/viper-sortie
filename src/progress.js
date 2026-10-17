@@ -71,6 +71,25 @@ function progModBuy(id,mk){const m=MODS.find(x=>x[0]===mk);if(!modOk(id,m)||!mod
 function crewCost(k){const c=CREW.find(x=>x[0]===k);return c[3]*((prog.crew[k]||0)+1)}
 function progCrew(k){const lv=prog.crew[k]||0;if(lv>=5||prog.sl<crewCost(k))return false;prog.sl-=crewCost(k);prog.crew[k]=lv+1;progSave();return true}
 
+/* ---------------- weekly tasks and the season pass (Career only) ----------------
+   Weekly tasks reset on Monday and pay RP and Silver Lions; the season pass (a month) fills with pass points earned per sortie, kill, win and finished task and
+   has 30 tiers of free rewards. Both live in localStorage (vsWeekly, vsPass). */
+const WEEKLY=[['k','Shoot down 15 bandits',15,2500,4000],['w','Win 3 missions',3,3000,6000],['g','Destroy 10 ground targets',10,2500,4000]];
+const weekKey=()=>{const d=new Date(),t=new Date(d.getFullYear(),d.getMonth(),d.getDate());t.setDate(t.getDate()-((t.getDay()+6)%7));return t.getFullYear()+'-'+(t.getMonth()+1)+'-'+t.getDate()};
+let weekly={wk:'',c:{k:0,w:0,g:0},done:{}};
+try{const v=JSON.parse(localStorage.getItem('vsWeekly')||'null');if(v&&typeof v.wk==='string')weekly=Object.assign(weekly,v,{c:Object.assign({k:0,w:0,g:0},v.c),done:Object.assign({},v.done)})}catch(e){}
+const weeklySave=()=>{try{localStorage.setItem('vsWeekly',JSON.stringify(weekly))}catch(e){}};
+function weeklyRoll(){const t=weekKey();if(weekly.wk!==t){weekly={wk:t,c:{k:0,w:0,g:0},done:{}};weeklySave()}}
+const PASS_TIERS=30, PASS_PTS=100, seasonKey=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')};
+let pass={s:'',pts:0,claimed:{}};
+try{const v=JSON.parse(localStorage.getItem('vsPass')||'null');if(v&&typeof v.s==='string')pass=Object.assign(pass,v,{claimed:Object.assign({},v.claimed)})}catch(e){}
+const passSave=()=>{try{localStorage.setItem('vsPass',JSON.stringify(pass))}catch(e){}};
+function passRoll(){const s=seasonKey();if(pass.s!==s){pass={s,pts:0,claimed:{}};passSave()}}
+const passReward=i=>i%5===4?{sl:15000+i*1000,rp:1500+i*50,t:'Big'}:i%2?{sl:2500+i*150,rp:0,t:'SL'}:{sl:0,rp:350+i*30,t:'RP'};
+function passAdd(n){if(!careerOn||!(n>0))return;passRoll();pass.pts=Math.min(PASS_TIERS*PASS_PTS,pass.pts+Math.round(n));passSave()}
+function passClaim(i){passRoll();const r=passReward(i);if(i<0||i>=PASS_TIERS||pass.claimed[i]||pass.pts<(i+1)*PASS_PTS)return false;pass.claimed[i]=1;prog.sl+=r.sl;prog.frp+=r.rp;progSave();passSave();return true}
+function weeklyAdd(k,n){if(!careerOn||!(n>0))return null;weeklyRoll();const t=WEEKLY.find(x=>x[0]===k);if(!t||weekly.done[k])return null;
+  weekly.c[k]=Math.min(t[2],(weekly.c[k]||0)+n);let hit=null;if(weekly.c[k]>=t[2]){weekly.done[k]=1;prog.frp+=t[3];prog.sl+=t[4];progSave();passAdd(150);hit='Weekly: '+t[1]+' (+'+t[3]+' RP, +'+t[4]+' SL)'}weeklySave();return hit}
 /* ---------------- daily tasks (Career only): three small goals that pay free RP; progress lives in vsDaily and resets at local midnight ---------------- */
 const DAILY=[['k','Shoot down 2 bandits',2,400],['m','Fly 10 minutes in Career',10,500],['l','Land once',1,300]];
 const dayKey=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')};
@@ -80,4 +99,4 @@ const dailySave=()=>{try{localStorage.setItem('vsDaily',JSON.stringify(daily))}c
 function dailyRoll(){const t=dayKey();if(daily.d!==t){daily={d:t,k:0,m:0,l:0,done:{}};dailySave()}}
 // returns the task text when this call completes it
 function dailyAdd(k,n){if(!careerOn||!(n>0))return null;dailyRoll();const t=DAILY.find(x=>x[0]===k);if(!t||daily.done[k])return null;
-  daily[k]=Math.min(t[2],(daily[k]||0)+n);let hit=null;if(daily[k]>=t[2]){daily.done[k]=1;prog.frp+=t[3];progSave();hit=t[1]+' (+'+t[3]+' RP)'}dailySave();return hit}
+  daily[k]=Math.min(t[2],(daily[k]||0)+n);let hit=null;if(daily[k]>=t[2]){daily.done[k]=1;prog.frp+=t[3];progSave();passAdd(40);hit=t[1]+' (+'+t[3]+' RP)'}dailySave();return hit}

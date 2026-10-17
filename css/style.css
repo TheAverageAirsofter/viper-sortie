@@ -683,3 +683,11 @@ button:disabled{opacity:.4;cursor:not-allowed}
 #kbEdit input[type=range]{width:170px}
 #kbEdit .kbVal{width:48px;text-align:right;font-size:12px}
 #kbEdit .kbFoot{display:flex;gap:8px;justify-content:flex-end}
+#ov .passRow{display:grid;grid-template-columns:repeat(auto-fill,minmax(82px,1fr));gap:6px;margin-top:8px}
+#ov .pt{display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 4px;border:1px solid var(--hair);border-radius:var(--r-md);background:transparent;color:inherit;font:inherit;font-size:11px;min-height:58px}
+#ov .pt b{font-size:13px}
+#ov .pt span{text-align:center;opacity:.85}
+#ov .pt i{font-style:normal;font-size:10px;letter-spacing:.08em;text-transform:uppercase}
+#ov .pt.open{border-color:var(--hud,#7dff9a);color:var(--hud,#7dff9a)}
+#ov .pt.got{opacity:.5}
+#ov .pt:disabled:not(.got){opacity:.45}

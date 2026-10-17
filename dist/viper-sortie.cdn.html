@@ -684,6 +684,14 @@ button:disabled{opacity:.4;cursor:not-allowed}
 #kbEdit input[type=range]{width:170px}
 #kbEdit .kbVal{width:48px;text-align:right;font-size:12px}
 #kbEdit .kbFoot{display:flex;gap:8px;justify-content:flex-end}
+#ov .passRow{display:grid;grid-template-columns:repeat(auto-fill,minmax(82px,1fr));gap:6px;margin-top:8px}
+#ov .pt{display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 4px;border:1px solid var(--hair);border-radius:var(--r-md);background:transparent;color:inherit;font:inherit;font-size:11px;min-height:58px}
+#ov .pt b{font-size:13px}
+#ov .pt span{text-align:center;opacity:.85}
+#ov .pt i{font-style:normal;font-size:10px;letter-spacing:.08em;text-transform:uppercase}
+#ov .pt.open{border-color:var(--hud,#7dff9a);color:var(--hud,#7dff9a)}
+#ov .pt.got{opacity:.5}
+#ov .pt:disabled:not(.got){opacity:.45}
 </style>
 <meta name="theme-color" content="#0b1217">
 
@@ -845,6 +853,8 @@ button:disabled{opacity:.4;cursor:not-allowed}
           <div class="pBox"><p class="cap">Campaign</p><div id="pgCamp"></div></div>
           <div class="pBox"><p class="cap">Best scores</p><div id="pBest"></div></div>
           <div class="pBox"><p class="cap">Daily tasks</p><div id="pgDaily"></div></div>
+          <div class="pBox"><p class="cap">Weekly tasks</p><div id="pgWeekly"></div></div>
+          <div class="pBox"><p class="cap">Season pass</p><div id="pgPass"></div></div>
           <div class="pBox"><p class="cap">Crew training</p><div id="pgCrew"></div></div>
           <div class="pBox how"><p class="cap">How to fly</p>
             <p class="txt" id="howLede">Real energy fighting. Thrust, drag and air density set your speed, hard turns bleed it, and holding 9&nbsp;g too long will black you out. Corner speed is about <span id="ovCorner">350</span>&nbsp;knots.</p>
@@ -4163,7 +4173,8 @@ function launchSAM(g){
   recLaunch(m,'SAM site',P); message('SAM LAUNCH',1.8); buzz([60,50,60,50,60]); for(let i=0;i<5;i++)setTimeout(()=>sndBeep(1300,.06,.05),i*100);
 }
 function clearGround(){for(const g of ground)scene.remove(g.obj);ground=[];warClear()}
-function killGround(g){if(!g.alive)return;g.alive=false;explode(g.pos.clone().setY(g.pos.y+3),true);g.obj.rotation.z=.3;g.obj.position.y-=1;
+let sortieGround=0;
+function killGround(g){if(!g.alive)return;g.alive=false;sortieGround++;explode(g.pos.clone().setY(g.pos.y+3),true);g.obj.rotation.z=.3;g.obj.position.y-=1;
   kills++;score+=200*Math.max(1,wave);scKill(({sam:'SAM',aaa:'AAA',radar:'RADAR',bunker:'BUNKER',truck:'TRUCK',ship:'FRIGATE',tank:'TANK',ifv:'IFV',spaa:'AA VEHICLE'})[g.kind]+' DESTROYED',0);SC.list[SC.list.length-1].pts=200*Math.max(1,wave);message(({sam:'SAM SITE DESTROYED',aaa:'AAA DESTROYED',radar:'EW RADAR DESTROYED',bunker:'BUNKER DESTROYED',truck:'TRUCK DESTROYED',ship:'FRIGATE SUNK',tank:'TANK DESTROYED',ifv:'IFV DESTROYED',spaa:'AA VEHICLE DESTROYED'})[g.kind],1.6);recEvent('You destroyed '+({sam:'a SAM launcher',aaa:'an AAA gun',radar:'the early-warning radar',bunker:'the command bunker',truck:'a convoy truck',ship:'the frigate',tank:'a '+g.type,ifv:'a '+g.type,spaa:'a '+g.type})[g.kind]);if(g.war)warWreck(g);if(g.kind==='ship'){g.obj.rotation.z=.25;g.obj.position.y=-4}if(typeof campaignKill==='function')campaignKill(g)}
 
 
@@ -4754,7 +4765,9 @@ let gunHeld=false,brake=false,fire9=false,fire120=false;
 const HG={on:false,bg:false,ang:.7,el:.2,zoom:1,drag:null,auto:true,pan:false,goal:null,t:0,tgt:new V3(0,2,-4),r:20};   // on = hangar editor panel; bg = hangar scene behind the menu   // hangar: turntable camera around the player's jet
 const VIEWS=['CHASE','COCKPIT','PADLOCK','FLYBY']; let view=0; const flyCam=new V3(); let flyCamSet=false;
 const keys={};
-const REDUCED=!!(window.matchMedia&&matchMedia('(prefers-reduced-motion:reduce)').matches);
+let REDUCED=!!(window.matchMedia&&matchMedia('(prefers-reduced-motion:reduce)').matches);
+try{const v=localStorage.getItem('vsReduce');if(v==='1')REDUCED=true;else if(v==='0')REDUCED=false}catch(e){}
+function setReduced(v){REDUCED=!!v;try{localStorage.setItem('vsReduce',v?'1':'0')}catch(e){}}
 const srLive=document.getElementById('srLive');
 // kill feed (War Thunder style): short lines in the top-right corner that fade after a few seconds; kind picks the colour
 const FEED=[], FEED_LIFE=7;
@@ -4762,6 +4775,7 @@ function feed(text,kind){FEED.push({t:clock,text,kind:kind||(/^You (killed|destr
 /* War Thunder style scoring events: lines fade over a few seconds under the sight; hits coalesce, kills chain into multi-kill bonuses */
 const SC={list:[],streak:0,lastKill:-99};
 function scEvent(text,pts,col,key){
+  if(srLive&&(col==='kill'||col==='crit'))srLive.textContent=text;   // screen readers hear kills and critical hits
   if(pts)score+=pts;if(col==='crit'&&key!=='ghit')sndCrit();
   const f=key&&SC.list.find(x=>x.key===key&&clock-x.t<1.6);
   if(f){f.n++;f.pts+=pts;f.t=clock;f.text=text+' ×'+f.n}
@@ -4823,7 +4837,7 @@ function clearWorld(){
   enemies=[];friends=[];spawnQ=[];[...pBullets,...eBullets,...missiles,...eMissiles].forEach(kill);
 }
 let gunShots=0,gunHits=0;
-function startGame(){BT.on=false;hideBtPick();TMAP.z=0;SC.list.length=0;SC.streak=0;SC.lastKill=-99;
+function startGame(){sortieGround=0;BT.on=false;hideBtPick();TMAP.z=0;SC.list.length=0;SC.streak=0;SC.lastKill=-99;
   gunShots=0;gunHits=0;clearWorld(); resetPlayer(); resetRadar(); resetCM(); recReset(); rec3Reset(); P.alive=true;
   if(mission!=='ONLINE'){netStop();$('bSb').hidden=true;$('sbBox').hidden=true}
   trainHook=null;
@@ -6582,7 +6596,7 @@ function btTick(dt){
   if(state==='dead'&&!P.alive&&BT.diedT&&clock-BT.diedT>2.4)showBtPick();
 }
 // respawn picker: lineup buttons plus a next-spectate button; the camera follows a team-mate meanwhile
-const btPick=document.createElement('div');btPick.id='btPick';btPick.hidden=true;document.body.appendChild(btPick);
+const btPick=document.createElement('div');btPick.id='btPick';btPick.hidden=true;btPick.setAttribute('role','dialog');btPick.setAttribute('aria-label','Choose your next jet');document.body.appendChild(btPick);
 function hideBtPick(){btPick.hidden=true;btPick.dataset.k=''}
 function showBtPick(){
   const key=BT.lineup.filter(btAfford).join(',')+'|'+BT.sp+'|'+BT.over;
@@ -6678,6 +6692,25 @@ function progModBuy(id,mk){const m=MODS.find(x=>x[0]===mk);if(!modOk(id,m)||!mod
 function crewCost(k){const c=CREW.find(x=>x[0]===k);return c[3]*((prog.crew[k]||0)+1)}
 function progCrew(k){const lv=prog.crew[k]||0;if(lv>=5||prog.sl<crewCost(k))return false;prog.sl-=crewCost(k);prog.crew[k]=lv+1;progSave();return true}
 
+/* ---------------- weekly tasks and the season pass (Career only) ----------------
+   Weekly tasks reset on Monday and pay RP and Silver Lions; the season pass (a month) fills with pass points earned per sortie, kill, win and finished task and
+   has 30 tiers of free rewards. Both live in localStorage (vsWeekly, vsPass). */
+const WEEKLY=[['k','Shoot down 15 bandits',15,2500,4000],['w','Win 3 missions',3,3000,6000],['g','Destroy 10 ground targets',10,2500,4000]];
+const weekKey=()=>{const d=new Date(),t=new Date(d.getFullYear(),d.getMonth(),d.getDate());t.setDate(t.getDate()-((t.getDay()+6)%7));return t.getFullYear()+'-'+(t.getMonth()+1)+'-'+t.getDate()};
+let weekly={wk:'',c:{k:0,w:0,g:0},done:{}};
+try{const v=JSON.parse(localStorage.getItem('vsWeekly')||'null');if(v&&typeof v.wk==='string')weekly=Object.assign(weekly,v,{c:Object.assign({k:0,w:0,g:0},v.c),done:Object.assign({},v.done)})}catch(e){}
+const weeklySave=()=>{try{localStorage.setItem('vsWeekly',JSON.stringify(weekly))}catch(e){}};
+function weeklyRoll(){const t=weekKey();if(weekly.wk!==t){weekly={wk:t,c:{k:0,w:0,g:0},done:{}};weeklySave()}}
+const PASS_TIERS=30, PASS_PTS=100, seasonKey=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')};
+let pass={s:'',pts:0,claimed:{}};
+try{const v=JSON.parse(localStorage.getItem('vsPass')||'null');if(v&&typeof v.s==='string')pass=Object.assign(pass,v,{claimed:Object.assign({},v.claimed)})}catch(e){}
+const passSave=()=>{try{localStorage.setItem('vsPass',JSON.stringify(pass))}catch(e){}};
+function passRoll(){const s=seasonKey();if(pass.s!==s){pass={s,pts:0,claimed:{}};passSave()}}
+const passReward=i=>i%5===4?{sl:15000+i*1000,rp:1500+i*50,t:'Big'}:i%2?{sl:2500+i*150,rp:0,t:'SL'}:{sl:0,rp:350+i*30,t:'RP'};
+function passAdd(n){if(!careerOn||!(n>0))return;passRoll();pass.pts=Math.min(PASS_TIERS*PASS_PTS,pass.pts+Math.round(n));passSave()}
+function passClaim(i){passRoll();const r=passReward(i);if(i<0||i>=PASS_TIERS||pass.claimed[i]||pass.pts<(i+1)*PASS_PTS)return false;pass.claimed[i]=1;prog.sl+=r.sl;prog.frp+=r.rp;progSave();passSave();return true}
+function weeklyAdd(k,n){if(!careerOn||!(n>0))return null;weeklyRoll();const t=WEEKLY.find(x=>x[0]===k);if(!t||weekly.done[k])return null;
+  weekly.c[k]=Math.min(t[2],(weekly.c[k]||0)+n);let hit=null;if(weekly.c[k]>=t[2]){weekly.done[k]=1;prog.frp+=t[3];prog.sl+=t[4];progSave();passAdd(150);hit='Weekly: '+t[1]+' (+'+t[3]+' RP, +'+t[4]+' SL)'}weeklySave();return hit}
 /* ---------------- daily tasks (Career only): three small goals that pay free RP; progress lives in vsDaily and resets at local midnight ---------------- */
 const DAILY=[['k','Shoot down 2 bandits',2,400],['m','Fly 10 minutes in Career',10,500],['l','Land once',1,300]];
 const dayKey=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')};
@@ -6687,7 +6720,7 @@ const dailySave=()=>{try{localStorage.setItem('vsDaily',JSON.stringify(daily))}c
 function dailyRoll(){const t=dayKey();if(daily.d!==t){daily={d:t,k:0,m:0,l:0,done:{}};dailySave()}}
 // returns the task text when this call completes it
 function dailyAdd(k,n){if(!careerOn||!(n>0))return null;dailyRoll();const t=DAILY.find(x=>x[0]===k);if(!t||daily.done[k])return null;
-  daily[k]=Math.min(t[2],(daily[k]||0)+n);let hit=null;if(daily[k]>=t[2]){daily.done[k]=1;prog.frp+=t[3];progSave();hit=t[1]+' (+'+t[3]+' RP)'}dailySave();return hit}
+  daily[k]=Math.min(t[2],(daily[k]||0)+n);let hit=null;if(daily[k]>=t[2]){daily.done[k]=1;prog.frp+=t[3];progSave();passAdd(40);hit=t[1]+' (+'+t[3]+' RP)'}dailySave();return hit}
 /* ---------------- sortie recorder for the debrief ---------------- */
 const REC={t:0,acc:0,frames:[],events:[],msl:new Map()}; let mslSeq=0;
 function recReset(){REC.t=0;REC.acc=0;REC.frames=[];REC.events=[];REC.msl=new Map();mslSeq=0}
@@ -6960,7 +6993,7 @@ function careerAward(){
   career.xp+=xp;career.sorties++;career.kills+=kills;if(!P.alive&&!P.rescued)career.deaths++;if(win)career.wins++;
   const after=rankIdx(career.xp), newJets=Object.keys(UNLOCK).filter(k=>UNLOCK[k]>before&&UNLOCK[k]<=after).map(k=>AC_DEFS[k].name);
   const pg=progAward(xp,win,kills,P.alive||!!P.rescued,!!P.rescued,lines.filter(l=>l[1]));
-  const dt=[dailyAdd('k',kills),dailyAdd('m',missionT/60)].filter(Boolean);
+  const dt=[dailyAdd('k',kills),dailyAdd('m',missionT/60),weeklyAdd('k',kills),win?weeklyAdd('w',1):null,weeklyAdd('g',sortieGround)].filter(Boolean);passAdd(20+kills*5+(win?30:0));
   lastAward={xp,promoted:after>before?RANKS[after][1]:null,newJets:[],prog:pg,daily:dt};
   saveCareer(); syncCareerUI();
 }
@@ -7106,7 +7139,7 @@ function drawMap(c){
   for(const g of ground)if(g.alive){const x=X(g.pos.x),y=Y(g.pos.z);if(g.kind==='sam'){c.strokeStyle='rgba(255,90,78,.45)';c.setLineDash([4,4]);c.lineWidth=1;c.beginPath();c.arc(x,y,(g.range||15000)*k,0,6.283);c.stroke();c.setLineDash([])}dot(x,y,'#ff5a4e',4,true)}
   if(typeof WAR!=='undefined'&&WAR.on)for(const u of WAR.units)if(u.alive&&u.team==='blue')dot(X(u.pos.x),Y(u.pos.z),'#5aa8ff',4,true);
   for(const f of friends)if(f.alive)tri(X(f.pos.x),Y(f.pos.z),head(f),'#5aa8ff',7);
-  for(const e of enemies)if(e.alive)tri(X(e.pos.x),Y(e.pos.z),head(e),'#ff5a4e',7);
+  for(const e of enemies)if(e.alive)tri(X(e.pos.x),Y(e.pos.z),head(e),THREAT,7);
   if(typeof NET!=='undefined'&&NET.remotes)for(const r of NET.remotes.values())if(r.alive)tri(X(r.pos.x),Y(r.pos.z),head(r),r.mate?'#5aa8ff':'#ff5a4e',7);
   const ph=Math.atan2(P.fwd.x,P.fwd.z);c.strokeStyle='rgba(255,255,255,.35)';c.lineWidth=1;c.beginPath();c.moveTo(cx,cy);c.lineTo(cx+Math.sin(ph)*R,cy-Math.cos(ph)*R);c.stroke();
   tri(cx,cy,ph,'#ffffff',9);
@@ -7512,11 +7545,16 @@ requestAnimationFrame(frame);
 
 /* ---------- HUD colour palette (colour-blind safe option: cyan friendly, orange threat, yellow warning) ---------- */
 const PALS={green:{n:'green',hud:'#7dff9a',dim:'rgba(125,255,154,.45)',warn:'#ffb347',threat:'#ff5a4e'},
-  cb:{n:'blue / orange',hud:'#5cd0ff',dim:'rgba(92,208,255,.45)',warn:'#ffe14d',threat:'#ff8c1a'}};
+  cb:{n:'blue / orange',hud:'#5cd0ff',dim:'rgba(92,208,255,.45)',warn:'#ffe14d',threat:'#ff8c1a'},
+  deut:{n:'cyan / magenta',hud:'#5ce8ff',dim:'rgba(92,232,255,.45)',warn:'#ffe14d',threat:'#ff4fd8'},          // red-green colour blindness: no red or green at all
+  trit:{n:'red / teal',hud:'#9df0e0',dim:'rgba(157,240,224,.45)',warn:'#ffd0a0',threat:'#ff5a6a'},            // blue-yellow colour blindness
+  mono:{n:'white / amber',hud:'#ffffff',dim:'rgba(255,255,255,.5)',warn:'#ffc04a',threat:'#ffffff'},          // threats are told apart by shape and flashing, not hue
+  hc:{n:'high contrast',hud:'#ffffff',dim:'rgba(255,255,255,.7)',warn:'#ffff00',threat:'#ff3030'}};
+const PAL_ORDER=['green','cb','deut','trit','mono','hc'];
 let palKey='green'; try{const k=localStorage.getItem('viperPal');if(PALS[k])palKey=k}catch(e){}
 function applyPal(){const p=PALS[palKey],r=document.documentElement.style;HUD=p.hud;HUDD=p.dim;WARN=p.warn;THREAT=p.threat;
   r.setProperty('--hud',p.hud);r.setProperty('--hud-dim',p.dim);r.setProperty('--warn',p.warn);r.setProperty('--threat',p.threat);$('bPal').textContent='HUD colours: '+p.n}
-$('bPal').addEventListener('click',()=>{palKey=palKey==='green'?'cb':'green';try{localStorage.setItem('viperPal',palKey)}catch(e){};applyPal()});
+$('bPal').addEventListener('click',()=>{palKey=PAL_ORDER[(PAL_ORDER.indexOf(palKey)+1)%PAL_ORDER.length];try{localStorage.setItem('viperPal',palKey)}catch(e){};applyPal()});
 applyPal();
 
 /* ---------- first-run hint: point new pilots at the guided lessons ---------- */
@@ -7615,7 +7653,7 @@ const _careerAward=careerAward;
 careerAward=function(){lbAdd();return _careerAward.apply(this,arguments)};
 
 /* ---------- test hook (only with ?test in the URL) ---------- */
-if(/[?&]test\b/.test(location.search))window.__vs={scene,rinfoReset:()=>{renderer.info.autoReset=false;renderer.info.reset()},rinfo:()=>({c:renderer.info.render.calls,t:renderer.info.render.triangles,g:renderer.info.memory.geometries,tx:renderer.info.memory.textures}),KB,kbRebuild,playerGunHit,wingHit,BT,die,btRespawn,TMAP,mapStep,KBM,SC,damageSystem,hitAI,killEnemy,setThr,HEAT,explode,puff,camera,LT,townLights,flashLt,P,fly,dlz,flyout,AC_DEFS,feed,WAR,WAR_V,warBuild,warSpawn,warModules,warDie,warFlags,updateWar,warAlive,buildJet,PLAYER_COLORS,M2,V3,atm,clamp,lbAdd,showOverlay:k=>showOverlay(k),setScore:(n,k)=>{score=n;kills=k},get state(){return state},get enemies(){return enemies},missiles:()=>missiles.filter(m=>m.on),setAC:id=>{AC=AC_DEFS[id];applyAC()},wt:{   // weapon-test hooks: a clean sky, one drone, scripted launches
+if(/[?&]test\b/.test(location.search))window.__vs={get pass(){return pass},passAdd,passClaim,weeklyAdd,scene,rinfoReset:()=>{renderer.info.autoReset=false;renderer.info.reset()},rinfo:()=>({c:renderer.info.render.calls,t:renderer.info.render.triangles,g:renderer.info.memory.geometries,tx:renderer.info.memory.textures}),KB,kbRebuild,playerGunHit,wingHit,BT,die,btRespawn,TMAP,mapStep,KBM,SC,damageSystem,hitAI,killEnemy,setThr,HEAT,explode,puff,camera,LT,townLights,flashLt,P,fly,dlz,flyout,AC_DEFS,feed,WAR,WAR_V,warBuild,warSpawn,warModules,warDie,warFlags,updateWar,warAlive,buildJet,PLAYER_COLORS,M2,V3,atm,clamp,lbAdd,showOverlay:k=>showOverlay(k),setScore:(n,k)=>{score=n;kills=k},get state(){return state},get enemies(){return enemies},missiles:()=>missiles.filter(m=>m.on),setAC:id=>{AC=AC_DEFS[id];applyAC()},wt:{   // weapon-test hooks: a clean sky, one drone, scripted launches
   begin:id=>{AC=AC_DEFS[id];applyAC();startGame();return AC.id},
   clear:()=>{waveClearT=1e9;for(const e of enemies){e.alive=false;scene.remove(e.obj)}enemies.length=0;P.pos.set(0,6000,0);P.vel.set(0,0,250);throttle=.7;return state},
   target:(type,dz,away,speed)=>{const e=spawnFighter('red',type,new V3(0,P.pos.y,dz),new V3(0,P.pos.y,dz+(away?9999:-9999)),{ir:0,rdr:0,speed:speed||220});e.drone=true;return e.id},
@@ -8003,7 +8041,7 @@ const SDESC={'Key bindings':'Rebind every keyboard key and mouse button, set mou
   'Vibration':'Haptic feedback for guns, hits and warnings.','Move buttons':'Drag the on-screen buttons where you want them, then save.','Controls guide':'Launch a sortie and show the controls guide on top.',
   'Graphics':'Lower this if the frame rate drops. Auto-adjusts when the game is struggling.','Cinematic menu':'Film grain, letterbox bars, light flare and the slow camera drift behind the menu.','Kill cam':'A short replay when you shoot something down.',
   'Sound':'All game sound.','Voice warnings':'Spoken cockpit warnings: pull up, missile, bingo fuel.','UI sounds':'Quiet clicks as you move through the menu.',
-  'Colours':'Switch the HUD to a colour-blind friendly blue and orange.','Text size':'Scale the HUD text.',
+  'Colours':'HUD colours: green, blue/orange, cyan/magenta (red-green colour blindness), red/teal (blue-yellow), white/amber, or high contrast.','Reduce motion':'Less camera shake and no strobing warnings. Follows the system setting until you change it.','Text size':'Scale the HUD text.',
   'Difficulty':'How smart and how deadly the bandits are.','Range':'How far away the fight starts. Longer ranges give you room to notch and use radar missiles.','Mode':'Career keeps your XP, rank and unlocks.'};
 const STABS=[['ctl','Controls'],['dsp','Display'],['aud','Audio'],['hud','HUD'],['gp','Gameplay']];
 let sTab='ctl';
@@ -8026,7 +8064,8 @@ let sTab='ctl';
     onoff('Kill cam',()=>KC.on,()=>$('bKc').click()));
   pane.aud.append(onoff('Sound',()=>A.on,()=>$('bSound').click()),onoff('Voice warnings',()=>VOICE.on,()=>$('bVoice').click()),onoff('UI sounds',()=>UIS.on,()=>{UIS.on=!UIS.on;lsSet('vsUiSnd',UIS.on?'1':'0');if(UIS.on){audioInit();uiSnd('sel')}}));
   pane.hud.append(
-    mRow('Colours',()=>[{v:'green',t:'Green'},{v:'cb',t:'Blue / orange'}],()=>palKey,v=>drive($('bPal'),()=>palKey,v,3)),
+    mRow('Colours',()=>PAL_ORDER.map(k=>({v:k,t:PALS[k].n[0].toUpperCase()+PALS[k].n.slice(1)})),()=>palKey,v=>drive($('bPal'),()=>palKey,v,8)),
+    onoff('Reduce motion',()=>REDUCED,()=>setReduced(!REDUCED)),
     mRow('Text size',()=>TXT_SIZES.map(k=>({v:k,t:Math.round(k*100)+'%'})),()=>txtK,v=>drive($('bText'),()=>txtK,v,4)));
   pane.gp.append(
     mRow('Difficulty',()=>Object.keys(DIFF).map(k=>({v:k,t:DIFF[k].name})),()=>difficulty,v=>drive($('bDiff'),()=>difficulty,v),{hidden:()=>$('bDiff').hidden}),
@@ -8198,7 +8237,7 @@ new MutationObserver(uiSoon).observe($('legacy'),{subtree:true,childList:true,ch
 function uiSync(){
   for(const c of mCtls)c.sync();
   if(quickList().indexOf(mission)>=0)lastQuick=mission;
-  wallet();dailyUI();crewUI();bnavSync();
+  wallet();dailyUI();weeklyPassUI();crewUI();bnavSync();
   // main screen: current aircraft
   {const n=NODES[AC.id];$('acName').textContent=AC.name;$('acBr').textContent='BR '+progBR(AC.id).toFixed(1)+(careerOn?' · Career':' · Free play');$('hNat').textContent=n?NATIONS[n.n].n+' · Rank '+ROMAN[n.r]:'Aircraft';
    $('hLoad').textContent=$('bRole').textContent.replace(/^Loadout:\s*/,'').replace(/\s*▸$/,'')}
@@ -8224,6 +8263,15 @@ function bnavSync(){const p=ovEl.dataset.pane;for(const b of $('bNav').querySele
 function dailyUI(){if(ovEl.dataset.pane!=='pilot')return;const d=$('pgDaily');
   d.innerHTML=(careerOn?'':'<p class="txt">Daily tasks count in Career mode.</p>')+DAILY.map(t=>{const v=Math.min(t[2],Math.floor(daily[t[0]]||0)),done=!!daily.done[t[0]];
     return '<div class="dt'+(done?' done':'')+'"><span class="tk" aria-hidden="true">'+(done?'<svg viewBox="0 0 16 12"><path d="M1 6l5 5L15 1"/></svg>':'')+'</span><span class="nm">'+t[1]+'<small>'+v+' / '+t[2]+' · +'+t[3]+' RP</small></span></div>'}).join('')}
+function weeklyPassUI(){if(ovEl.dataset.pane!=='pilot')return;weeklyRoll();passRoll();
+  $('pgWeekly').innerHTML=(careerOn?'':'<p class="txt">Weekly tasks count in Career mode.</p>')+WEEKLY.map(t=>{const v=Math.min(t[2],Math.floor(weekly.c[t[0]]||0)),done=!!weekly.done[t[0]];
+    return '<div class="dt'+(done?' done':'')+'"><span class="tk" aria-hidden="true">'+(done?'<svg viewBox="0 0 16 12"><path d="M1 6l5 5L15 1"/></svg>':'')+'</span><span class="nm">'+t[1]+'<small>'+v+' / '+t[2]+' · +'+t[3]+' RP, +'+t[4]+' SL</small></span></div>'}).join('');
+  const tier=Math.min(PASS_TIERS,Math.floor(pass.pts/PASS_PTS));
+  let h='<p class="txt">'+(careerOn?'':'Pass points count in Career mode. ')+'Tier '+tier+' / '+PASS_TIERS+' · '+pass.pts+' pass points · '+PASS_PTS+' per tier. Points come from sorties, kills, wins and finished tasks.</p><div class="passRow">';
+  for(let i=0;i<PASS_TIERS;i++){const r=passReward(i),open=pass.pts>=(i+1)*PASS_PTS,got=!!pass.claimed[i];
+    h+='<button type="button" class="pt'+(got?' got':open?' open':'')+'" data-act="pass" data-i="'+i+'"'+(open&&!got?'':' disabled')+'><b>'+(i+1)+'</b><span>'+(r.sl?'+'+r.sl.toLocaleString()+' SL':'')+(r.sl&&r.rp?'<br>':'')+(r.rp?'+'+r.rp.toLocaleString()+' RP':'')+'</span><i>'+(got?'✓':open?'Claim':'')+'</i></button>'}
+  $('pgPass').innerHTML=h+'</div>'}
+$('pgPass').addEventListener('click',e=>{const t=e.target.closest('[data-act=pass]');if(!t||t.disabled)return;if(passClaim(+t.dataset.i)){uiSnd('sel');syncCareerUI();weeklyPassUI()}});
 function crewUI(){if(ovEl.dataset.pane==='pilot')$('pgCrew').innerHTML=crewCards()}
 $('pgCrew').addEventListener('click',e=>{const t=e.target.closest('[data-act=crew]');if(!t||t.disabled)return;if(progCrew(t.dataset.k)){uiSnd('sel');applyAC();syncCareerUI();uiSync();if(typeof progRender==='function')progRender()}});
 setInterval(()=>{if(daily.d!==dayKey())uiSoon()},30000);

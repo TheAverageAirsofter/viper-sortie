@@ -10,7 +10,9 @@ let gunHeld=false,brake=false,fire9=false,fire120=false;
 const HG={on:false,bg:false,ang:.7,el:.2,zoom:1,drag:null,auto:true,pan:false,goal:null,t:0,tgt:new V3(0,2,-4),r:20};   // on = hangar editor panel; bg = hangar scene behind the menu   // hangar: turntable camera around the player's jet
 const VIEWS=['CHASE','COCKPIT','PADLOCK','FLYBY']; let view=0; const flyCam=new V3(); let flyCamSet=false;
 const keys={};
-const REDUCED=!!(window.matchMedia&&matchMedia('(prefers-reduced-motion:reduce)').matches);
+let REDUCED=!!(window.matchMedia&&matchMedia('(prefers-reduced-motion:reduce)').matches);
+try{const v=localStorage.getItem('vsReduce');if(v==='1')REDUCED=true;else if(v==='0')REDUCED=false}catch(e){}
+function setReduced(v){REDUCED=!!v;try{localStorage.setItem('vsReduce',v?'1':'0')}catch(e){}}
 const srLive=document.getElementById('srLive');
 // kill feed (War Thunder style): short lines in the top-right corner that fade after a few seconds; kind picks the colour
 const FEED=[], FEED_LIFE=7;
@@ -18,6 +20,7 @@ function feed(text,kind){FEED.push({t:clock,text,kind:kind||(/^You (killed|destr
 /* War Thunder style scoring events: lines fade over a few seconds under the sight; hits coalesce, kills chain into multi-kill bonuses */
 const SC={list:[],streak:0,lastKill:-99};
 function scEvent(text,pts,col,key){
+  if(srLive&&(col==='kill'||col==='crit'))srLive.textContent=text;   // screen readers hear kills and critical hits
   if(pts)score+=pts;if(col==='crit'&&key!=='ghit')sndCrit();
   const f=key&&SC.list.find(x=>x.key===key&&clock-x.t<1.6);
   if(f){f.n++;f.pts+=pts;f.t=clock;f.text=text+' ×'+f.n}
@@ -79,7 +82,7 @@ function clearWorld(){
   enemies=[];friends=[];spawnQ=[];[...pBullets,...eBullets,...missiles,...eMissiles].forEach(kill);
 }
 let gunShots=0,gunHits=0;
-function startGame(){BT.on=false;hideBtPick();TMAP.z=0;SC.list.length=0;SC.streak=0;SC.lastKill=-99;
+function startGame(){sortieGround=0;BT.on=false;hideBtPick();TMAP.z=0;SC.list.length=0;SC.streak=0;SC.lastKill=-99;
   gunShots=0;gunHits=0;clearWorld(); resetPlayer(); resetRadar(); resetCM(); recReset(); rec3Reset(); P.alive=true;
   if(mission!=='ONLINE'){netStop();$('bSb').hidden=true;$('sbBox').hidden=true}
   trainHook=null;

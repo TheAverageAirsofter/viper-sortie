@@ -270,7 +270,7 @@ function careerAward(){
   career.xp+=xp;career.sorties++;career.kills+=kills;if(!P.alive&&!P.rescued)career.deaths++;if(win)career.wins++;
   const after=rankIdx(career.xp), newJets=Object.keys(UNLOCK).filter(k=>UNLOCK[k]>before&&UNLOCK[k]<=after).map(k=>AC_DEFS[k].name);
   const pg=progAward(xp,win,kills,P.alive||!!P.rescued,!!P.rescued,lines.filter(l=>l[1]));
-  const dt=[dailyAdd('k',kills),dailyAdd('m',missionT/60)].filter(Boolean);
+  const dt=[dailyAdd('k',kills),dailyAdd('m',missionT/60),weeklyAdd('k',kills),win?weeklyAdd('w',1):null,weeklyAdd('g',sortieGround)].filter(Boolean);passAdd(20+kills*5+(win?30:0));
   lastAward={xp,promoted:after>before?RANKS[after][1]:null,newJets:[],prog:pg,daily:dt};
   saveCareer(); syncCareerUI();
 }
