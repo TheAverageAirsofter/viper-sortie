@@ -30,7 +30,7 @@ function lockOn(e){
   R.stt=e;R.acqT=0;R.notchT=0;R.bug=e;R.sttSrc=R.mode==='IRST'?'IRST':'RDR';
   // bandit's warning receiver hears the lock: at range he may beam and dive to notch you
   if(R.sttSrc==='RDR'&&R.spiked!==e){R.spiked=e; /* IRST is passive: he never hears it */ const d=e.pos.distanceTo(P.pos);
-    if(d>6000&&DIFF[difficulty].notch&&Math.random()<.6*DIFF[difficulty].defP)e.rwrSpikeT=clock+3.5}  // he hears the lock and may beam pre-emptively
+    if(d>6000&&redSkill().notch&&Math.random()<.6*redSkill().defP)e.rwrSpikeT=clock+3.5}  // he hears the lock and may beam pre-emptively
   syncRadarUI();
 }
 function breakLock(){R.stt=null;syncRadarUI()}
@@ -357,7 +357,7 @@ function syncCM(){
   $('nAuto').textContent=CM.auto?'ON':'OFF';$('cAuto').classList.toggle('on',CM.auto);
 }
 function cutDecoy(){CM.decoy=null;decoyMesh.visible=false;cable.visible=false}
-function resetCM(){CM.flares=cmFlares();CM.chaff=cmChaff();CM.decoys=AC.cm.decoys;CM.ecm=false;CM.objs.length=0;cutDecoy();eMissiles.forEach(kill);syncCM()}
+function resetCM(){CM.flares=cmFlares();CM.chaff=cmChaff();CM.decoys=AC.cm.decoys;CM.ecm=false;CM.objs.length=0;CM.flDisp=0;CM.chDisp=0;cutDecoy();eMissiles.forEach(kill);syncCM()}
 function dispense(type){
   if(state!=='play')return false;
   if(type==='flare'){if(CM.flares<=0){message('FLARES OUT',.8);return false}CM.flares--;CM.flDisp=(CM.flDisp||0)+1}

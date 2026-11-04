@@ -243,7 +243,7 @@ const kvs=a=>'<dl class="kvs">'+a.map(x=>'<div><dt>'+x[0]+'</dt><dd>'+x[1]+'</dd
 function briefQuick(){const k=mission,mine=progBR(AC.id),er=enemyBR(),out=er&&(mine<er.lo-.001||mine>er.hi+.001);
   const rng=er?(er.lo===er.hi?er.lo.toFixed(1):er.lo.toFixed(1)+'–'+er.hi.toFixed(1)):'none';
   $('qBrief').innerHTML='<p class="eyebrow">Briefing</p><h2>'+MISSIONS[k]+'</h2>'+(out?'<p class="warnchip" role="status">Your BR '+mine.toFixed(1)+' is outside the enemy range '+rng+'</p>':'')+'<p class="txt">'+(MIS_BRIEF[k]||MIS_DESC[k]||'')+'</p><div class="diag">'+diagram()+'</div>'+
-    kvs([['Aircraft',AC.name],['BR','<span id="brMine">'+mine.toFixed(1)+' ±0.7</span>'],['Enemy BR','<span id="brEnemy">'+rng+'</span>'],['Time',TMN[timeOfDay]],['Weather',WXN[weather]],['Map',MAP_NAME(MAP)]])}
+    kvs([['Aircraft',AC.name+(stockMods(AC.id)?' · stock':'')],['BR','<span id="brMine">'+mine.toFixed(1)+' ±0.7</span>'],['Enemy BR','<span id="brEnemy">'+rng+'</span>'],['Time',TMN[timeOfDay]],['Weather',WXN[weather]],['Map',MAP_NAME(MAP)]])}
 function briefTrain(){const k=lesson,done=lessonsDone();$('trBrief').innerHTML='<p class="eyebrow">Lesson '+String(Object.keys(LESSONS).indexOf(k)+1).padStart(2,'0')+'</p><h2>'+LESSONS[k]+'</h2><p class="txt">'+(LES_BRIEF[k]||LES_DESC[k])+'</p>'+
   kvs([['Aircraft',AC.name],['Status',done[k]?'Complete':'Not yet flown'],['Lessons done',Object.keys(done).filter(x=>done[x]).length+' / '+Object.keys(LESSONS).length]])}
 const lessonsDone=()=>{try{return JSON.parse(lsGet('vsLessonsDone','{}'))||{}}catch(e){return{}}};
@@ -297,7 +297,7 @@ function buildReport(){const src={};for(const e of document.querySelectorAll('#o
     ...(lastAward&&lastAward.prog&&lastAward.prog.breakdown?[]:[['XP',src.XP],['Silver Lions',src['Silver Lions']],['Free RP',src['Free RP']],['Repair cost',src.Repair]])].filter(x=>x[1]!=null);
   const g=$('repGrid');g.innerHTML='';let i=0;
   for(const [l,v] of items){const d=mk('div','rp','<span>'+l+'</span><b></b>');d.style.setProperty('--i',i++);g.appendChild(d);countUp(d.querySelector('b'),String(v),i)}
-  buildItems();overTab()}
+  buildItems();buildCoach();overTab()}
 /* itemised rewards (Career): every line comes from progAward's breakdown and the lines add up to the totals */
 const sgn=n=>(n<0?'−':'+')+Math.abs(n).toLocaleString();
 function buildItems(){const box=$('ovItems');box.innerHTML='';const bd=lastAward&&lastAward.prog&&lastAward.prog.breakdown;box.hidden=!bd;if(!bd)return;
@@ -305,6 +305,39 @@ function buildItems(){const box=$('ovItems');box.innerHTML='';const bd=lastAward
   box.innerHTML=col('Research points',bd.rp,bd.totalRp,'Total RP')+col('Silver Lions',bd.sl,bd.totalSl,'Total Silver Lions')+
     '<div class="itCol sum"><div class="it"><span>Repair cost</span><b>'+(bd.repair?'−'+bd.repair.toLocaleString():'none')+'</b></div><div class="it"><span>Free RP (10 % of RP)</span><b>'+sgn(bd.freeRp)+'</b></div></div>';
   let i=0;for(const e of box.querySelectorAll('.it')){e.style.setProperty('--i',i++)}}
+/* ---- what to work on: the sortie record (missile results, countermeasures, gunnery) turned into advice ---- */
+const COACH_FIX={
+  'OUT OF ENERGY':'Fire inside the NE bracket on the launch scale, not at the top of it.',
+  'LOST TARGET':'Keep the lock while the missile flies: crank about 45 degrees off, do not turn away.',
+  'NO RADAR LOCK IN TERMINAL PHASE':'Keep the radar in STT until the missile has gone active.',
+  'NO ILLUMINATION IN TERMINAL PHASE':'A semi-active shot needs your lock all the way to impact.',
+  'TARGET LEFT SEEKER FIELD':'Wait for a steady growl before you fire; do not shoot across the circle.',
+  'HIT THE GROUND':'Only shoot at targets above the horizon, and loft the long ones.',
+  'NOTCHED':'A bandit turning beam-on hides in ground clutter: close the range, or use IRST and heat-seekers.',
+  'DECOYED BY FLARES':'Fire from closer in, where his flares cannot pull the seeker away.',
+  'DECOYED BY CHAFF':'Close the range, or wait for a missile that goes active late.',
+  'TARGET GONE':'Do not fire at a contact you cannot hold on the scope.',
+  'LOST THE TARGET IN CLOUD':'Go below the deck, or pick a shot the cloud does not block.',
+  'LOST THE TARGET IN RAIN':'Rain blinds the seeker: get closer before you fire.',
+  'SEEKER LOCKED ONTO THE SUN':'Do not attack out of the sun; change your aspect.',
+  'REAR-ASPECT SEEKER: TARGET TURNED HEAD-ON':'That seeker needs a tail: fire only when he is flying away from you.'};
+function coachLines(){
+  const out=[],all=[...REC.msl.values()].filter(r=>r.who==='You'),miss=all.filter(r=>r.res==='MISS'),hit=all.filter(r=>r.res==='HIT');
+  const acc=gunShots>0?gunHits/gunShots:null, cm=(CM.flDisp||0)+(CM.chDisp||0), air=['WAVES','2V4','4SHIP','RUSH','CAMPAIGN','INTERCEPT','ESCORT'];
+  if(deathCause==='missile'&&!cm)out.push('You were killed by a missile without dropping a single flare or chaff. Hold CHF or FLR as soon as the RWR spikes, or switch AUTO on.');
+  if(miss.length>=2){const n={};for(const r of miss)n[r.why]=(n[r.why]||0)+1;
+    const top=Object.keys(n).sort((a,b)=>n[b]-n[a])[0];
+    if(n[top]>=2&&COACH_FIX[top])out.push(n[top]+' of your '+all.length+' missiles missed the same way. '+COACH_FIX[top])}
+  if(gunShots>=60&&acc!=null&&acc<.12)out.push('Gunnery: '+gunShots+' rounds for '+gunHits+' hits. Hold fire until the pipper is settled and the range is under about 800 m.');
+  if(!all.length&&!kills&&missionT>45&&air.indexOf(mission)>=0)out.push('You never got a missile away. Tap LOCK (or T) for a radar track, then fire when the caret sits inside the NE bracket.');
+  if((P.glocN||0)>0)out.push('You blacked out '+(P.glocN>1?P.glocN+' times':'once')+' at '+P.maxG.toFixed(1)+' g. Ease the pull, or buy anti-g training in the crew cards.');
+  if(REC.events.some(e=>/ran out of fuel/i.test(e.text)))out.push('You ran the tanks dry. Watch the fuel tape and top up at the tanker before BINGO.');
+  if(!out.length&&(deathCause==='terrain'||deathCause==='collision'))out.push('You flew into the ground. Keep the flight path marker above the ground line and start the pull earlier.');
+  if(!out.length&&kills>0&&deathCause!=='abort')out.push('Clean sortie: '+kills+' kill'+(kills===1?'':'s')+(all.length?', '+hit.length+' of '+all.length+' missiles hit':'')+(acc!=null?' and '+Math.round(acc*100)+' per cent gun accuracy':'')+'.');
+  return out.slice(0,3)
+}
+function buildCoach(){const el=$('ovCoach');if(!el)return;const L=coachLines();
+  el.hidden=!L.length;el.innerHTML=L.length?'<span class="ck">What to work on</span>'+L.map(t=>'<p>'+t+'</p>').join(''):''}
 function countUp(el,txt,i){const m=/^([+−-]?)([\d,]+)(.*)$/.exec(txt);if(!m||REDUCE||!FX.on){el.textContent=txt;return}
   const n=+m[2].replace(/,/g,''),t0=performance.now()+i*70,dur=900;el.textContent=m[1]+'0'+m[3];
   const f=t=>{const k=clamp((t-t0)/dur,0,1),e=1-Math.pow(1-k,3);el.textContent=m[1]+Math.round(n*e).toLocaleString()+m[3];if(k<1&&el.isConnected)requestAnimationFrame(f)};requestAnimationFrame(f)}

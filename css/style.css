@@ -446,6 +446,10 @@ button:disabled{opacity:.4;cursor:not-allowed}
 #ov .rp{display:grid;gap:4px;padding:10px 0;border-top:1px solid var(--hair);animation:slideIn .3s var(--ease) both;animation-delay:calc(var(--i,0)*60ms)}
 #ov .rp span{font:600 10px/1 var(--f-body);letter-spacing:.26em;text-transform:uppercase;color:var(--faint)}
 #ov .rp b{font:700 clamp(24px,3vw,40px)/1 var(--f-display);letter-spacing:.06em;color:var(--txt)}
+#ov .coach{display:grid;gap:5px;padding-top:10px;border-top:1px solid var(--hair)}
+#ov .coach[hidden]{display:none}
+#ov .coach .ck{font:600 10px/1 var(--f-body);letter-spacing:.26em;text-transform:uppercase;color:var(--acc)}
+#ov .coach p{margin:0;font:400 13px/1.4 var(--f-body);color:rgba(233,238,234,.85);max-width:76ch}
 #ov[data-over=report] #debrief,#ov[data-over=report] #lbBox,#ov[data-over=replay] .oRep,#ov[data-over=replay] #lbBox,#ov[data-over=scores] .oRep,#ov[data-over=scores] #debrief{display:none}
 #ov #debrief{display:grid;gap:8px}
 #ov .dbHead{display:flex;gap:var(--s3);align-items:center}
@@ -518,6 +522,7 @@ button:disabled{opacity:.4;cursor:not-allowed}
   #ov .pList button,#ov .pList #bStart{font-size:28px}
   #ov[data-pane=over] .crumb h1{font-size:34px}
   #ov .rp{padding:6px 0}#ov .rp b{font-size:24px}
+  #ov .coach{padding-top:6px;gap:3px}#ov .coach p{font-size:12px;line-height:1.35}#ov .coach p:nth-child(n+3){display:none}
   #ov #dbCanvas{height:min(30vh,120px)}
   #ov #ovLede{font-size:12px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
   #ov .mr.sl .track{flex-basis:96px}

@@ -35,6 +35,22 @@ function progSave(){try{localStorage.setItem('vsProg',JSON.stringify(prog))}catc
 function progMigrate(){if(!prog.fresh)return;prog.fresh=false;const ri=rankIdx(career.xp);if(career.xp>0){for(const id in NODES)if(UNLOCK[id]!=null&&UNLOCK[id]<=ri){prog.res[id]=true;prog.own[id]=true}prog.sl+=Math.round(career.xp*.8)}progSave()}
 const progOwned=id=>!!prog.own[id], progRes=id=>!!prog.res[id], progBR=id=>NODES[id]?NODES[id].br:11.5;
 const crewLvl=k=>careerOn?(prog.crew[k]||0):0, hasMod=(id,m)=>careerOn&&!!(prog.mods[id]&&prog.mods[id][m]===true), modRes=(id,m)=>careerOn&&!!(prog.mods[id]&&prog.mods[id][m]);   // true = installed, 'r' = researched, not yet bought
+/* career ramp-in: a fresh career flies softer bandits for the first sorties, so a stock jet is not thrown at a 7.5 g pilot on day one.
+   Free play and Online always fly the chosen difficulty; the ramp only softens the opening, then gets out of the way. */
+const CAREER_RAMP=10;
+let _rsk=null,_rskKey='';
+function redSkill(){
+  if(!careerOn)return DIFF[difficulty];
+  const k=Math.min(1,Math.max(0,prog.sorties/CAREER_RAMP)); if(k>=1)return DIFF[difficulty];
+  const key=prog.sorties+'|'+difficulty; if(_rskKey===key)return _rsk;
+  const a=DIFF.ROOKIE,b=DIFF[difficulty],m=(x,y)=>x+(y-x)*k;
+  _rsk=Object.assign({},b,{g:m(a.g,b.g),react:m(a.react,b.react),irSee:m(a.irSee,b.irSee),defP:m(a.defP,b.defP),cmP:m(a.cmP,b.cmP),notchP:m(a.notchP,b.notchP),
+    notch:k>.5?b.notch:false,rne:k>.8?b.rne:false,iK:m(a.iK,b.iK),rK:m(a.rK,b.rK),spread:m(a.spread,b.spread),gunR:m(a.gunR,b.gunR),lock:m(a.lock,b.lock),cd:m(a.cd,b.cd)});
+  _rskKey=key;return _rsk
+}
+// the stock-airframe penalties, for the places that need to say why a career jet feels worse than the same jet in free play
+const STOCK_NOTE='−6 % thrust, −10 % roll rate, half the countermeasures and missiles, −10 % missile range and agility';
+const stockMods=id=>!!careerOn&&(!hasMod(id,'eng1')||!hasMod(id,'afr1')||!hasMod(id,'cms1')||!hasMod(id,'wpn1'));
 // modules and crew skill change the effective aircraft the whole game uses
 function modApply(id,e){if(!careerOn)return e;const H=k=>hasMod(id,k);
   const thr=(H('eng1')?1:STOCK.thr)*(H('eng2')?1.04:1), roll=(H('afr1')?1:STOCK.roll)*(H('afr2')?1.05:1)*Math.pow(1.02,crewLvl('f')), lift=H('afr2')?1.03:1,

@@ -22,7 +22,7 @@ function rearm(){
 }
 function resetPlayer(){
   P.pos.set(0,4000,0); playerJet.quaternion.identity(); playerJet.visible=true;
-  P.vel.set(0,0,230); P.onGround=false; P.onDeck=false; P.ejected=null; P.jetGhost=null; P.rescued=false; if(chute)chute.visible=false; P.scramble=false; P.stopT=0; if(typeof setGear==='function')setGear(false); P.n=1; P.hp=100; P.fuel=.75*(AC.intFuel||AC.fuelCap)+(AC.tankFuel||0); P.flamedOut=false; resetSystems(); P.gStress=0; P.gloc=0; P.gcas=false; P.maxG=1; axes(P); qPrev.copy(playerJet.quaternion); omega.set(0,0,0);
+  P.vel.set(0,0,230); P.onGround=false; P.onDeck=false; P.ejected=null; P.jetGhost=null; P.rescued=false; if(chute)chute.visible=false; P.scramble=false; P.stopT=0; if(typeof setGear==='function')setGear(false); P.n=1; P.hp=100; P.fuel=.75*(AC.intFuel||AC.fuelCap)+(AC.tankFuel||0); P.flamedOut=false; resetSystems(); P.gStress=0; P.gloc=0; P.glocN=0; P.gcas=false; P.maxG=1; axes(P); qPrev.copy(playerJet.quaternion); omega.set(0,0,0);
   rearm(); throttle=.8; setThr(.8);
 }
 let friends=[], mission='WAVES', banditType='F16', missionT=0, missionDone=false, spawnQ=[];
@@ -49,7 +49,7 @@ const ENG_RANGES={SHORT:{n:'Short',k:1},LONG:{n:'Long',k:2.5},EXTREME:{n:'Extrem
 let rangeKey='LONG'; try{const r=localStorage.getItem('viperRange');if(ENG_RANGES[r])rangeKey=r}catch(e){}
 const engK=()=>ENG_RANGES[rangeKey].k, farK=()=>1+(engK()-1)*.3;   // engK scales random merge distances; farK scales fixed scripted set-ups
 let difficulty='REGULAR'; try{const d=localStorage.getItem('viperDiff');if(DIFF[d])difficulty=d}catch(e){}
-const sk=e=>e.sk?e.sk:e.remote?REMOTE_SK:e.team==='red'?DIFF[difficulty]:DIFF.VETERAN;   // your wingman flies at veteran level
+const sk=e=>e.sk?e.sk:e.remote?REMOTE_SK:e.team==='red'?redSkill():DIFF.VETERAN;   // your wingman flies at veteran level; red bandits ease in over a new career
 const RED_COLORS={body:0x6a3f3a,dark:0x2f2523,glass:0x222a30,glassE:0x000000,flame:0xff6a3a};
 const BLUE_COLORS={body:0x7f93a8,dark:0x36404b,glass:0xc9a24a,glassE:0x2a1d00,flame:0xffa64a};
 const templates={};
@@ -86,9 +86,9 @@ function pickBanditType(){const pool=banditPool();if(banditType!=='MIXED'&&pool.
 // spawn a fighter: team, aircraft type, position, heading toward a point, loadout
 function spawnFighter(team,type,pos,lookAt,opts={}){
   const obj=tmpl(team,type).clone(); obj.position.copy(pos); obj.lookAt(lookAt.x,pos.y,lookAt.z); scene.add(obj);
-  const ac=AC_DEFS[type], e=Object.assign(newJet(obj,team==='red'?Math.min(DIFF[difficulty].g+wave*.15,ac.gmax):ac.gmax,ac),{
+  const ac=AC_DEFS[type], rk=team==='red'?redSkill():null, e=Object.assign(newJet(obj,rk?Math.min(rk.g+wave*.15,ac.gmax):ac.gmax,ac),{
     team,type,kind:'fighter',hp:3,alive:true,mode:'',tgt:null,retgtT:0,lead:null,side:1,engaged:false,crankSide:Math.random()<.5?1:-1,
-    flareCd:0,chaffCd:0,gunAcc:0,mslCd:rand(3,6)*(team==='red'?DIFF[difficulty].cd:1),lockT:0,spiking:false,zoneT:0,zI:null,zR:null,
+    flareCd:0,chaffCd:0,gunAcc:0,mslCd:rand(3,6)*(rk?rk.cd:1),lockT:0,spiking:false,zoneT:0,zI:null,zR:null,
     espec:aiSpecs(type),ir:opts.ir??ac.srN,rdr:opts.rdr??ac.mrN,cmd:'ENGAGE',escortPref:!!opts.escortPref,id:nextId()});
   axes(e); e.vel.copy(e.fwd).multiplyScalar(opts.speed||rand(220,250));
   (team==='red'?enemies:friends).push(e); return e;
@@ -666,7 +666,7 @@ function updatePlayer(dt,auto){
     const over=Math.max(0,P.n-6-.25*crewLvl('g')), under=Math.max(0,-P.n-2);
     if(over>0||under>0)P.gStress+=(Math.pow(over,1.6)*.035+under*.08)*dt; else if(P.n<4.5)P.gStress=Math.max(0,P.gStress-.3*dt);
     if(P.gloc>0){P.gloc-=dt;if(P.gloc<=0)P.gStress=.6}
-    else if(P.gStress>=1){P.gloc=5;message('G-LOC',2)}
+    else if(P.gStress>=1){P.gloc=5;P.glocN=(P.glocN||0)+1;message('G-LOC',2)}
   }
   const ab=throttle>.81, fw=ab?1.1:.45+throttle*.55; setAB(playerJet,ab); setAB(outside,ab); pFlame.scale.set(fw,fw,ab?.8+(throttle-.8)*5*(1+Math.random()*.25):.1+throttle*.55);
   if(ab&&state==='play'){_d.copy(P.pos).addScaledVector(P.fwd,-8.5);puff(_d.x,_d.y,_d.z,0,0,0,1,.6,.25,.6,1.8,5,.16)}

@@ -3199,7 +3199,7 @@ function rearm(){
 }
 function resetPlayer(){
   P.pos.set(0,4000,0); playerJet.quaternion.identity(); playerJet.visible=true;
-  P.vel.set(0,0,230); P.onGround=false; P.onDeck=false; P.ejected=null; P.jetGhost=null; P.rescued=false; if(chute)chute.visible=false; P.scramble=false; P.stopT=0; if(typeof setGear==='function')setGear(false); P.n=1; P.hp=100; P.fuel=.75*(AC.intFuel||AC.fuelCap)+(AC.tankFuel||0); P.flamedOut=false; resetSystems(); P.gStress=0; P.gloc=0; P.gcas=false; P.maxG=1; axes(P); qPrev.copy(playerJet.quaternion); omega.set(0,0,0);
+  P.vel.set(0,0,230); P.onGround=false; P.onDeck=false; P.ejected=null; P.jetGhost=null; P.rescued=false; if(chute)chute.visible=false; P.scramble=false; P.stopT=0; if(typeof setGear==='function')setGear(false); P.n=1; P.hp=100; P.fuel=.75*(AC.intFuel||AC.fuelCap)+(AC.tankFuel||0); P.flamedOut=false; resetSystems(); P.gStress=0; P.gloc=0; P.glocN=0; P.gcas=false; P.maxG=1; axes(P); qPrev.copy(playerJet.quaternion); omega.set(0,0,0);
   rearm(); throttle=.8; setThr(.8);
 }
 let friends=[], mission='WAVES', banditType='F16', missionT=0, missionDone=false, spawnQ=[];
@@ -3226,7 +3226,7 @@ const ENG_RANGES={SHORT:{n:'Short',k:1},LONG:{n:'Long',k:2.5},EXTREME:{n:'Extrem
 let rangeKey='LONG'; try{const r=localStorage.getItem('viperRange');if(ENG_RANGES[r])rangeKey=r}catch(e){}
 const engK=()=>ENG_RANGES[rangeKey].k, farK=()=>1+(engK()-1)*.3;   // engK scales random merge distances; farK scales fixed scripted set-ups
 let difficulty='REGULAR'; try{const d=localStorage.getItem('viperDiff');if(DIFF[d])difficulty=d}catch(e){}
-const sk=e=>e.sk?e.sk:e.remote?REMOTE_SK:e.team==='red'?DIFF[difficulty]:DIFF.VETERAN;   // your wingman flies at veteran level
+const sk=e=>e.sk?e.sk:e.remote?REMOTE_SK:e.team==='red'?redSkill():DIFF.VETERAN;   // your wingman flies at veteran level; red bandits ease in over a new career
 const RED_COLORS={body:0x6a3f3a,dark:0x2f2523,glass:0x222a30,glassE:0x000000,flame:0xff6a3a};
 const BLUE_COLORS={body:0x7f93a8,dark:0x36404b,glass:0xc9a24a,glassE:0x2a1d00,flame:0xffa64a};
 const templates={};
@@ -3263,9 +3263,9 @@ function pickBanditType(){const pool=banditPool();if(banditType!=='MIXED'&&pool.
 // spawn a fighter: team, aircraft type, position, heading toward a point, loadout
 function spawnFighter(team,type,pos,lookAt,opts={}){
   const obj=tmpl(team,type).clone(); obj.position.copy(pos); obj.lookAt(lookAt.x,pos.y,lookAt.z); scene.add(obj);
-  const ac=AC_DEFS[type], e=Object.assign(newJet(obj,team==='red'?Math.min(DIFF[difficulty].g+wave*.15,ac.gmax):ac.gmax,ac),{
+  const ac=AC_DEFS[type], rk=team==='red'?redSkill():null, e=Object.assign(newJet(obj,rk?Math.min(rk.g+wave*.15,ac.gmax):ac.gmax,ac),{
     team,type,kind:'fighter',hp:3,alive:true,mode:'',tgt:null,retgtT:0,lead:null,side:1,engaged:false,crankSide:Math.random()<.5?1:-1,
-    flareCd:0,chaffCd:0,gunAcc:0,mslCd:rand(3,6)*(team==='red'?DIFF[difficulty].cd:1),lockT:0,spiking:false,zoneT:0,zI:null,zR:null,
+    flareCd:0,chaffCd:0,gunAcc:0,mslCd:rand(3,6)*(rk?rk.cd:1),lockT:0,spiking:false,zoneT:0,zI:null,zR:null,
     espec:aiSpecs(type),ir:opts.ir??ac.srN,rdr:opts.rdr??ac.mrN,cmd:'ENGAGE',escortPref:!!opts.escortPref,id:nextId()});
   axes(e); e.vel.copy(e.fwd).multiplyScalar(opts.speed||rand(220,250));
   (team==='red'?enemies:friends).push(e); return e;
@@ -3843,7 +3843,7 @@ function updatePlayer(dt,auto){
     const over=Math.max(0,P.n-6-.25*crewLvl('g')), under=Math.max(0,-P.n-2);
     if(over>0||under>0)P.gStress+=(Math.pow(over,1.6)*.035+under*.08)*dt; else if(P.n<4.5)P.gStress=Math.max(0,P.gStress-.3*dt);
     if(P.gloc>0){P.gloc-=dt;if(P.gloc<=0)P.gStress=.6}
-    else if(P.gStress>=1){P.gloc=5;message('G-LOC',2)}
+    else if(P.gStress>=1){P.gloc=5;P.glocN=(P.glocN||0)+1;message('G-LOC',2)}
   }
   const ab=throttle>.81, fw=ab?1.1:.45+throttle*.55; setAB(playerJet,ab); setAB(outside,ab); pFlame.scale.set(fw,fw,ab?.8+(throttle-.8)*5*(1+Math.random()*.25):.1+throttle*.55);
   if(ab&&state==='play'){_d.copy(P.pos).addScaledVector(P.fwd,-8.5);puff(_d.x,_d.y,_d.z,0,0,0,1,.6,.25,.6,1.8,5,.16)}
@@ -4038,7 +4038,7 @@ function lockOn(e){
   R.stt=e;R.acqT=0;R.notchT=0;R.bug=e;R.sttSrc=R.mode==='IRST'?'IRST':'RDR';
   // bandit's warning receiver hears the lock: at range he may beam and dive to notch you
   if(R.sttSrc==='RDR'&&R.spiked!==e){R.spiked=e; /* IRST is passive: he never hears it */ const d=e.pos.distanceTo(P.pos);
-    if(d>6000&&DIFF[difficulty].notch&&Math.random()<.6*DIFF[difficulty].defP)e.rwrSpikeT=clock+3.5}  // he hears the lock and may beam pre-emptively
+    if(d>6000&&redSkill().notch&&Math.random()<.6*redSkill().defP)e.rwrSpikeT=clock+3.5}  // he hears the lock and may beam pre-emptively
   syncRadarUI();
 }
 function breakLock(){R.stt=null;syncRadarUI()}
@@ -4365,7 +4365,7 @@ function syncCM(){
   $('nAuto').textContent=CM.auto?'ON':'OFF';$('cAuto').classList.toggle('on',CM.auto);
 }
 function cutDecoy(){CM.decoy=null;decoyMesh.visible=false;cable.visible=false}
-function resetCM(){CM.flares=cmFlares();CM.chaff=cmChaff();CM.decoys=AC.cm.decoys;CM.ecm=false;CM.objs.length=0;cutDecoy();eMissiles.forEach(kill);syncCM()}
+function resetCM(){CM.flares=cmFlares();CM.chaff=cmChaff();CM.decoys=AC.cm.decoys;CM.ecm=false;CM.objs.length=0;CM.flDisp=0;CM.chDisp=0;cutDecoy();eMissiles.forEach(kill);syncCM()}
 function dispense(type){
   if(state!=='play')return false;
   if(type==='flare'){if(CM.flares<=0){message('FLARES OUT',.8);return false}CM.flares--;CM.flDisp=(CM.flDisp||0)+1}
@@ -4614,6 +4614,22 @@ function progSave(){try{localStorage.setItem('vsProg',JSON.stringify(prog))}catc
 function progMigrate(){if(!prog.fresh)return;prog.fresh=false;const ri=rankIdx(career.xp);if(career.xp>0){for(const id in NODES)if(UNLOCK[id]!=null&&UNLOCK[id]<=ri){prog.res[id]=true;prog.own[id]=true}prog.sl+=Math.round(career.xp*.8)}progSave()}
 const progOwned=id=>!!prog.own[id], progRes=id=>!!prog.res[id], progBR=id=>NODES[id]?NODES[id].br:11.5;
 const crewLvl=k=>careerOn?(prog.crew[k]||0):0, hasMod=(id,m)=>careerOn&&!!(prog.mods[id]&&prog.mods[id][m]===true), modRes=(id,m)=>careerOn&&!!(prog.mods[id]&&prog.mods[id][m]);   // true = installed, 'r' = researched, not yet bought
+/* career ramp-in: a fresh career flies softer bandits for the first sorties, so a stock jet is not thrown at a 7.5 g pilot on day one.
+   Free play and Online always fly the chosen difficulty; the ramp only softens the opening, then gets out of the way. */
+const CAREER_RAMP=10;
+let _rsk=null,_rskKey='';
+function redSkill(){
+  if(!careerOn)return DIFF[difficulty];
+  const k=Math.min(1,Math.max(0,prog.sorties/CAREER_RAMP)); if(k>=1)return DIFF[difficulty];
+  const key=prog.sorties+'|'+difficulty; if(_rskKey===key)return _rsk;
+  const a=DIFF.ROOKIE,b=DIFF[difficulty],m=(x,y)=>x+(y-x)*k;
+  _rsk=Object.assign({},b,{g:m(a.g,b.g),react:m(a.react,b.react),irSee:m(a.irSee,b.irSee),defP:m(a.defP,b.defP),cmP:m(a.cmP,b.cmP),notchP:m(a.notchP,b.notchP),
+    notch:k>.5?b.notch:false,rne:k>.8?b.rne:false,iK:m(a.iK,b.iK),rK:m(a.rK,b.rK),spread:m(a.spread,b.spread),gunR:m(a.gunR,b.gunR),lock:m(a.lock,b.lock),cd:m(a.cd,b.cd)});
+  _rskKey=key;return _rsk
+}
+// the stock-airframe penalties, for the places that need to say why a career jet feels worse than the same jet in free play
+const STOCK_NOTE='−6 % thrust, −10 % roll rate, half the countermeasures and missiles, −10 % missile range and agility';
+const stockMods=id=>!!careerOn&&(!hasMod(id,'eng1')||!hasMod(id,'afr1')||!hasMod(id,'cms1')||!hasMod(id,'wpn1'));
 // modules and crew skill change the effective aircraft the whole game uses
 function modApply(id,e){if(!careerOn)return e;const H=k=>hasMod(id,k);
   const thr=(H('eng1')?1:STOCK.thr)*(H('eng2')?1.04:1), roll=(H('afr1')?1:STOCK.roll)*(H('afr2')?1.05:1)*Math.pow(1.02,crewLvl('f')), lift=H('afr2')?1.03:1,
@@ -5338,7 +5354,7 @@ function renderLd(){
       ()=>{v.ag[k]=n-1;if(!v.ag[k])delete v.ag[k]},()=>{v.ag[k]=n+1})}
   if(c.tanks)row('Drop tanks','+'+(H.tankKg/1000).toFixed(1)+' t fuel each · drag · JETT button',v.tk,v.tk>0,v.tk<c.tanks&&free>0,()=>v.tk--,()=>v.tk++);
   const e=effAC(id), m=e.MASS+.75*e.intFuel+e.tankFuel-.6*e.fuelCap+.6*e.fuelCap*0, tw=(e.T_AB/(m*G));
-  $('ldSum').textContent=`Stations ${ldUsed(v)}/${c.hp+c.extra} · take-off weight ${(m/1000).toFixed(1)} t · thrust/weight ${tw.toFixed(2)} · fuel ${((.75*e.intFuel+e.tankFuel)/1000).toFixed(1)} t`+` · RCS ≈ ${((RCS[id]??3)+storesRCS(e)).toFixed(2)} m² (est.)`+(c.ag.length?'':' · no air-to-ground stores cleared');
+  $('ldSum').textContent=`Stations ${ldUsed(v)}/${c.hp+c.extra} · take-off weight ${(m/1000).toFixed(1)} t · thrust/weight ${tw.toFixed(2)} · fuel ${((.75*e.intFuel+e.tankFuel)/1000).toFixed(1)} t`+` · RCS ≈ ${((RCS[id]??3)+storesRCS(e)).toFixed(2)} m² (est.)`+(stockMods(id)?' · stock airframe ('+STOCK_NOTE+') — fit modules in the Mods tab':'')+(c.ag.length?'':' · no air-to-ground stores cleared');
   $('bRole').textContent='Loadout: '+[v.sr+'× '+b.srFull,c.hp?v.mr+'× '+b.mrFull:null,...Object.entries(v.ag).filter(([,n])=>n).map(([k,n])=>n+'× '+AGW[k].sh),v.tk?v.tk+' tank'+(v.tk>1?'s':''):null].filter(Boolean).join(', ')+' ▸'}
 $('bBandit').addEventListener('click',()=>{const k=Object.keys(BANDITS);banditType=k[(k.indexOf(banditType)+1)%k.length];try{localStorage.setItem('viperBandit',banditType)}catch(e){};setMenuLabels()});
 $('cWing').addEventListener('click',wingCmd);
@@ -5780,7 +5796,7 @@ $('hgTree').addEventListener('keydown',e=>{const k=e.key;if(['ArrowLeft','ArrowR
   const all=[...$('hgTree').querySelectorAll('.tn')],c=cur.getBoundingClientRect(),cx=c.left+c.width/2,cy=c.top+c.height/2,dx=k==='ArrowRight'?1:k==='ArrowLeft'?-1:0,dy=k==='ArrowDown'?1:k==='ArrowUp'?-1:0;let best=null,bs=1e9;
   for(const n of all){if(n===cur)continue;const r=n.getBoundingClientRect(),x=r.left+r.width/2-cx,y=r.top+r.height/2-cy,pr=dx?x*dx:y*dy,sd=dx?Math.abs(y):Math.abs(x);if(pr<4)continue;const sc=pr+sd*2.2;if(sc<bs){bs=sc;best=n}}
   e.preventDefault();if(best)best.focus()});
-if(/[?&]test\b/.test(location.search))Object.assign(window.__vs||{},{ldCap,progModResearch,progModBuy,modCost,MODS,prog,progAward,NODES,pickBanditType});
+if(/[?&]test\b/.test(location.search))Object.assign(window.__vs||{},{ldCap,progModResearch,progModBuy,modCost,MODS,prog,progAward,NODES,pickBanditType,redSkill,stockMods});
 $('hgTree').addEventListener('click',e=>{const t=e.target.closest('[data-id],[data-act]');if(!t)return;const id=t.dataset.id,act=t.dataset.act;
   if(!act){progSel=id;progRender();return}
   if(act==='career'){$('bMode').click();progRender();return}
@@ -6033,7 +6049,7 @@ const kvs=a=>'<dl class="kvs">'+a.map(x=>'<div><dt>'+x[0]+'</dt><dd>'+x[1]+'</dd
 function briefQuick(){const k=mission,mine=progBR(AC.id),er=enemyBR(),out=er&&(mine<er.lo-.001||mine>er.hi+.001);
   const rng=er?(er.lo===er.hi?er.lo.toFixed(1):er.lo.toFixed(1)+'–'+er.hi.toFixed(1)):'none';
   $('qBrief').innerHTML='<p class="eyebrow">Briefing</p><h2>'+MISSIONS[k]+'</h2>'+(out?'<p class="warnchip" role="status">Your BR '+mine.toFixed(1)+' is outside the enemy range '+rng+'</p>':'')+'<p class="txt">'+(MIS_BRIEF[k]||MIS_DESC[k]||'')+'</p><div class="diag">'+diagram()+'</div>'+
-    kvs([['Aircraft',AC.name],['BR','<span id="brMine">'+mine.toFixed(1)+' ±0.7</span>'],['Enemy BR','<span id="brEnemy">'+rng+'</span>'],['Time',TMN[timeOfDay]],['Weather',WXN[weather]],['Map',MAP_NAME(MAP)]])}
+    kvs([['Aircraft',AC.name+(stockMods(AC.id)?' · stock':'')],['BR','<span id="brMine">'+mine.toFixed(1)+' ±0.7</span>'],['Enemy BR','<span id="brEnemy">'+rng+'</span>'],['Time',TMN[timeOfDay]],['Weather',WXN[weather]],['Map',MAP_NAME(MAP)]])}
 function briefTrain(){const k=lesson,done=lessonsDone();$('trBrief').innerHTML='<p class="eyebrow">Lesson '+String(Object.keys(LESSONS).indexOf(k)+1).padStart(2,'0')+'</p><h2>'+LESSONS[k]+'</h2><p class="txt">'+(LES_BRIEF[k]||LES_DESC[k])+'</p>'+
   kvs([['Aircraft',AC.name],['Status',done[k]?'Complete':'Not yet flown'],['Lessons done',Object.keys(done).filter(x=>done[x]).length+' / '+Object.keys(LESSONS).length]])}
 const lessonsDone=()=>{try{return JSON.parse(lsGet('vsLessonsDone','{}'))||{}}catch(e){return{}}};
@@ -6087,7 +6103,7 @@ function buildReport(){const src={};for(const e of document.querySelectorAll('#o
     ...(lastAward&&lastAward.prog&&lastAward.prog.breakdown?[]:[['XP',src.XP],['Silver Lions',src['Silver Lions']],['Free RP',src['Free RP']],['Repair cost',src.Repair]])].filter(x=>x[1]!=null);
   const g=$('repGrid');g.innerHTML='';let i=0;
   for(const [l,v] of items){const d=mk('div','rp','<span>'+l+'</span><b></b>');d.style.setProperty('--i',i++);g.appendChild(d);countUp(d.querySelector('b'),String(v),i)}
-  buildItems();overTab()}
+  buildItems();buildCoach();overTab()}
 /* itemised rewards (Career): every line comes from progAward's breakdown and the lines add up to the totals */
 const sgn=n=>(n<0?'−':'+')+Math.abs(n).toLocaleString();
 function buildItems(){const box=$('ovItems');box.innerHTML='';const bd=lastAward&&lastAward.prog&&lastAward.prog.breakdown;box.hidden=!bd;if(!bd)return;
@@ -6095,6 +6111,39 @@ function buildItems(){const box=$('ovItems');box.innerHTML='';const bd=lastAward
   box.innerHTML=col('Research points',bd.rp,bd.totalRp,'Total RP')+col('Silver Lions',bd.sl,bd.totalSl,'Total Silver Lions')+
     '<div class="itCol sum"><div class="it"><span>Repair cost</span><b>'+(bd.repair?'−'+bd.repair.toLocaleString():'none')+'</b></div><div class="it"><span>Free RP (10 % of RP)</span><b>'+sgn(bd.freeRp)+'</b></div></div>';
   let i=0;for(const e of box.querySelectorAll('.it')){e.style.setProperty('--i',i++)}}
+/* ---- what to work on: the sortie record (missile results, countermeasures, gunnery) turned into advice ---- */
+const COACH_FIX={
+  'OUT OF ENERGY':'Fire inside the NE bracket on the launch scale, not at the top of it.',
+  'LOST TARGET':'Keep the lock while the missile flies: crank about 45 degrees off, do not turn away.',
+  'NO RADAR LOCK IN TERMINAL PHASE':'Keep the radar in STT until the missile has gone active.',
+  'NO ILLUMINATION IN TERMINAL PHASE':'A semi-active shot needs your lock all the way to impact.',
+  'TARGET LEFT SEEKER FIELD':'Wait for a steady growl before you fire; do not shoot across the circle.',
+  'HIT THE GROUND':'Only shoot at targets above the horizon, and loft the long ones.',
+  'NOTCHED':'A bandit turning beam-on hides in ground clutter: close the range, or use IRST and heat-seekers.',
+  'DECOYED BY FLARES':'Fire from closer in, where his flares cannot pull the seeker away.',
+  'DECOYED BY CHAFF':'Close the range, or wait for a missile that goes active late.',
+  'TARGET GONE':'Do not fire at a contact you cannot hold on the scope.',
+  'LOST THE TARGET IN CLOUD':'Go below the deck, or pick a shot the cloud does not block.',
+  'LOST THE TARGET IN RAIN':'Rain blinds the seeker: get closer before you fire.',
+  'SEEKER LOCKED ONTO THE SUN':'Do not attack out of the sun; change your aspect.',
+  'REAR-ASPECT SEEKER: TARGET TURNED HEAD-ON':'That seeker needs a tail: fire only when he is flying away from you.'};
+function coachLines(){
+  const out=[],all=[...REC.msl.values()].filter(r=>r.who==='You'),miss=all.filter(r=>r.res==='MISS'),hit=all.filter(r=>r.res==='HIT');
+  const acc=gunShots>0?gunHits/gunShots:null, cm=(CM.flDisp||0)+(CM.chDisp||0), air=['WAVES','2V4','4SHIP','RUSH','CAMPAIGN','INTERCEPT','ESCORT'];
+  if(deathCause==='missile'&&!cm)out.push('You were killed by a missile without dropping a single flare or chaff. Hold CHF or FLR as soon as the RWR spikes, or switch AUTO on.');
+  if(miss.length>=2){const n={};for(const r of miss)n[r.why]=(n[r.why]||0)+1;
+    const top=Object.keys(n).sort((a,b)=>n[b]-n[a])[0];
+    if(n[top]>=2&&COACH_FIX[top])out.push(n[top]+' of your '+all.length+' missiles missed the same way. '+COACH_FIX[top])}
+  if(gunShots>=60&&acc!=null&&acc<.12)out.push('Gunnery: '+gunShots+' rounds for '+gunHits+' hits. Hold fire until the pipper is settled and the range is under about 800 m.');
+  if(!all.length&&!kills&&missionT>45&&air.indexOf(mission)>=0)out.push('You never got a missile away. Tap LOCK (or T) for a radar track, then fire when the caret sits inside the NE bracket.');
+  if((P.glocN||0)>0)out.push('You blacked out '+(P.glocN>1?P.glocN+' times':'once')+' at '+P.maxG.toFixed(1)+' g. Ease the pull, or buy anti-g training in the crew cards.');
+  if(REC.events.some(e=>/ran out of fuel/i.test(e.text)))out.push('You ran the tanks dry. Watch the fuel tape and top up at the tanker before BINGO.');
+  if(!out.length&&(deathCause==='terrain'||deathCause==='collision'))out.push('You flew into the ground. Keep the flight path marker above the ground line and start the pull earlier.');
+  if(!out.length&&kills>0&&deathCause!=='abort')out.push('Clean sortie: '+kills+' kill'+(kills===1?'':'s')+(all.length?', '+hit.length+' of '+all.length+' missiles hit':'')+(acc!=null?' and '+Math.round(acc*100)+' per cent gun accuracy':'')+'.');
+  return out.slice(0,3)
+}
+function buildCoach(){const el=$('ovCoach');if(!el)return;const L=coachLines();
+  el.hidden=!L.length;el.innerHTML=L.length?'<span class="ck">What to work on</span>'+L.map(t=>'<p>'+t+'</p>').join(''):''}
 function countUp(el,txt,i){const m=/^([+−-]?)([\d,]+)(.*)$/.exec(txt);if(!m||REDUCE||!FX.on){el.textContent=txt;return}
   const n=+m[2].replace(/,/g,''),t0=performance.now()+i*70,dur=900;el.textContent=m[1]+'0'+m[3];
   const f=t=>{const k=clamp((t-t0)/dur,0,1),e=1-Math.pow(1-k,3);el.textContent=m[1]+Math.round(n*e).toLocaleString()+m[3];if(k<1&&el.isConnected)requestAnimationFrame(f)};requestAnimationFrame(f)}
