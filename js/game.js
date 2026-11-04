@@ -5757,14 +5757,17 @@ function progDetail(id){
 function modSnap(id){const e=effAC(id),c=ldCap(id),bf=AC.cm.fixed?AC.cm.flares:CM_LOADS[cmLoad][0]*15,bc=AC.cm.fixed?AC.cm.chaff:CM_LOADS[cmLoad][1]*30;
   return {thrust:e.T_AB,roll:e.roll,lift:e.CLMAX,range:e.mr.maxR,agility:e.mr.gmax,tanks:c.tanks,rails:c.hp,flares:bf*(e.cmK||1),chaff:bc*(e.cmK||1)}}
 const MOD_METRICS=[['thrust','thrust','pct'],['roll','roll rate','pct'],['lift','lift','pct'],['range','missile range','pct'],['agility','missile agility','pct'],['tanks','drop tanks','abs'],['rails','missile stations','abs'],['flares','flares','abs'],['chaff','chaff','abs']];
-function modEffect(id,k){const m=prog.mods[id]||(prog.mods[id]={}),had=Object.prototype.hasOwnProperty.call(m,k),prev=m[k];
-  if(had)delete m[k]; const a=modSnap(id);          // as flown today
-  m[k]=true; const b=modSnap(id);                   // with this module
-  if(had)m[k]=prev;else delete m[k]; if(!Object.keys(m).length)delete prog.mods[id];
+function modEffect(id,k){const m=prog.mods[id]||(prog.mods[id]={}),row=MODS.find(x=>x[0]===k),req=row&&row[4],
+  pre=req&&!m[req]?[req]:[],                        // tier II is measured from the state that already has tier I, so its card reads the same before and after you buy the prerequisite
+  keys=pre.concat(k),had={},prev={};
+  for(const q of keys)if(Object.prototype.hasOwnProperty.call(m,q)){prev[q]=m[q];had[q]=1;delete m[q]}
+  for(const q of pre)m[q]=true; const a=modSnap(id);          // as it will fly once the prerequisite is in
+  m[k]=true; const b=modSnap(id);                            // with this module as well
+  for(const q of keys)if(had[q])m[q]=prev[q];else delete m[q]; if(!Object.keys(m).length)delete prog.mods[id];
   const out=[];for(const [f,label,kind] of MOD_METRICS){const x=a[f],y=b[f];if(typeof x!=='number'||typeof y!=='number')continue;
     if(kind==='abs'){const X=Math.round(x),Y=Math.round(y);if(X!==Y)out.push(X+' → '+Y+' '+label)}   // a count, so zero is a real starting point
     else if(x){const d=Math.round((y/x-1)*100);if(d)out.push((d>0?'+':'−')+Math.abs(d)+' % '+label)}}
-  return out.slice(0,3).join(' · ')}
+  const s=out.slice(0,3).join(' · ');return s&&pre.length?s+' · with '+MODS.find(x=>x[0]===pre[0])[1]:s}
 function modsRender(){const el=$('hgMods'),id=AC.id;progWallet();
   if(!careerOn){el.innerHTML='<p class="hgNote">Modifications belong to <b>Career mode</b>: a stock aircraft flies with penalties and you earn the modules by flying it. Free play gives every aircraft all modules for free.</p><div class="row"><button class="primary" data-act="career">Switch to Career</button></div>';return}
   if(!progOwned(id)){el.innerHTML='<p class="hgNote">Buy this aircraft in the Tech tree first.</p>';return}
