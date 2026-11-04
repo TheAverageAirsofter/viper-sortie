@@ -7117,6 +7117,9 @@ $('pgCrew').addEventListener('click',e=>{const t=e.target.closest('[data-act=cre
 setInterval(()=>{if(daily.d!==dayKey())uiSoon()},30000);
 /* ---- loading screen between pressing Launch and the cockpit ---- */
 const LOAD_TIPS=['Corner speed is where you turn the tightest. Stay near it in a fight.','Notch a radar missile: put it on your beam and drop chaff.','Flares beat heat seekers, chaff beats radar missiles. Do not mix them up.','Pull too many g for too long and you will black out. Ease off.','Energy is life. Do not trade your speed for a shot you cannot make.','The top of the throttle is afterburner. It burns fuel fast. Watch bingo.','Lock a radar contact with T, then fire when the shot is in range.'];
+/* the career ramp, stated where the bandits are named: only the red pilots are softened, so only say it when fighters are due */
+function rampNote(){if(!careerOn||prog.sorties>=CAREER_RAMP||mission==='TRAINING'||NO_FIGHTERS.indexOf(mission)>=0)return '';
+  return 'career sortie '+Math.min(prog.sorties+1,CAREER_RAMP)+' of '+CAREER_RAMP+' · bandits still green'}
 let loading=false;const _sg=startGame;
 startGame=function(){if(loading)return;const args=arguments,self=this;
   if(NOLOAD||ovEl.hidden){return _sg.apply(self,args)}
@@ -7125,7 +7128,7 @@ startGame=function(){if(loading)return;const args=arguments,self=this;
   $('ldKick').textContent='Sortie';$('ldName').textContent=m;$('ldMeta').textContent=AC.name+' · BR '+progBR(AC.id).toFixed(1)+' · '+TMN[timeOfDay]+', '+WXN[weather];
   // briefing card: the map, the goal, and who you are up against
   $('ldMap').innerHTML=diagram();$('ldMapName').textContent=MAP_NAME(MAP)+' · '+(MAP_DESC[MAP]||'');$('ldGoal').textContent='Goal: '+(MIS_BRIEF[mission]||MIS_DESC[mission]||'');
-  $('ldWho').textContent=mission==='TRAINING'?'Lesson: '+LESSONS[lesson]+' · '+(LES_DESC[lesson]||''):NO_FIGHTERS.indexOf(mission)>=0?'No fighters expected.':'Bandits: '+(BANDITS[banditType]||banditType);
+  $('ldWho').textContent=(mission==='TRAINING'?'Lesson: '+LESSONS[lesson]+' · '+(LES_DESC[lesson]||''):NO_FIGHTERS.indexOf(mission)>=0?'No fighters expected.':'Bandits: '+(BANDITS[banditType]||banditType))+(rampNote()?' · '+rampNote():'');
   $('ldTip').textContent=LOAD_TIPS[Math.floor(Math.random()*LOAD_TIPS.length)];$('ldState').textContent='Loading';
   const bar=$('ldBar');bar.style.transition='none';bar.style.width='0%';
   ovEl.dataset.prev=ovEl.dataset.pane;ovEl.dataset.pane='load';prompts();void bar.offsetWidth;bar.style.transition='width '+(REDUCE?60:Math.min(LD-100,1000))+'ms linear';bar.style.width='100%';
