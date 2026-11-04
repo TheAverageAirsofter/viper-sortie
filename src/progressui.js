@@ -14,6 +14,19 @@ function progDetail(id){
   else h+='<p class="hgNote">Locked: research the '+req+' first.</p>';
   return h+'</div>'}
 /* Mods tab: modules for the aircraft in the hangar, grouped by family. Research costs RP earned in this aircraft (or free RP), then the module is bought with Silver Lions. */
+/* what a module actually changes: flip it on in memory, re-run the effective-aircraft maths, and report the numbers that moved.
+   Computed rather than written down, so a card can never disagree with modApply or ldCap. */
+function modSnap(id){const e=effAC(id),c=ldCap(id),bf=AC.cm.fixed?AC.cm.flares:CM_LOADS[cmLoad][0]*15,bc=AC.cm.fixed?AC.cm.chaff:CM_LOADS[cmLoad][1]*30;
+  return {thrust:e.T_AB,roll:e.roll,lift:e.CLMAX,range:e.mr.maxR,agility:e.mr.gmax,tanks:c.tanks,rails:c.hp,flares:bf*(e.cmK||1),chaff:bc*(e.cmK||1)}}
+const MOD_METRICS=[['thrust','thrust','pct'],['roll','roll rate','pct'],['lift','lift','pct'],['range','missile range','pct'],['agility','missile agility','pct'],['tanks','drop tanks','abs'],['rails','missile stations','abs'],['flares','flares','abs'],['chaff','chaff','abs']];
+function modEffect(id,k){const m=prog.mods[id]||(prog.mods[id]={}),had=Object.prototype.hasOwnProperty.call(m,k),prev=m[k];
+  if(had)delete m[k]; const a=modSnap(id);          // as flown today
+  m[k]=true; const b=modSnap(id);                   // with this module
+  if(had)m[k]=prev;else delete m[k]; if(!Object.keys(m).length)delete prog.mods[id];
+  const out=[];for(const [f,label,kind] of MOD_METRICS){const x=a[f],y=b[f];if(typeof x!=='number'||typeof y!=='number')continue;
+    if(kind==='abs'){const X=Math.round(x),Y=Math.round(y);if(X!==Y)out.push(X+' → '+Y+' '+label)}   // a count, so zero is a real starting point
+    else if(x){const d=Math.round((y/x-1)*100);if(d)out.push((d>0?'+':'−')+Math.abs(d)+' % '+label)}}
+  return out.slice(0,3).join(' · ')}
 function modsRender(){const el=$('hgMods'),id=AC.id;progWallet();
   if(!careerOn){el.innerHTML='<p class="hgNote">Modifications belong to <b>Career mode</b>: a stock aircraft flies with penalties and you earn the modules by flying it. Free play gives every aircraft all modules for free.</p><div class="row"><button class="primary" data-act="career">Switch to Career</button></div>';return}
   if(!progOwned(id)){el.innerHTML='<p class="hgNote">Buy this aircraft in the Tech tree first.</p>';return}
@@ -23,7 +36,8 @@ function modsRender(){const el=$('hgMods'),id=AC.id;progWallet();
     let btn;if(have)btn='<b class="ok">Installed</b>';else if(lockd)btn='<small>Needs '+MODS.find(x=>x[0]===m[4])[1]+'</small>';
     else if(res)btn='<button type="button" class="primary" data-act="mbuy" data-m="'+k+'"'+(prog.sl>=c.sl?'':' disabled')+'>Buy '+fmtN(c.sl)+' SL</button>';
     else btn='<button type="button" class="ghost" data-act="mres" data-m="'+k+'"'+(progPool(id)>=c.rp?'':' disabled')+'>Research '+fmtN(c.rp)+' RP</button>';
-    h+='<div class="mod '+st+'" data-m="'+k+'"><small>'+m[5]+'</small><b>'+m[1]+'</b><p>'+m[3]+'</p>'+btn+'</div>'}
+    const eff=modEffect(id,k);
+    h+='<div class="mod '+st+'" data-m="'+k+'"><small>'+m[5]+'</small><b>'+m[1]+'</b>'+(eff?'<em class="eff">'+eff+'</em>':'')+'<p>'+m[3]+'</p>'+btn+'</div>'}
   el.innerHTML=h+'</div>'}
 $('hgMods').addEventListener('click',e=>{const t=e.target.closest('[data-act]');if(!t)return;const act=t.dataset.act;
   if(act==='career'){$('bMode').click();modsRender();return}
