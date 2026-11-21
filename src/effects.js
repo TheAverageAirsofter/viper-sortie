@@ -36,10 +36,28 @@ function jetFX(j,type,isPlayer){
   if(j.pos.y<7000&&j.n>6){const span=AC_DEFS[type]&&AC_DEFS[type].fx?AC_DEFS[type].fx.vapor:type.startsWith('SU')?7.3:type.startsWith('MIG29')?5.6:type==='GRIPEN'?4.2:4.9;
     for(let i=0;i<(fx>1?3:1);i++){const x=rand(-span,span);_s1.copy(j.pos).addScaledVector(j.right,x).addScaledVector(j.up,.7).addScaledVector(j.fwd,rand(-2,1));
       puff(_s1.x,_s1.y,_s1.z,j.vel.x*.9,j.vel.y*.9,j.vel.z*.9,1,1,1,.32,1.6,5,.22)}}
-  if(j.pos.y<6000&&j.mach>.96&&j.mach<1.03&&isPlayer){
+  vaporCone(j,type,isPlayer);
+  if(j.pos.y<9000&&j.n>4.2){const span=(AC_DEFS[type]&&AC_DEFS[type].fx&&AC_DEFS[type].fx.vapor)||5;   // wingtip vortices: thin streamers off each tip in a hard pull
+    for(const sd of [1,-1]){_s1.copy(j.pos).addScaledVector(j.right,sd*span).addScaledVector(j.fwd,-2);puff(_s1.x,_s1.y,_s1.z,j.vel.x*.97,j.vel.y*.97,j.vel.z*.97,1,1,1,.22*Math.min(1,(j.n-4.2)/2),.35,.6,.5)}}
+  if(false&&j.pos.y<6000&&j.mach>.96&&j.mach<1.03&&isPlayer){
     for(let i=0;i<(fx>1?5:2);i++){const a=Math.random()*Math.PI*2;_s1.copy(j.pos).addScaledVector(j.right,Math.cos(a)*2.4).addScaledVector(j.up,Math.sin(a)*2.4).addScaledVector(j.fwd,-1);
       puff(_s1.x,_s1.y,_s1.z,j.vel.x*.97,j.vel.y*.97,j.vel.z*.97,1,1,1,.3,2,6,.18)}}
 }
+// missile motor smoke: two puffs a frame (here and halfway back) so the trail stays continuous at Mach 3; it lingers and spreads
+function mslSmoke(m,p,dim){const q=m.prev,life=QUALS[quality].fx>1?4.2:3;for(const t of [0,.5]){const x=p.x+(q.x-p.x)*t,y=p.y+(q.y-p.y)*t,z=p.z+(q.z-p.z)*t;
+    puff(x,y,z,rand(-1.5,1.5),rand(-1,1.5),rand(-1.5,1.5),dim,dim,dim+.02,.5,2.4,6,life)}
+  puff(p.x,p.y,p.z,0,0,0,1,.75,.35,.95,2.4,0,.07)}
+const sstep=(a,b,x)=>{const t=clamp((x-a)/(b-a),0,1);return t*t*(3-2*t)};
+// transonic vapour cone: a translucent bell over the wings when a jet runs near Mach 1 low in humid air
+const VC_GEO=(()=>{const g=new THREE.CylinderGeometry(1,.22,1,28,6,true);g.rotateX(-Math.PI/2);g.translate(0,0,-.5);return g})();   // narrow at the front (z=0), wide at the back (z=-1)
+const VC_MAT=new THREE.ShaderMaterial({transparent:true,depthWrite:false,side:THREE.DoubleSide,uniforms:{op:{value:0},t:{value:0}},
+  vertexShader:'varying vec2 vUv;varying float vF;void main(){vUv=uv;vec4 mv=modelViewMatrix*vec4(position,1.);vec3 n=normalize(normalMatrix*normal);vF=1.-abs(dot(n,normalize(-mv.xyz)));gl_Position=projectionMatrix*mv;}',
+  fragmentShader:'uniform float op,t;varying vec2 vUv;varying float vF;void main(){float e=smoothstep(0.,.35,vUv.y)*smoothstep(1.,.75,vUv.y);float n=.75+.25*sin(vUv.x*40.+t*9.)*sin(vUv.y*17.-t*5.);gl_FragColor=vec4(vec3(1.),op*e*n*(.4+.6*vF*vF));}'});
+function vaporCone(j,type,isPlayer){const o=isPlayer?playerJet:j.obj;if(!o)return;let vc=o.userData.vc;
+  const m=j.mach||0,y=j.pos.y,hum=(weather==='RAIN'||weather==='OVERCAST'?1.3:1)*(MAP==='DESERT'?.4:1),k=clamp(sstep(.92,.97,m)*(1-sstep(.99,1.05,m))*(1-y/6500)*hum,0,1);
+  if(k<.02){if(vc)vc.visible=false;return}
+  if(!vc){const span=(AC_DEFS[type]&&AC_DEFS[type].fx&&AC_DEFS[type].fx.vapor)||5;vc=new THREE.Mesh(VC_GEO,VC_MAT.clone());vc.scale.set(span*1.05,span*.75,span*1.1);vc.position.z=1.2;vc.frustumCulled=false;o.add(vc);o.userData.vc=vc}
+  vc.visible=true;vc.material.uniforms.op.value=.75*k*(.8+.2*Math.random());vc.material.uniforms.t.value=clock}
 // battle damage: hit jets trail smoke, badly hit ones burn
 function dmgFX(j,type,isPlayer){
   if(!j.alive&&!isPlayer)return; if(!isPlayer&&j.pos.distanceTo(camera.position)>12000)return;
@@ -50,6 +68,10 @@ function dmgFX(j,type,isPlayer){
   const s=fire?rand(.08,.16):rand(.35,.5);
   puff(_s1.x,_s1.y,_s1.z,j.vel.x*.15+rand(-2,2),j.vel.y*.15+rand(-1,3),j.vel.z*.15+rand(-2,2),s,s,s,fire?.65:.42,fire?5:3.5,fire?16:10,fire?3.2:2.2);
   if(fire)puff(_s1.x,_s1.y,_s1.z,j.vel.x*.6,j.vel.y*.6,j.vel.z*.6,1,rand(.4,.6),.12,.9,rand(2.5,4),2,.18)}
+// fuel venting: a leaking tank or a holed wing streams white mist from the wing
+function ventFX(j,type,isPlayer){const sy=isPlayer?P.sys:j.sys;if(!sy)return;const span=(AC_DEFS[type]&&AC_DEFS[type].fx&&AC_DEFS[type].fx.vapor)||5;
+  const sides=[];if(isPlayer&&sy.leak)sides.push(Math.random()<.5?.35:-.35);if(sy.wL>0&&sy.wL<1)sides.push(-.55);if(sy.wR>0&&sy.wR<1)sides.push(.55);
+  for(const f of sides){_s1.copy(j.pos).addScaledVector(j.right,f*span).addScaledVector(j.fwd,-1);puff(_s1.x,_s1.y,_s1.z,j.vel.x*.85,j.vel.y*.85,j.vel.z*.85,.96,.97,.98,.4,.6,4,1.3)}}
 function updateParticles(dt){
   const drag=Math.max(0,1-dt*1.6);
   for(let i=0;i<PMAX;i++){

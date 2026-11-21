@@ -332,7 +332,7 @@ function updateWeapons(dt){
     }
     m.prev.copy(p); p.addScaledVector(m.vel,dt);
     m.m.quaternion.setFromUnitVectors(ZF,_a.copy(m.vel).normalize());
-    if(m.t<s.burn){puff(p.x,p.y,p.z,rand(-3,3),rand(-3,3),rand(-3,3),.88,.88,.9,.55,3,9,1.6);puff(p.x,p.y,p.z,0,0,0,1,.75,.35,.9,1.8,0,.06)}
+    if(m.t<s.burn)mslSmoke(m,p,.88);
     let done=false;
     for(const e of enemies){if(e.alive&&distSeg(e.pos,m.prev,p)<s.fuze*(e.kind==='fighter'?1:1.8)){recMsl(m,'HIT','');hitAI(e,5,m.type==='9X'?AC.srFull:AC.mrFull,true);done=true;break}}
     if(!done&&p.y<Math.max(groundH(p.x,p.z),0)){explode(p,false);done=true;recMsl(m,'MISS',m.reason||'HIT THE GROUND')}
@@ -567,7 +567,7 @@ function updateEnemyMissiles(dt){
     }
     m.prev.copy(p); p.addScaledVector(m.vel,dt);
     m.m.quaternion.setFromUnitVectors(ZF,_a.copy(m.vel).normalize());
-    if(m.t<s.burn){puff(p.x,p.y,p.z,rand(-3,3),rand(-3,3),rand(-3,3),.85,.85,.87,.55,3,9,1.6);puff(p.x,p.y,p.z,0,0,0,1,.7,.3,.9,1.8,0,.06)}
+    if(m.t<s.burn)mslSmoke(m,p,.85);
     let done=false;
     const fz=s.fuze;
     if(m.team==='red'&&state==='play'&&P.alive&&distSeg(P.pos,m.prev,p)<fz){

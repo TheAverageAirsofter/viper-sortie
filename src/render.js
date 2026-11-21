@@ -653,11 +653,25 @@ vec3 paint(){vec3 n=normalize(vJN);bool side=abs(n.x)>.62;vec2 p=side?vec2(vJP.z
  if(abs(n.y)>.6&&abs(vJP.x)>1.25){float wx=fwidth(vJP.x)+1e-4,lx=abs(fract(vJP.x/1.05+.5)-.5)*1.05;ln=max(ln,1.-smoothstep(.012,.012+wx*1.4,lx));}
  ln*=1.-smoothstep(.015,.05,wz);
  float pid=ph(floor(vec2(vJP.z/1.27,vJP.x/1.05+vJP.y)));
+ // access panels: some bays carry a smaller hatch outline, placed per bay
+ {vec2 q=side?vec2(vJP.z/1.27,vJP.y/.62):vec2(vJP.z/1.27,vJP.x/1.05);vec2 cid=floor(q),f=fract(q);float hr=ph(cid+3.1);
+  if(hr>.68){vec2 lo=vec2(.18,.2)+vec2(ph(cid+1.7),ph(cid+2.9))*.18,hi=lo+vec2(.32,.3)+vec2(ph(cid+4.3),ph(cid+5.9))*.2;
+   vec2 dq=fwidth(q)+1e-4;float e=min(min(abs(f.x-lo.x)/dq.x,abs(f.x-hi.x)/dq.x),min(abs(f.y-lo.y)/dq.y,abs(f.y-hi.y)/dq.y));
+   float inside=step(lo.x,f.x)*step(f.x,hi.x)*step(lo.y,f.y)*step(f.y,hi.y),edge=(1.-smoothstep(.6,1.6,e))*max(inside,step(lo.x-.02,f.x)*step(f.x,hi.x+.02)*step(lo.y-.02,f.y)*step(f.y,hi.y+.02));
+   ln=max(ln,edge*.65*(1.-smoothstep(.015,.05,wz)));}}
+ // rivet rows a hand's width either side of the frame lines, only up close
+ {float rv=abs(fract(vJP.z/1.27+.5)-.5)*1.27;float row=1.-smoothstep(.02,.035,abs(rv-.06));float t=side?vJP.y:vJP.x;float dot2=1.-smoothstep(.15,.3,abs(fract(t/.09)-.5)*2.);
+  c*=1.-.12*row*dot2*(1.-smoothstep(.004,.012,wz));}
  c*=(1.-.24*ln)*(.975+.05*pid);
- // grime and exhaust soot
+ // walkways: dark outlines on top of the wing roots
+ if(n.y>.6&&abs(vJP.x)>1.1&&abs(vJP.x)<2.3){float wx2=fwidth(vJP.x)+1e-4;float ed=min(abs(abs(vJP.x)-1.15),abs(abs(vJP.x)-2.25))/wx2;c*=1.-.35*(1.-smoothstep(.6,1.8,ed))*(1.-smoothstep(.02,.06,wz))*step(pTail+5.,vJP.z);}
+ // weathering: sun-faded tops, grime streaking aft with the airflow, darker leading edges, soot behind the exhaust
  float gr=texture2D(nTex,vJP.zx/7.).g;c*=.93+.1*gr;
+ float stk=texture2D(nTex,vec2((side?vJP.y:vJP.x)*.9,vJP.z*.045)).b;c*=1.-.12*smoothstep(.55,.85,stk)*(.6+.4*gr);
+ c=mix(c,c*1.07+.02,smoothstep(.55,.95,n.y)*smoothstep(.4,.7,texture2D(nTex,vJP.zx/16.).r)*.6);
  c=mix(c,c*.42,smoothstep(pTail+3.2,pTail+.2,vJP.z)*(.55+.35*gr));
- return c;}`).replace('#include <color_fragment>','#include <color_fragment>\ndiffuseColor.rgb=paint();')}
+ return c;}`).replace('#include <color_fragment>','#include <color_fragment>\ndiffuseColor.rgb=paint();')
+   .replace('#include <roughnessmap_fragment>','#include <roughnessmap_fragment>\n roughnessFactor=clamp(roughnessFactor*(.82+.3*texture2D(nTex,vJP.zx/5.).r)+.06*(ph(floor(vec2(vJP.z/1.27,vJP.x/1.05+vJP.y)))-.5),.25,.9);')}
 // bake jet-space position and normal into each painted mesh so paint stays put when a surface moves
 function bakePaint(g,mat){g.updateMatrixWorld(true);const iv=new THREE.Matrix4().copy(g.matrixWorld).invert(),M=new THREE.Matrix4(),N=new THREE.Matrix3(),v=new THREE.Vector3();
   g.traverse(o=>{if(!o.isMesh||o.material!==mat||o.geometry.attributes.jp)return;const ge=o.geometry,p=ge.attributes.position,nn=ge.attributes.normal;M.multiplyMatrices(iv,o.matrixWorld);N.getNormalMatrix(M);

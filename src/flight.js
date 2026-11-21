@@ -187,13 +187,29 @@ const base=new THREE.Group(); scene.add(base);
   tw.position.set(RWY.x+140,BASE_Y+.12,0); base.add(tw);
   const apron=new THREE.Mesh(new THREE.PlaneGeometry(260,420).rotateX(-Math.PI/2),new THREE.MeshLambertMaterial({color:0x55585b}));
   apron.position.set(RWY.x+290,BASE_Y+.1,-200); base.add(apron);
-  const bm=new THREE.MeshLambertMaterial({color:0x7c8172}), dm=new THREE.MeshLambertMaterial({color:0x5d6158});
-  for(let i=0;i<4;i++){const h=new THREE.Mesh(new THREE.BoxGeometry(46,14,40),bm);h.position.set(RWY.x+380,BASE_Y+7,-360+i*70);base.add(h)}
-  const tower=new THREE.Mesh(new THREE.BoxGeometry(10,26,10),dm);tower.position.set(RWY.x+250,BASE_Y+13,120);base.add(tower);
-  const cab=new THREE.Mesh(new THREE.BoxGeometry(14,5,14),new THREE.MeshLambertMaterial({color:0x223038,emissive:0x0a1a24}));cab.position.set(RWY.x+250,BASE_Y+28,120);base.add(cab);
+  const bm=new THREE.MeshLambertMaterial({color:0x7c8172}), dm=new THREE.MeshLambertMaterial({color:0x5d6158}), con=new THREE.MeshLambertMaterial({color:0x8d8f88}),
+    door=new THREE.MeshLambertMaterial({color:0x3e4440}), glass=new THREE.MeshLambertMaterial({color:0x1d2c36,emissive:0x0a1a24}), white=new THREE.MeshLambertMaterial({color:0xd8d8d0}), tar=new THREE.MeshLambertMaterial({color:0x4a4d50});
+  const box=(w,h,d,m,x,y,z)=>{const o=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),m);o.position.set(x,y,z);base.add(o);return o};
+  const arch=(w,h,len,m,x,z,ry)=>{const sh=new THREE.Shape();sh.moveTo(-w/2,0);sh.absellipse(0,0,w/2,h,Math.PI,0,true);sh.lineTo(-w/2,0);   // a half-ellipse barrel roof
+    const o=new THREE.Mesh(new THREE.ExtrudeGeometry(sh,{depth:len,bevelEnabled:false,curveSegments:14}),m);o.geometry.translate(0,0,-len/2);o.position.set(x,BASE_Y,z);o.rotation.y=ry||0;base.add(o);return o};
+  // taxiway links from the runway to the parallel taxiway
+  for(const z of [RWY.z0+150,0,RWY.z1-150]){const l=new THREE.Mesh(new THREE.PlaneGeometry(118,20).rotateX(-Math.PI/2),tar);l.position.set(RWY.x+81,BASE_Y+.11,z);base.add(l)}
+  // maintenance hangars: arched roofs on the apron, dark doors facing the runway
+  for(let i=0;i<3;i++){const z=-380+i*90;arch(48,17,60,bm,RWY.x+392,z,Math.PI/2);box(.6,15,42,door,RWY.x+361.7,BASE_Y+7.5,z)}
+  // hardened aircraft shelters along a dispersal strip north of the apron
+  const disp=new THREE.Mesh(new THREE.PlaneGeometry(40,760).rotateX(-Math.PI/2),tar);disp.position.set(RWY.x+250,BASE_Y+.1,560);base.add(disp);
+  for(let i=0;i<6;i++){const z=260+i*110,sd=i%2?1:-1,x=RWY.x+250+sd*58;arch(26,11,34,con,x,z,Math.PI/2);box(.8,9.5,22,door,x-sd*17.2,BASE_Y+4.75,z);
+    const lead=new THREE.Mesh(new THREE.PlaneGeometry(36,18).rotateX(-Math.PI/2),tar);lead.position.set(x-sd*36,BASE_Y+.1,z);base.add(lead)}
+  // control tower: shaft, glass cab with an overhanging roof and a mast; a radar dome and fuel tanks nearby
+  box(9,24,9,dm,RWY.x+250,BASE_Y+12,120);box(13,4.5,13,glass,RWY.x+250,BASE_Y+26.3,120);box(15,1,15,white,RWY.x+250,BASE_Y+29,120);box(.3,6,.3,dm,RWY.x+252,BASE_Y+32.5,122);
+  box(16,8,22,bm,RWY.x+262,BASE_Y+4,138);
+  box(4,14,4,dm,RWY.x+300,BASE_Y+7,230);{const d=new THREE.Mesh(new THREE.SphereGeometry(5.5,16,10),white);d.position.set(RWY.x+300,BASE_Y+18,230);base.add(d)}
+  for(let i=0;i<3;i++){const t=new THREE.Mesh(new THREE.CylinderGeometry(7,7,9,18),white);t.position.set(RWY.x+460,BASE_Y+4.5,60+i*20);base.add(t)}
   // edge and threshold lights (bright at night)
   const pts=[],cols=[];for(let z=RWY.z0;z<=RWY.z1;z+=60)for(const x of [-RWY.w/2-1,RWY.w/2+1]){pts.push(RWY.x+x,BASE_Y+.6,z);cols.push(1,.95,.8)}
   for(let x=-RWY.w/2;x<=RWY.w/2;x+=4){pts.push(RWY.x+x,BASE_Y+.6,RWY.z0-4);cols.push(.3,1,.4);pts.push(RWY.x+x,BASE_Y+.6,RWY.z1+4);cols.push(.3,1,.4)}
+  for(const [z0,dir] of [[RWY.z0,-1],[RWY.z1,1]]){for(let k=1;k<=10;k++){const z=z0+dir*k*30;for(let x=-6;x<=6;x+=3){pts.push(RWY.x+x,BASE_Y+.8,z);cols.push(1,.97,.85)}}   // approach light bars
+    for(let i=0;i<4;i++){pts.push(RWY.x-RWY.w/2-14-i*9,BASE_Y+.8,z0-dir*300);cols.push(i<2?1:1,i<2?1:.15,i<2?1:.1)}}   // PAPI: two white, two red
   const lg=new THREE.BufferGeometry();lg.setAttribute('position',new THREE.Float32BufferAttribute(pts,3));lg.setAttribute('color',new THREE.Float32BufferAttribute(cols,3));
   const rl=new THREE.Points(lg,new THREE.PointsMaterial({size:2.2,vertexColors:true,sizeAttenuation:true,transparent:true,opacity:.5,fog:false}));rl.name='rwyLights';base.add(rl);
 }
