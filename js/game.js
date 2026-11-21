@@ -787,14 +787,56 @@ function wingGeo(st,mirror){
 function finGeo(st){const ws=st.map(s=>({x:s.h,zle:s.zle,zte:s.zte,t:s.t||.05,y:0}));const g=wingGeo(ws,false);
   const p=g.attributes.position;for(let i=0;i<p.count;i++){const x=p.getX(i),y=p.getY(i);p.setXYZ(i,y,x,p.getZ(i))}g.computeVertexNormals();return g}
 // missile: body, ogive nose, cruciform fins; named group so launch rails find it
-function mslMesh(len,r,mat,name,fin){const g=new THREE.Group();g.name=name;
-  const b=new THREE.Mesh(new THREE.CylinderGeometry(r,r,len*.86,8).rotateX(Math.PI/2),mat);b.position.z=-len*.07;g.add(b);
-  const n=new THREE.Mesh(new THREE.ConeGeometry(r,len*.14,8).rotateX(Math.PI/2),mat);n.position.z=len*.43;g.add(n);
-  const fs=fin||r*3.2;for(const a of [0,Math.PI/2]){const f=new THREE.Mesh(new THREE.BoxGeometry(fs,.012,len*.1),mat);f.rotation.z=a+Math.PI/4;f.position.z=-len*.44;g.add(f);
-    const f2=new THREE.Mesh(new THREE.BoxGeometry(fs*.7,.012,len*.06),mat);f2.rotation.z=a+Math.PI/4;f2.position.z=len*.2;g.add(f2)}
-  return g}
-const MSL_DIM={'AIM-9X':[3.0,.08],'AIM-120C':[3.66,.1],'AIM-120C-7':[3.66,.1],'AIM-120D':[3.66,.1],'R-73':[2.9,.1],'R-27R':[4.08,.13],'R-27ER':[4.78,.15],'R-77':[3.6,.11],'R-77-1':[3.71,.11],
-  'R-37M':[4.2,.19],'IRIS-T':[2.94,.08],'METEOR':[3.65,.1],'MICA IR':[3.1,.09],'PL-10':[3.0,.09],'PL-15':[4.0,.11]};
+// air-to-air missiles: a lathed body (IR seeker dome or radome, warhead and motor bands, boat tail) and fins by family, merged into one vertex-coloured mesh.
+// The same geometry hangs on the rails and flies (pools in effects.js take it at launch through mslSet).
+const MSL_DIM={'AIM-9X':[3.0,.064],'AIM-120C':[3.66,.089],'AIM-120C-7':[3.66,.089],'AIM-120D':[3.66,.089],'R-73':[2.9,.085],'R-74M':[2.9,.085],'R-27R':[4.08,.115],'R-27ER':[4.78,.13],'R-77':[3.6,.1],'R-77-1':[3.71,.1],
+  'R-37M':[4.2,.19],'IRIS-T':[2.94,.064],'METEOR':[3.65,.089],'MICA IR':[3.1,.08],'MICA EM':[3.1,.08],'PL-10':[3.0,.08],'PL-15':[4.0,.1],'PL-12':[3.93,.1],'PL-11':[3.69,.1],'PL-8':[2.99,.08],'PL-5':[2.89,.065],'PL-2':[2.99,.064],
+  'AIM-9B':[2.83,.064],'AIM-9D':[2.87,.064],'AIM-9E':[3.0,.064],'AIM-9G':[2.87,.064],'AIM-9J':[3.07,.064],'AIM-9L':[2.87,.064],'AIM-9M':[2.87,.064],'AIM-9P':[3.07,.064],'AIM-7D':[3.66,.1],'AIM-7E':[3.66,.1],'AIM-7F':[3.66,.1],'AIM-7M':[3.66,.1],
+  'AIM-54C':[3.96,.19],'R-60':[2.1,.06],'R-60M':[2.1,.06],'R-60MK':[2.1,.06],'R-3S':[2.84,.064],'R-3R':[3.1,.064],'R-13M':[2.9,.064],'R-23R':[4.46,.11],'R-24R':[4.46,.11],'R-40RD':[6.2,.155],'R-33':[4.15,.19],
+  'Python 3':[2.95,.08],'Python 4':[3.0,.08],'Python 5':[3.1,.08],'Magic':[2.75,.08],'R550':[2.75,.08],'Rb 24':[2.83,.064],'Rb 74':[2.87,.064],'Rb 71':[3.7,.1],'Rb 27':[2.1,.145],'Rb 28':[2.0,.08],'Red Top':[3.32,.11],'9M38 (Buk)':[5.55,.2]};
+const MSL_MAT=new THREE.MeshStandardMaterial({vertexColors:true,roughness:.45,metalness:.12,side:THREE.DoubleSide});
+const mslKind=n=>/R-77|PL-15/.test(n||'')?'grid':/METEOR/.test(n)?'ram':/R-37|R-40|R-33|AIM-54|Buk/.test(n)?'big':/AIM-120|PL-12|MICA/.test(n)?'amr':
+  /AIM-7|R-27|R-23|R-24|R-3R|PL-11|Rb 71|Rb 27|Rb 28|Red Top|Skyflash|Aspide/.test(n)?'sarh':/R-73|R-74/.test(n)?'r73':/AIM-9X|IRIS|PL-10|ASRAAM/.test(n)?'tail':'ir';
+const MSL_GEO={}, mslNI=g=>g.index?g.toNonIndexed():g;
+function mslGeoFor(name,len,r){const d=MSL_DIM[name]||[len||3,r||.08];len=len||d[0];r=r||d[1];const k=mslKind(name),key=k+'|'+len+'|'+r;if(MSL_GEO[key])return MSL_GEO[key];
+  const L=len,ir=k==='ir'||k==='tail'||k==='r73',nl=ir?r*1.7:r*(k==='big'?4.2:3.6),nb=L/2-nl,parts=[];
+  const C={body:new THREE.Color(0xe4e4de),dome:new THREE.Color(0x30373c),rad:new THREE.Color(0xcfd0ca),yel:new THREE.Color(0xc9a227),brn:new THREE.Color(0x7a5a3a),dk:new THREE.Color(0x3a3d40)};
+  // lathe profile from the tail to the nose (radius, axial); tiny steps keep the paint bands sharp
+  const pr=[[0,-L/2],[r*.72,-L/2],[r*.97,-L/2+L*.04],[r,-L/2+L*.06]],bands=[[-L*.06,-L*.06+.06,'brn'],[nb-r*2.6-.07,nb-r*2.6,'yel']];
+  for(const [y0,y1] of bands){pr.push([r,y0-.002],[r,y0],[r,y1],[r,y1+.002])}
+  pr.push([r,nb]);for(let i=1;i<=8;i++){const t=i/8;pr.push([ir?r*Math.sqrt(Math.max(0,1-t*t)):r*Math.pow(1-t,.72),nb+t*nl])}
+  pr.sort((a,b)=>a[1]-b[1]);
+  const lg=mslNI(new THREE.LatheGeometry(pr.map(([x,y])=>new THREE.Vector2(Math.max(0,x),y)),12));lg.deleteAttribute('uv');
+  {const P=lg.attributes.position,col=new Float32Array(P.count*3);for(let i=0;i<P.count;i++){const y=P.getY(i);let c=C.body;
+      if(y>nb+.001)c=ir?(y>nb+nl*.25?C.dome:C.body):C.rad;for(const [y0,y1,cn] of bands)if(y>=y0-1e-4&&y<=y1+1e-4)c=C[cn];col[i*3]=c.r;col[i*3+1]=c.g;col[i*3+2]=c.b}
+    lg.setAttribute('color',new THREE.BufferAttribute(col,3));parts.push(lg)}
+  // a fin: trapezoid in the radial/axial plane (root LE at yLE, root chord cr, tip chord ct, span s, tip set back by d), thickness t, around the body at angle a
+  const fin=(yLE,cr,ct,s,dd,a,col)=>{const sh=new THREE.Shape([new THREE.Vector2(0,yLE),new THREE.Vector2(s,yLE-dd),new THREE.Vector2(s,yLE-dd-ct),new THREE.Vector2(0,yLE-cr)]);
+    const g=mslNI(new THREE.ExtrudeGeometry(sh,{depth:Math.max(.006,r*.09),bevelEnabled:false}));g.deleteAttribute('uv');g.translate(r*.9,0,-Math.max(.006,r*.09)/2);g.rotateY(a);
+    const c=C[col||'body'],cc=new Float32Array(g.attributes.position.count*3);for(let i=0;i<cc.length;i+=3){cc[i]=c.r;cc[i+1]=c.g;cc[i+2]=c.b}g.setAttribute('color',new THREE.BufferAttribute(cc,3));parts.push(g)};
+  const X4=(f)=>{for(let q=0;q<4;q++)f(Math.PI/4+q*Math.PI/2)};
+  const tail=(cr,ct,s,dd,y)=>X4(a=>fin(y==null?-L/2+cr+L*.03:y,cr,ct,s,dd,a));
+  if(k==='ir'){X4(a=>fin(nb-L*.01,L*.09,L*.012,r*1.9,L*.075,a));tail(L*.16,L*.075,r*2.7,L*.085)}
+  else if(k==='r73'){X4(a=>fin(nb+nl*.3,L*.03,L*.01,r*.9,L*.02,a));X4(a=>fin(nb-L*.04,L*.08,L*.03,r*1.6,L*.05,a));tail(L*.15,L*.08,r*2.9,L*.07)}
+  else if(k==='tail'){X4(a=>fin(L*.12,L*.32,L*.28,r*.55,L*.04,a));tail(L*.12,L*.04,r*2.3,L*.08)}
+  else if(k==='amr'){X4(a=>fin(L*.13,L*.11,L*.04,r*1.7,L*.065,a));tail(L*.1,L*.045,r*2.0,L*.05)}
+  else if(k==='sarh'){X4(a=>fin(L*.1,L*.15,L*.012,r*2.9,L*.13,a));tail(L*.12,L*.035,r*2.6,L*.08)}
+  else if(k==='big'){X4(a=>fin(L*.12,L*.42,L*.34,r*1.05,L*.06,a));tail(L*.13,L*.05,r*2.2,L*.08)}
+  else if(k==='ram'){tail(L*.1,L*.05,r*1.9,L*.05);for(const sd of [1,-1]){const b=mslNI(new THREE.BoxGeometry(r*.75,r*.8,L*.26));b.deleteAttribute('uv');b.rotateX(Math.PI/2);b.translate(sd*r*.78,-L*.04,-r*.78);   // ramjet intakes low on each side
+      const cc=new Float32Array(b.attributes.position.count*3);for(let i=0;i<cc.length;i+=3){cc[i]=C.body.r;cc[i+1]=C.body.g;cc[i+2]=C.body.b}b.setAttribute('color',new THREE.BufferAttribute(cc,3));parts.push(b)}}
+  else if(k==='grid'){X4(a=>fin(L*.1,L*.3,L*.27,r*.5,L*.03,a));   // long low strakes, then four lattice fins across the flow at the tail
+    X4(a=>{const W=r*2.1,H=r*1.5,D=L*.035,t=Math.max(.006,r*.07),y=-L/2+L*.045,bars=[];
+      for(const [w,h,x,z] of [[W,t,W/2,-H/2],[W,t,W/2,H/2],[t,H,0,0],[t,H,W,0],[t,H,W/2,0],[W,t,W/2,0]])bars.push([w,h,x,z]);
+      for(const [w,h,x,z] of bars){const b=mslNI(new THREE.BoxGeometry(w,D,h));b.deleteAttribute('uv');b.translate(r*.9+x,y,z);b.rotateY(a);
+        const cc=new Float32Array(b.attributes.position.count*3);for(let i=0;i<cc.length;i+=3){cc[i]=C.dk.r;cc[i+1]=C.dk.g;cc[i+2]=C.dk.b}b.setAttribute('color',new THREE.BufferAttribute(cc,3));parts.push(b)}})}
+  // merge, then lay the axis along +z (nose forward)
+  let n=0;for(const g of parts)n+=g.attributes.position.count;const P=new Float32Array(n*3),N=new Float32Array(n*3),Cc=new Float32Array(n*3);let o=0;
+  for(const g of parts){if(!g.attributes.normal)g.computeVertexNormals();P.set(g.attributes.position.array,o);N.set(g.attributes.normal.array,o);Cc.set(g.attributes.color.array,o);o+=g.attributes.position.count*3}
+  const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.BufferAttribute(P,3));geo.setAttribute('normal',new THREE.BufferAttribute(N,3));geo.setAttribute('color',new THREE.BufferAttribute(Cc,3));
+  geo.rotateX(Math.PI/2);geo.computeBoundingSphere();return MSL_GEO[key]=geo}
+function mslMesh(len,r,mat,name,mname){const g=new THREE.Group();g.name=name;g.add(new THREE.Mesh(mslGeoFor(mname,len,r),MSL_MAT));return g}
+// a pooled missile takes the shape of what was fired
+function mslSet(m,name){m.m.geometry=mslGeoFor(name);m.m.material=MSL_MAT;m.m.scale.set(1,1,1)}
 /* ================= jet detail: paint, panel lines, control surfaces, canopies, pilots, decals ================= */
 // real-world schemes. p: 0 solid, 1 soft two-tone, 2 splinter, 3 digital. c: three paint colours, b: belly colour (null = same), soot: exhaust staining
 const PAINT={
@@ -914,7 +956,7 @@ function buildLoftJet(c,S,type){
   const rz=S.radome, fst0=S.fus, ni=(S.parts||[]).find(p=>p.mouth&&!p.x&&p.st[p.st.length-1][0]>fst0[fst0.length-1][0]-.2);   // nose intake: the fuselage stops just inside the mouth
   const fst=ni?(()=>{const zc=ni.st[ni.st.length-1][0]-.2,o=fst0.filter(r=>r[0]<zc);o.push(secAt(fst0,zc).map((v,i)=>i?v:zc));return o})():fst0;
   if(rz!=null){const k=fst.findIndex(s=>s[0]>=rz);let mid=null;if(k>0&&Math.abs(fst[k][0]-rz)>.01){const a=fst[k-1],b=fst[k],t=(rz-a[0])/(b[0]-a[0]);mid=a.map((v,i)=>v+(b[i]-v)*t)}
-    const back=fst.filter(s=>s[0]<=rz+.01).concat(mid?[mid]:[]), front=(mid?[mid]:[]).concat(fst.filter(s=>s[0]>=rz-.01));add(loftGeo(back),body,'fuse').userData.st=back;add(loftGeo(front,{capTail:false}),dark,'radome')}
+    const back=fst.filter(s=>s[0]<=rz+.01).concat(mid?[mid]:[]), front=(mid?[mid]:[]).concat(fst.filter(s=>s[0]>=rz-.01));add(loftGeo(back),body,'fuse').userData.st=back;add(loftGeo(front,{capTail:false}),new THREE.MeshStandardMaterial({color:new THREE.Color(PS.c[1]).multiplyScalar(PS.rad||.84),roughness:.42,metalness:.1,side:THREE.DoubleSide}),'radome')}   // radomes are a slightly different grey, not black
   else add(loftGeo(fst),body,'fuse');
   const cz=S.canopy[0],cut=add(loftGeo(rz!=null?g.getObjectByName('fuse').userData.st:fst,{skipTop:[cz-1.3,cz+1.4]}),body,'fuseCut');cut.visible=false;
   for(const p of S.parts||[]){const xs=p.x?[p.x,-p.x]:[0];for(const x of xs){const zM=p.st[p.st.length-1][0],yM=p.st[p.st.length-1][4]||0,sg=Math.sign(x)||1;
@@ -1009,8 +1051,8 @@ function buildLoftJet(c,S,type){
   const ac=AC_DEFS[type], d9=MSL_DIM[ac.srFull]||[3,.09], dM=MSL_DIM[ac.mrFull]||[3.7,.1];
   const lr=type==='SU35'&&c===PLAYER_COLORS&&suLR, d120=lr?MSL_DIM['R-37M']:dM;
   const pyl=(x,y,z,top,nm)=>{if(top==null||top-y<.25)return;const p=add(new THREE.BoxGeometry(.09,top-y-.1,1.4),dark,'py_'+nm);p.position.set(x,(top+y)/2,z)};
-  (S.r9||[]).forEach(([x,y,z,top],i)=>{const m=mslMesh(d9[0],d9[1],white,'r9_'+i);m.position.set(x,y,z);g.add(m);pyl(x,y+d9[1],z,top,'r9_'+i)});
-  (lr&&S.r120lr?S.r120lr:S.r120||[]).forEach(([x,y,z,top],i)=>{const m=mslMesh(d120[0],d120[1],white,'r120_'+i);m.position.set(x,y,z);g.add(m);if(!S.internal)pyl(x,y+d120[1],z,top,'r120_'+i)});
+  (S.r9||[]).forEach(([x,y,z,top],i)=>{const m=mslMesh(d9[0],d9[1],white,'r9_'+i,ac.srFull);m.position.set(x,y,z);g.add(m);pyl(x,y+d9[1],z,top,'r9_'+i)});
+  (lr&&S.r120lr?S.r120lr:S.r120||[]).forEach(([x,y,z,top],i)=>{const m=mslMesh(d120[0],d120[1],white,'r120_'+i,lr?'R-37M':ac.mrFull);m.position.set(x,y,z);g.add(m);if(!S.internal)pyl(x,y+d120[1],z,top,'r120_'+i)});
   if(S.hook){const h=add(new THREE.BoxGeometry(.08,.08,1.6),dark);h.position.set(0,S.hook[1],S.hook[0])}
   body.userData.pu.pTail.value=Math.min(...S.noz.map(n=>n[2]))+.6;
   bakePaint(g,body);
@@ -1052,7 +1094,7 @@ const M2={};
 const mir=a=>a.flatMap(p=>p[0]?[p,[-p[0],...p.slice(1)]]:[p]);
 M2.F16={L:15.06,nz:3.0,radome:6.2,
   fus:[[-7.0,.5,.52,.5,.05,2.4],[-6.0,.62,.62,.56,.05,2.5],[-4.5,.78,.66,.62,0,2.6],[-2.5,.9,.66,.66,0,2.8],[-.5,.92,.64,.66,0,2.8],[1.5,.82,.62,.6,0,2.6],[3.0,.7,.6,.5,0,2.4],[4.2,.62,.58,.45,0,2.2],[5.4,.52,.46,.42,0,2.1],[6.2,.42,.36,.36,-.02,2],[7.0,.22,.2,.2,-.05,2],[7.6,0,0,0,-.08,2]],
-  parts:[{x:0,mouth:1,st:[[-2.0,.38,.15,.22,-.62,2.2],[0,.5,.2,.32,-.72,2.4],[2.0,.56,.26,.4,-.76,2.6],[3.3,.56,.28,.4,-.76,3]]},
+  parts:[{x:0,mouth:1,rake:[.3,0],st:[[-2.0,.38,.15,.22,-.62,2.2],[0,.5,.2,.32,-.72,2.4],[2.0,.56,.26,.4,-.76,2.6],[3.3,.56,.28,.4,-.76,3]]},
     {x:0,st:[[2.2,.2,.1,.1,.6,2],[1.0,.3,.2,.1,.6,2],[-1.5,.34,.24,.1,.58,2],[-4,.3,.2,.1,.54,2],[-5.6,.2,.1,.1,.5,2],[-6.5,0,0,0,.5,2]]}],
   wings:[{st:[{x:.85,zle:1.3,zte:-3.95,y:-.08,t:.04},{x:4.6,zle:-1.95,zte:-3.05,y:-.08,t:.03}]},{st:[{x:.55,zle:4.4,zte:.6,y:0,t:.02},{x:1.05,zle:1.35,zte:.6,y:-.05,t:.02}]},
     {st:[{x:.7,zle:-5.0,zte:-7.0,y:-.1,t:.035},{x:2.79,zle:-6.55,zte:-7.35,y:-.25,t:.03}]}],
@@ -1062,7 +1104,7 @@ M2.F16={L:15.06,nz:3.0,radome:6.2,
 M2.F16B70=Object.assign({},M2.F16,{parts:[...M2.F16.parts,{x:.8,st:[[-3.4,.3,.22,.2,.4,2],[-1,.38,.26,.2,.42,2],[1.6,.3,.2,.18,.38,2]]}]});
 M2.F15C={L:19.43,nz:5.6,radome:7.0,
   fus:[[-8.5,.55,.5,.45,.15,2.4],[-6.5,.75,.55,.5,.15,2.6],[-4,.85,.6,.5,.15,2.8],[-1,.85,.62,.5,.2,2.8],[2,.75,.62,.5,.25,2.6],[4,.68,.62,.48,.2,2.4],[5.5,.6,.55,.45,.15,2.2],[7.0,.5,.45,.4,.1,2],[8.3,.36,.32,.3,.05,2],[9.2,.18,.16,.16,0,2],[9.7,0,0,0,0,2]],
-  parts:[{x:1.1,mouth:1,st:[[-8.6,.55,.55,.6,-.1,2.6],[-5,.66,.6,.62,-.1,3],[-1,.64,.62,.62,-.1,3.4],[2.5,.56,.65,.6,-.05,4],[3.6,.55,.68,.6,0,5]]}],
+  parts:[{x:1.1,mouth:1,rake:[.7,0],st:[[-8.6,.55,.55,.6,-.1,2.6],[-5,.66,.6,.62,-.1,3],[-1,.64,.62,.62,-.1,3.4],[2.5,.56,.65,.6,-.05,4],[3.6,.55,.68,.6,0,5]]}],
   wings:[{st:[{x:1.6,zle:1.5,zte:-4.6,y:.1,t:.05},{x:6.5,zle:-3.4,zte:-5.0,y:.05,t:.035}]},{st:[{x:1.5,zle:-6.4,zte:-8.9,y:-.05,t:.035},{x:4.3,zle:-8.3,zte:-9.5,y:-.05,t:.03}]}],
   fins:[{x:1.55,y:.5,cant:-.04,mirror:1,st:[{h:0,zle:-4.9,zte:-8.7,t:.05},{h:3.1,zle:-7.8,zte:-9.4,t:.04}]}],
   canopy:[5.0,.95,.5,.5,1.9],frame:-1.5,noz:[[.82,.15,-9.0,.56,1.3],[-.82,.15,-9.0,.56,1.3]],
@@ -1086,7 +1128,7 @@ M2.GRIPEN={L:14.1,nz:3.6,radome:5.6,
   r9:mir([[4.3,-.2,-3.0,null]]),r120:mir([[3.0,-.65,-2.1,-.22],[1.95,-.68,-1.8,-.2]])};
 M2.TYPHOON={L:15.96,nz:4.6,radome:6.3,
   fus:[[-7.1,.55,.5,.45,.15,2.4],[-5.5,.7,.6,.5,.12,2.6],[-3,.8,.62,.55,.05,2.8],[-.5,.8,.62,.55,0,2.8],[2,.66,.62,.5,0,2.4],[3.8,.58,.6,.45,0,2.2],[5.2,.5,.5,.42,0,2],[6.6,.36,.32,.3,-.03,2],[7.5,.18,.16,.16,-.05,2],[7.9,0,0,0,-.06,2]],
-  parts:[{x:0,mouth:1,st:[[-3.5,.72,.2,.45,-.65,3],[0,.9,.25,.55,-.7,3.4],[2.2,.88,.22,.55,-.72,4],[3.0,.85,.2,.52,-.72,5]]}],
+  parts:[{x:0,mouth:1,rake:[-.4,0],st:[[-3.5,.72,.2,.45,-.65,3],[0,.9,.25,.55,-.7,3.4],[2.2,.88,.22,.55,-.72,4],[3.0,.85,.2,.52,-.72,5]]}],
   wings:[{st:[{x:.75,zle:.9,zte:-6.3,y:-.15,t:.04},{x:5.45,zle:-5.2,zte:-6.2,y:-.18,t:.03}]},{st:[{x:.6,zle:5.0,zte:3.7,y:.15,t:.035},{x:2.2,zle:3.95,zte:3.55,y:.15,t:.03}]}],
   fins:[{x:0,y:.55,st:[{h:0,zle:-2.9,zte:-6.6,t:.05},{h:3.1,zle:-5.9,zte:-7.0,t:.04}]}],
   canopy:[4.05,.78,.44,.44,1.4],frame:-1.2,noz:[[.5,.1,-7.35,.47,1.0],[-.5,.1,-7.35,.47,1.0]],
@@ -1113,8 +1155,8 @@ M2.J20={L:21.2,nz:6.2,radome:8.2,internal:1,
   canopy:[5.0,.9,.5,.48,1.8],frame:-1.5,noz:[[.78,.1,-9.7,.6,1.2],[-.78,.1,-9.7,.6,1.2]],
   r9:mir([[1.3,-.3,.8,null]]),r120:mir([[.5,-.42,-1.0,null],[.5,-.42,-3.6,null]])};
 M2.MIG29={L:17.32,nz:5.0,radome:7.0,irst:[.2,.68,6.0],
-  fus:[[-6,.9,.35,.3,.05,3],[-3,1.1,.4,.3,.05,3.2],[0,1.0,.5,.3,.1,3],[2.5,.62,.62,.4,.15,2.4],[4.2,.55,.62,.42,.1,2.2],[5.6,.48,.5,.4,.05,2.1],[7.0,.35,.34,.3,0,2],[8.2,.18,.16,.16,-.02,2],[8.8,0,0,0,-.04,2]],
-  parts:[{x:1.05,mouth:1,st:[[-8.0,.55,.55,.55,-.35,2.2],[-5.0,.62,.6,.6,-.4,2.4],[-1.0,.6,.55,.6,-.45,2.8],[2.0,.5,.45,.5,-.55,3.4],[3.4,.48,.42,.48,-.6,4]]}],
+  fus:[[-6,.9,.35,.3,.05,3],[-3,1.1,.4,.3,.05,3.2],[0,1.0,.5,.3,.1,3],[2.5,.62,.62,.4,.15,2.4],[4.2,.55,.62,.42,.1,2.2],[5.6,.48,.5,.4,.04,2.1],[7.0,.35,.34,.3,-.05,2],[8.2,.18,.16,.16,-.14,2],[8.8,0,0,0,-.2,2]],
+  parts:[{x:1.05,mouth:1,rake:[-.55,0],st:[[-8.0,.55,.55,.55,-.35,2.2],[-5.0,.62,.6,.6,-.4,2.4],[-1.0,.6,.55,.6,-.45,2.8],[2.0,.5,.45,.5,-.55,3.4],[3.4,.48,.42,.48,-.6,4]]}],
   wings:[{st:[{x:.55,zle:5.6,zte:1.0,y:.12,t:.02},{x:1.75,zle:1.2,zte:.6,y:.05,t:.02}]},{st:[{x:1.7,zle:1.2,zte:-3.7,y:0,t:.045},{x:5.68,zle:-2.4,zte:-3.8,y:-.1,t:.035}]},
     {st:[{x:1.6,zle:-5.9,zte:-8.2,y:-.2,t:.035},{x:3.95,zle:-7.5,zte:-8.4,y:-.25,t:.03}]}],
   fins:[{x:1.55,y:.25,cant:-.12,mirror:1,st:[{h:0,zle:-3.9,zte:-7.2,t:.05},{h:3.05,zle:-6.5,zte:-7.9,t:.04}]}],
@@ -1126,8 +1168,8 @@ M2.MIG35=Object.assign({},M2.MIG29,{probe:[.55,.45,6.4,1.5],parts:[...M2.MIG29.p
   r9:mir([[4.95,-.5,-2.9,-.12]]),r120:mir([[4.05,-.55,-2.5,-.1],[3.15,-.58,-2.1,-.06],[2.25,-.62,-1.8,-.02]])});
 M2.MIG29K=Object.assign({},M2.MIG35,{hook:[-7.6,-.6],wings:[M2.MIG29.wings[0],{st:[{x:1.7,zle:1.3,zte:-3.9,y:0,t:.045},{x:6.0,zle:-2.6,zte:-4.0,y:-.1,t:.035}]},M2.MIG29.wings[2]]});
 M2.SU27={L:21.94,nz:6.8,radome:8.4,irst:[.25,.85,7.7],
-  fus:[[-7.5,1.2,.45,.35,.1,3.2],[-4,1.5,.5,.35,.1,3.4],[-.5,1.4,.65,.38,.15,3],[2.5,.9,.8,.45,.2,2.4],[4.6,.72,.8,.5,.15,2.2],[6.4,.62,.68,.5,.1,2.1],[8.2,.48,.46,.42,.05,2],[9.8,.3,.26,.24,0,2],[11.0,0,0,0,-.03,2]],
-  parts:[{x:1.35,mouth:1,st:[[-10.2,.62,.62,.62,-.5,2.2],[-6,.72,.66,.66,-.55,2.4],[-1,.7,.6,.7,-.6,2.8],[2.5,.62,.5,.62,-.7,3.4],[4.2,.6,.45,.58,-.75,4]]}],
+  fus:[[-7.5,1.2,.45,.35,.1,3.2],[-4,1.5,.5,.35,.1,3.4],[-.5,1.4,.65,.38,.15,3],[2.5,.9,.8,.45,.2,2.4],[4.6,.72,.8,.5,.15,2.2],[6.4,.62,.68,.5,.08,2.1],[8.2,.48,.46,.42,-.05,2],[9.8,.3,.26,.24,-.2,2],[11.0,0,0,0,-.3,2]],
+  parts:[{x:1.35,mouth:1,rake:[-.55,0],st:[[-10.2,.62,.62,.62,-.5,2.2],[-6,.72,.66,.66,-.55,2.4],[-1,.7,.6,.7,-.6,2.8],[2.5,.62,.5,.62,-.7,3.4],[4.2,.6,.45,.58,-.75,4]]}],
   stinger:[[-12.0,.12,.12,.12,.05,2],[-9.5,.4,.35,.3,.05,2],[-7.4,.6,.4,.35,.1,2.4]],
   wings:[{st:[{x:.6,zle:7.0,zte:1.5,y:.15,t:.02},{x:2.1,zle:1.6,zte:.8,y:.1,t:.02}]},{st:[{x:2.1,zle:1.6,zte:-5.2,y:.05,t:.045},{x:7.1,zle:-3.0,zte:-4.6,y:-.1,t:.035}]},
     {st:[{x:2.0,zle:-7.6,zte:-10.4,y:-.25,t:.035},{x:4.95,zle:-9.6,zte:-10.7,y:-.3,t:.03}]}],
@@ -2717,8 +2759,8 @@ function kill(b){b.on=false;b.m.visible=false}
 const tracerGeo=new THREE.BoxGeometry(.3,.3,14);
 const pBullets=makePool(240,tracerGeo,new THREE.MeshBasicMaterial({color:0xffe27a}));
 const eBullets=makePool(160,tracerGeo,new THREE.MeshBasicMaterial({color:0xff6a4d}));
-const mslGeo=new THREE.CylinderGeometry(.13,.13,3,6).rotateX(Math.PI/2);
-const missiles=makePool(8,mslGeo,new THREE.MeshStandardMaterial({color:0xf2f2ee,flatShading:true}));
+const mslGeo=mslGeoFor('AIM-9X');   // each launch swaps in the real shape (mslSet)
+const missiles=makePool(8,mslGeo,MSL_MAT);
 
 
 /* ---------- post-processing (Medium and High): HDR scene target, bloom, filmic highlight roll-off, grade and vignette ----------
@@ -3374,7 +3416,7 @@ function updateGround(dt){
 function launchSAM(g){
   const m=take(eMissiles);m.on=true;m.type='RDR';m.t=0;m.target=P;m.m.visible=true;m.owner=g;m.team='red';m.spec=BUK;
   m.seen=new Set();m.notchT=0;m.notchRolled=false;m.blindT=0;m.lostT=0;m.dRolled=false;m.mawsWarned=false;m.mawSeen=-99;m.term=false;m.kp=null;m.gmode='';m.jit=m.jit||new V3();m.jit.set(0,0,0);m.jitT=0;m.reason='';
-  m.name='9M38 (Buk)'; m.m.scale.set(1.8,1.8,1.9);
+  m.name='9M38 (Buk)'; mslSet(m,m.name);
   m.m.position.copy(g.pos).setY(g.pos.y+4); m.prev.copy(m.m.position); m.vel.set(0,40,0).addScaledVector(g.fwd,20);
   recLaunch(m,'SAM site',P); message('SAM LAUNCH',1.8); buzz([60,50,60,50,60]); for(let i=0;i<5;i++)setTimeout(()=>sndBeep(1300,.06,.05),i*100);
 }
@@ -5262,7 +5304,7 @@ function launch(type,target){
   if(isNine)P.aim9--; else P.aim120--;
   const rail=playerJet.getObjectByName((isNine?'r9_':'r120_')+idx);
   const m=take(missiles); m.on=true; m.type=type; m.t=0; m.target=target; m.m.visible=true;
-  m.m.scale.set(isNine?1:1.3,isNine?1:1.3,isNine?1:1.22);
+  mslSet(m,isNine?AC.srFull:(AC.id==='SU35'&&suLR?'R-37M':AC.mrFull));
   if(rail){rail.getWorldPosition(m.m.position);rail.visible=false} else m.m.position.copy(P.pos);
   m.m.position.addScaledVector(P.up,-1);
   m.vel.copy(P.vel).addScaledVector(P.up,-4); m.prev.copy(m.m.position);
@@ -5385,7 +5427,7 @@ let cmLoad=0; try{cmLoad=clamp(+localStorage.getItem('viperCmLoad')||0,0,CM_LOAD
 const cmFlares=()=>Math.round((AC.cm.fixed?AC.cm.flares:CM_LOADS[cmLoad][0]*15)*(AC.cmK||1)), cmChaff=()=>Math.round((AC.cm.fixed?AC.cm.chaff:CM_LOADS[cmLoad][1]*30)*(AC.cmK||1));
 const CM={flares:30,chaff:60,decoys:4,ecm:false,heat:0,auto:false,flrHeld:false,chfHeld:false,flrT:0,chfT:0,autoT:0,decoy:null,objs:[]};
 // bandit missiles: an older heat-seeker and a radar missile, both PN-guided and g-limited like yours
-const eMissiles=makePool(14,mslGeo,new THREE.MeshStandardMaterial({color:0xcfc6b8,flatShading:true}));
+const eMissiles=makePool(14,mslGeo,MSL_MAT);
 const decoyMesh=new THREE.Mesh(new THREE.CylinderGeometry(.15,.15,1.6,6).rotateX(Math.PI/2),new THREE.MeshStandardMaterial({color:0x50585e,flatShading:true}));
 decoyMesh.visible=false; scene.add(decoyMesh);
 const cableGeo=new THREE.BufferGeometry().setFromPoints([new V3(),new V3()]);
@@ -5429,7 +5471,7 @@ function launchAI(e,type){
   const m=take(eMissiles);m.on=true;m.type=type;m.t=0;m.target=e.tgt;m.m.visible=true;m.owner=e;m.team=e.team;m.spec=e.espec[type];
   m.seen=new Set();m.notchT=0;m.notchRolled=false;m.blindT=0;m.lostT=0;m.dRolled=false;m.mawsWarned=false;m.mawSeen=-99;m.term=false;m.kp=null;m.gmode='';m.jit=m.jit||new V3();m.jit.set(0,0,0);m.jitT=0;m.reason='';m.rollT=0;m.nextRoll=0;m.pNotch=false;m.pClutter=false;
   m.name=(type==='IR'?AC_DEFS[e.type].srFull:AC_DEFS[e.type].mrFull);
-  m.m.scale.set(type==='IR'?1:1.3,type==='IR'?1:1.3,type==='IR'?1:1.25);
+  mslSet(m,m.name);
   m.m.position.copy(e.pos).addScaledVector(e.up,-1.5);m.prev.copy(m.m.position);m.vel.copy(e.vel);
   recLaunch(m,e.team==='red'?'Bandit':'Wingman',e.tgt);
   if(e.team==='blue')message('TWO · FOX '+(type==='IR'?'2':m.spec.sarh?'1':'3'),1);
@@ -7074,7 +7116,7 @@ if(/[?&]test\b/.test(location.search))window.__vs={buildSAM,buildAAA,buildRadar,
   target:(type,dz,away,speed)=>{const e=spawnFighter('red',type,new V3(0,P.pos.y,dz),new V3(0,P.pos.y,dz+(away?9999:-9999)),{ir:0,rdr:0,speed:speed||220});e.drone=true;return e.id},
   lock:()=>{if(enemies[0])lockOn(enemies[0])},fire:w=>{if(w==='9X')fire9=true;else fire120=true},gun:on=>{gunHeld=on},
   missiles:()=>missiles.filter(m=>m.on),
-  st:()=>{const e=enemies[0];return{can9,can120,aim9:P.aim9,aim120:P.aim120,rounds:P.rounds,alive:!!(e&&e.alive),hp:e?e.hp:0,msl:missiles.filter(m=>m.on).length,stt:!!R.stt,sttAcq:R.acqT,d:e?e.pos.distanceTo(P.pos):0,msg:$('msg')?$('msg').textContent:''}}},M2dims:()=>{const o={};for(const id in M2){const S=M2[id],zs=S.fus.map(f=>f[0]).concat(S.noz.map(n=>n[2]-n[4]/2)),L=Math.max(...zs)-Math.min(...zs),sp=2*Math.max(...S.wings.flatMap(w=>w.st.map(q=>q.x)));const k=M2K[id]||[1,1,1];o[id]=[+(L*k[2]).toFixed(2),+(sp*k[0]).toFixed(2)]}return o},ROSTER_IDS,restart:()=>startGame(),spawnAll:()=>{let n=0;for(const id of FIGHTERS){spawnFighter('red',id,P.pos.clone().add(new V3(rand(-4000,4000),rand(-300,300),rand(8000,14000))),P.pos);n++}return n},tableRows:id=>({gear:!!GEAR_SPEC[id],snd:!!ENG_SND[id],hp:!!JET_HP[id],rcs:RCS[id]!=null,paint:!!PAINT[id]||!!(AC_DEFS[id].model),band:!!BANDITS[id],fighter:FIGHTERS.indexOf(id)>=0}),get preset(){return preset},PRESETS,get daily(){return daily},dailyAdd,endTest:o=>{deathCause=o.cause||'win';score=o.score||0;kills=o.kills||0;missionT=o.t||90;P.alive=o.alive!==false;P.rescued=!!o.rescued;state='over';careerAward();showOverlay('over')},get AC(){return AC}};
+  st:()=>{const e=enemies[0];return{can9,can120,aim9:P.aim9,aim120:P.aim120,rounds:P.rounds,alive:!!(e&&e.alive),hp:e?e.hp:0,msl:missiles.filter(m=>m.on).length,stt:!!R.stt,sttAcq:R.acqT,d:e?e.pos.distanceTo(P.pos):0,msg:$('msg')?$('msg').textContent:''}}},mslGeoFor,MSL_MAT,M2dims:()=>{const o={};for(const id in M2){const S=M2[id],zs=S.fus.map(f=>f[0]).concat(S.noz.map(n=>n[2]-n[4]/2)),L=Math.max(...zs)-Math.min(...zs),sp=2*Math.max(...S.wings.flatMap(w=>w.st.map(q=>q.x)));const k=M2K[id]||[1,1,1];o[id]=[+(L*k[2]).toFixed(2),+(sp*k[0]).toFixed(2)]}return o},ROSTER_IDS,restart:()=>startGame(),spawnAll:()=>{let n=0;for(const id of FIGHTERS){spawnFighter('red',id,P.pos.clone().add(new V3(rand(-4000,4000),rand(-300,300),rand(8000,14000))),P.pos);n++}return n},tableRows:id=>({gear:!!GEAR_SPEC[id],snd:!!ENG_SND[id],hp:!!JET_HP[id],rcs:RCS[id]!=null,paint:!!PAINT[id]||!!(AC_DEFS[id].model),band:!!BANDITS[id],fighter:FIGHTERS.indexOf(id)>=0}),get preset(){return preset},PRESETS,get daily(){return daily},dailyAdd,endTest:o=>{deathCause=o.cause||'win';score=o.score||0;kills=o.kills||0;missionT=o.t||90;P.alive=o.alive!==false;P.rescued=!!o.rescued;state='over';careerAward();showOverlay('over')},get AC(){return AC}};
 
 /* ---------- hangar: pick the aircraft, edit the loadout, change paint, read every spec; the jet turns on a turntable behind the panel ---------- */
 const hgEl=$('hangar');

@@ -117,7 +117,7 @@ function updateGround(dt){
 function launchSAM(g){
   const m=take(eMissiles);m.on=true;m.type='RDR';m.t=0;m.target=P;m.m.visible=true;m.owner=g;m.team='red';m.spec=BUK;
   m.seen=new Set();m.notchT=0;m.notchRolled=false;m.blindT=0;m.lostT=0;m.dRolled=false;m.mawsWarned=false;m.mawSeen=-99;m.term=false;m.kp=null;m.gmode='';m.jit=m.jit||new V3();m.jit.set(0,0,0);m.jitT=0;m.reason='';
-  m.name='9M38 (Buk)'; m.m.scale.set(1.8,1.8,1.9);
+  m.name='9M38 (Buk)'; mslSet(m,m.name);
   m.m.position.copy(g.pos).setY(g.pos.y+4); m.prev.copy(m.m.position); m.vel.set(0,40,0).addScaledVector(g.fwd,20);
   recLaunch(m,'SAM site',P); message('SAM LAUNCH',1.8); buzz([60,50,60,50,60]); for(let i=0;i<5;i++)setTimeout(()=>sndBeep(1300,.06,.05),i*100);
 }

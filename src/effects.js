@@ -122,8 +122,8 @@ function kill(b){b.on=false;b.m.visible=false}
 const tracerGeo=new THREE.BoxGeometry(.3,.3,14);
 const pBullets=makePool(240,tracerGeo,new THREE.MeshBasicMaterial({color:0xffe27a}));
 const eBullets=makePool(160,tracerGeo,new THREE.MeshBasicMaterial({color:0xff6a4d}));
-const mslGeo=new THREE.CylinderGeometry(.13,.13,3,6).rotateX(Math.PI/2);
-const missiles=makePool(8,mslGeo,new THREE.MeshStandardMaterial({color:0xf2f2ee,flatShading:true}));
+const mslGeo=mslGeoFor('AIM-9X');   // each launch swaps in the real shape (mslSet)
+const missiles=makePool(8,mslGeo,MSL_MAT);
 
 
 /* ---------- post-processing (Medium and High): HDR scene target, bloom, filmic highlight roll-off, grade and vignette ----------

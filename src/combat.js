@@ -240,7 +240,7 @@ function launch(type,target){
   if(isNine)P.aim9--; else P.aim120--;
   const rail=playerJet.getObjectByName((isNine?'r9_':'r120_')+idx);
   const m=take(missiles); m.on=true; m.type=type; m.t=0; m.target=target; m.m.visible=true;
-  m.m.scale.set(isNine?1:1.3,isNine?1:1.3,isNine?1:1.22);
+  mslSet(m,isNine?AC.srFull:(AC.id==='SU35'&&suLR?'R-37M':AC.mrFull));
   if(rail){rail.getWorldPosition(m.m.position);rail.visible=false} else m.m.position.copy(P.pos);
   m.m.position.addScaledVector(P.up,-1);
   m.vel.copy(P.vel).addScaledVector(P.up,-4); m.prev.copy(m.m.position);
@@ -363,7 +363,7 @@ let cmLoad=0; try{cmLoad=clamp(+localStorage.getItem('viperCmLoad')||0,0,CM_LOAD
 const cmFlares=()=>Math.round((AC.cm.fixed?AC.cm.flares:CM_LOADS[cmLoad][0]*15)*(AC.cmK||1)), cmChaff=()=>Math.round((AC.cm.fixed?AC.cm.chaff:CM_LOADS[cmLoad][1]*30)*(AC.cmK||1));
 const CM={flares:30,chaff:60,decoys:4,ecm:false,heat:0,auto:false,flrHeld:false,chfHeld:false,flrT:0,chfT:0,autoT:0,decoy:null,objs:[]};
 // bandit missiles: an older heat-seeker and a radar missile, both PN-guided and g-limited like yours
-const eMissiles=makePool(14,mslGeo,new THREE.MeshStandardMaterial({color:0xcfc6b8,flatShading:true}));
+const eMissiles=makePool(14,mslGeo,MSL_MAT);
 const decoyMesh=new THREE.Mesh(new THREE.CylinderGeometry(.15,.15,1.6,6).rotateX(Math.PI/2),new THREE.MeshStandardMaterial({color:0x50585e,flatShading:true}));
 decoyMesh.visible=false; scene.add(decoyMesh);
 const cableGeo=new THREE.BufferGeometry().setFromPoints([new V3(),new V3()]);
@@ -407,7 +407,7 @@ function launchAI(e,type){
   const m=take(eMissiles);m.on=true;m.type=type;m.t=0;m.target=e.tgt;m.m.visible=true;m.owner=e;m.team=e.team;m.spec=e.espec[type];
   m.seen=new Set();m.notchT=0;m.notchRolled=false;m.blindT=0;m.lostT=0;m.dRolled=false;m.mawsWarned=false;m.mawSeen=-99;m.term=false;m.kp=null;m.gmode='';m.jit=m.jit||new V3();m.jit.set(0,0,0);m.jitT=0;m.reason='';m.rollT=0;m.nextRoll=0;m.pNotch=false;m.pClutter=false;
   m.name=(type==='IR'?AC_DEFS[e.type].srFull:AC_DEFS[e.type].mrFull);
-  m.m.scale.set(type==='IR'?1:1.3,type==='IR'?1:1.3,type==='IR'?1:1.25);
+  mslSet(m,m.name);
   m.m.position.copy(e.pos).addScaledVector(e.up,-1.5);m.prev.copy(m.m.position);m.vel.copy(e.vel);
   recLaunch(m,e.team==='red'?'Bandit':'Wingman',e.tgt);
   if(e.team==='blue')message('TWO · FOX '+(type==='IR'?'2':m.spec.sarh?'1':'3'),1);
