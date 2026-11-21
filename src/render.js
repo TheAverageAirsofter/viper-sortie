@@ -667,13 +667,16 @@ function buildLoftJet(c,S,type){
   const black=new THREE.MeshStandardMaterial({color:0x0b0c0d,roughness:.8,side:THREE.DoubleSide});
   const add=(geo,mat,name,par)=>{const m=new THREE.Mesh(geo,mat);if(name)m.name=name;(par||g).add(m);return m};
   // fuselage (radome split off in the dark colour), plus a copy with the cockpit tub opened for the cockpit view
-  const rz=S.radome, fst=S.fus;
+  const rz=S.radome, fst0=S.fus, ni=(S.parts||[]).find(p=>p.mouth&&!p.x&&p.st[p.st.length-1][0]>fst0[fst0.length-1][0]-.2);   // nose intake: the fuselage stops just inside the mouth
+  const fst=ni?(()=>{const zc=ni.st[ni.st.length-1][0]-.2,o=fst0.filter(r=>r[0]<zc);o.push(secAt(fst0,zc).map((v,i)=>i?v:zc));return o})():fst0;
   if(rz!=null){const k=fst.findIndex(s=>s[0]>=rz);let mid=null;if(k>0&&Math.abs(fst[k][0]-rz)>.01){const a=fst[k-1],b=fst[k],t=(rz-a[0])/(b[0]-a[0]);mid=a.map((v,i)=>v+(b[i]-v)*t)}
     const back=fst.filter(s=>s[0]<=rz+.01).concat(mid?[mid]:[]), front=(mid?[mid]:[]).concat(fst.filter(s=>s[0]>=rz-.01));add(loftGeo(back),body,'fuse').userData.st=back;add(loftGeo(front,{capTail:false}),dark,'radome')}
   else add(loftGeo(fst),body,'fuse');
   const cz=S.canopy[0],cut=add(loftGeo(rz!=null?g.getObjectByName('fuse').userData.st:fst,{skipTop:[cz-1.3,cz+1.4]}),body,'fuseCut');cut.visible=false;
   for(const p of S.parts||[]){const xs=p.x?[p.x,-p.x]:[0];for(const x of xs){const m=add(loftGeo(p.st,{n:p.n||12}),p.dark?dark:body);m.position.x=x;
-      if(p.mouth){const [z,w,ht,hb,yc]=p.st[p.st.length-1];const mo=add(new THREE.PlaneGeometry(w*1.8,(ht+hb)*.9),black);mo.position.set(x,yc+(ht-hb)/2,z-.02)}}}
+      if(p.mouth){const [z,w,ht,hb,yc,pw]=p.st[p.st.length-1],r=(k,dz)=>[z-dz,w*k,ht*k,hb*k,yc,pw];   // a lip curling into a dark duct instead of a flat black plate
+        const lip=add(loftGeo([r(.86,.12),r(.93,.03),r(1,0)],{n:p.n||12,capTail:false}),p.dark?dark:body);lip.position.x=x;
+        const duct=add(loftGeo([r(.8,1.1),r(.86,.12)],{n:p.n||12}),black);duct.position.x=x}}}
   // control surfaces follow every station of a multi-section wing (one strip per segment) so they stay inside the planform
   const segStrips=(st,lo,hi,frac,sd,mat,kind)=>{const x0=st[0].x,span=st[st.length-1].x-x0;if(!(span>0))return;
     for(let i=0;i<st.length-1;i++){const a=st[i],b=st[i+1],fa=(a.x-x0)/span,fb=(b.x-x0)/span,l=Math.max(lo,fa),h=Math.min(hi,fb);if(h-l<.03)continue;g.add(hingeStrip(a,b,(l-fa)/(fb-fa),(h-fa)/(fb-fa),frac,sd,mat,kind))}};
@@ -714,15 +717,24 @@ function buildLoftJet(c,S,type){
     for(const sd of [1,-1]){let mat,w;if(PS.nose){mat=decalMat('text',{s:PS.nose,red:PS.nat==='rus'},PS.lowvis);w=PS.nose.length>3?1.1:.95}
       else{mat=decalMat(PS.nat,null,PS.lowvis);w=.85}
       const zz=PS.nose?zN:cz-1.75-.4, ss=PS.nose?s:secAt(fst,zz), d=add(new THREE.PlaneGeometry(w,w*(PS.nose?.5:.4)),mat,'decal');d.position.set(sd*(ss[1]+.012),ss[4]+(PS.nose?-.02:-ss[3]*.35),zz);d.rotation.y=sd*Math.PI/2}}
-  // canopy: hinged at the back so it can open on the ground; frames by type
-  const [cZ,cY,sx,sy,sz]=S.canopy, cg=new THREE.Group(); cg.name='canopyG'; cg.position.set(0,cY,cZ-sz*.92); g.add(cg);
-  const can=add(new THREE.SphereGeometry(1,24,14),glass,'canopy',cg); can.position.set(0,0,sz*.92); can.scale.set(sx,sy,sz);
-  const bow=(zo,par,name)=>{const k=Math.sqrt(Math.max(.05,1-(zo/sz)**2)),fr=add(new THREE.TorusGeometry(sx*k*.99,.035,5,18,Math.PI),dark,name||'cframe',par||cg);fr.position.set(0,0,(par===g?cZ:sz*.92)+zo);if(par===g)fr.position.y=cY;fr.scale.set(1,sy/sx,1);return fr};
+  // canopy: a teardrop bubble seated on the fuselage sill (raked windscreen, highest over the pilot, tapering into the spine), hinged at the back; frames by type
+  const [cZ,cY,sx,sy,sz]=S.canopy, topAt=z=>{const s=secAt(fst,z);return s[4]+s[2]};
+  const H=clamp((cY+sy-topAt(cZ))*1.25,.5,.85), zF=cZ+sz, zB=cZ-sz*1.15, cH=new THREE.Vector3(0,cY,cZ-sz*.92);
+  const prof=u=>{const a=Math.min(1,u/.4),b=Math.max(0,(u-.4)/.6);   // u: 0 at the windscreen tip, 1 at the back of the glass
+    return{w:sx*(u<.4?.12+.88*Math.sin(a*Math.PI/2):1-.42*b*b),h:H*(u<.4?Math.pow(Math.sin(a*Math.PI/2),.85):1-.78*Math.pow(b,1.5))}};
+  const zAt=u=>zF+(zB-zF)*u, cRows=[0,.03,.08,.15,.24,.34,.44,.56,.68,.8,.9,1].map(u=>{const q=prof(u),z=zAt(u);return[z,Math.max(.03,q.w),Math.max(.02,q.h),.32,topAt(z)-.05,2.3]}).reverse();
+  const cg=new THREE.Group(); cg.name='canopyG'; cg.position.copy(cH); g.add(cg);
+  const cgeo=loftGeo(cRows,{n:24,capTail:false});cgeo.translate(-cH.x,-cH.y,-cH.z);add(cgeo,glass,'canopy',cg);
+  {const sp=[];for(const [u,k] of [[.55,1],[.8,.92],[1,.8],[1.5,.55],[2.1,.32],[2.8,.12],[3.3,0]]){const z=cZ-sz*.55-(u-.55)*sz*1.25;sp.push([z,sx*Math.max(.15,k*.95),Math.max(.01,H*.62*k),.3,topAt(z)-.05,2.4])}   // dorsal spine fairing
+   add(loftGeo(sp.reverse(),{n:16,capTail:false}),body,'spine')}
+  const uOf=z=>clamp((zF-z)/(zF-zB),0,1);
+  const bow=(zo,par,name)=>{const z=cZ+zo,q=prof(uOf(z)),fr=add(new THREE.TorusGeometry(q.w*1.01,.032,5,18,Math.PI),dark,name||'cframe',par||cg);
+    fr.scale.set(1,q.h/q.w,1);fr.position.set(0,topAt(z)-.05,z);if(par!==g)fr.position.sub(cH);return fr};
   if(S.frame)bow(S.frame);
-  if(!/^F16/.test(type))bow(sz*.58,g,'wsbow');
+  if(!/^F16/.test(type))bow(sz*.62,g,'wsbow');
   if(type==='F15EX')bow(-.1);
   if(/^(MIG|SU)/.test(type))bow(sz*.12);
-  for(const s of [1,-1]){const r=add(new THREE.BoxGeometry(.05,.05,sz*1.75),dark,'cframe',cg);r.position.set(s*sx*.99,0,sz*.92)}
+  for(const s of [1,-1]){const r=add(new THREE.BoxGeometry(.04,.04,sz*1.9),dark,'cframe',cg);r.position.set(s*sx*.96,topAt(cZ)-.03-cH.y,cZ-sz*.05-cH.z)}
   // pilot (helmet, visor, shoulders), hidden in the cockpit view
   {const D=AC_DEFS[type],e=D&&D.eye?D.eye:[0,cY+sy*.38,cZ+sz*.12],pg=new THREE.Group();pg.name='pilot';g.add(pg);
     const rus=/^(MIG|SU)/.test(type),hm=new THREE.MeshStandardMaterial({color:rus?0xe8e8e2:0x6f7478,roughness:.45}),vm=new THREE.MeshStandardMaterial({color:0x1a1408,roughness:.08,metalness:.9}),sm=new THREE.MeshStandardMaterial({color:rus?0x55603f:0x4f5a43,roughness:.9});
@@ -731,7 +743,7 @@ function buildLoftJet(c,S,type){
     const sh=add(new THREE.BoxGeometry(.46,.3,.32),sm,null,pg);sh.position.set(0,e[1]-.36,e[2]-.18);
     const hr=add(new THREE.BoxGeometry(.5,.55,.12),dark,null,pg);hr.position.set(0,e[1]-.15,e[2]-.42)}
   if(S.irst){const ir=add(new THREE.SphereGeometry(.13,10,8),new THREE.MeshStandardMaterial({color:0x2a2a1a,roughness:.1,metalness:.8}),'irst');ir.position.set(...S.irst)}
-  {const tip=fst[fst.length-1],pt=add(new THREE.CylinderGeometry(.013,.02,1.1,6).rotateX(Math.PI/2),metal);pt.position.set(0,tip[4],tip[0]+.42);                       // pitot boom
+  {const tip=fst0[fst0.length-1],pt=add(new THREE.CylinderGeometry(.013,.02,1.1,6).rotateX(Math.PI/2),metal);pt.position.set(0,tip[4],tip[0]+.42);                       // pitot boom
    const aT=cz-S.canopy[4]*1.05-.7,sT=secAt(fst,aT),bl=add(new THREE.BoxGeometry(.018,.2,.14),dark);bl.position.set(0,sT[4]+sT[2]+.08,aT);                       // spine blade antenna
    const aB=cz-1.9,sB=secAt(fst,aB),bb=add(new THREE.BoxGeometry(.018,.16,.12),dark);bb.position.set(0,sB[4]-sB[3]-.07,aB);                                        // belly blade antenna
    const zD=Math.min(...S.noz.map(n=>n[2]))+3.4,sD=secAt(fst,zD);for(const sx2 of [-1,1]){const d=add(new THREE.BoxGeometry(.2,.025,.46),black);d.position.set(sx2*Math.min(.32,sD[1]*.45),sD[4]-sD[3]+.005,zD)}}   // chaff/flare dispensers
