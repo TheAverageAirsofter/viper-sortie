@@ -516,8 +516,8 @@ for(const id of ['F15C','F15EX','TYPHOON','RAFALE','J10C','J20','FA18E']){const 
 const LOFT_N=28;
 function loftGeo(st,opts){
   opts=opts||{};const N=opts.n||LOFT_N, pos=[], idx=[], sk=opts.skipTop;
-  for(const [z,w,ht,hb,yc,ne] of st){const e=2/(ne||2.4);
-    for(let j=0;j<N;j++){const a=j/N*Math.PI*2,c=Math.cos(a),s=Math.sin(a);
+  for(const [z,w,ht,hb,yc,ne,nb] of st){const eT=2/(ne||2.4),eB=2/(nb||ne||2.4);   // nb: optional exponent for the lower half (a chine where the two halves meet)
+    for(let j=0;j<N;j++){const a=j/N*Math.PI*2,c=Math.cos(a),s=Math.sin(a),e=s>=0?eT:eB;
       pos.push(Math.sign(c)*Math.pow(Math.abs(c),e)*w, (yc||0)+Math.sign(s)*Math.pow(Math.abs(s),e)*(s>=0?ht:hb), z)}}
   for(let i=0;i<st.length-1;i++){const zm=(st[i][0]+st[i+1][0])/2;
     for(let j=0;j<N;j++){const a=i*N+j,b=i*N+(j+1)%N,c=(i+1)*N+j,d=(i+1)*N+(j+1)%N;
@@ -673,10 +673,13 @@ function buildLoftJet(c,S,type){
     const back=fst.filter(s=>s[0]<=rz+.01).concat(mid?[mid]:[]), front=(mid?[mid]:[]).concat(fst.filter(s=>s[0]>=rz-.01));add(loftGeo(back),body,'fuse').userData.st=back;add(loftGeo(front,{capTail:false}),dark,'radome')}
   else add(loftGeo(fst),body,'fuse');
   const cz=S.canopy[0],cut=add(loftGeo(rz!=null?g.getObjectByName('fuse').userData.st:fst,{skipTop:[cz-1.3,cz+1.4]}),body,'fuseCut');cut.visible=false;
-  for(const p of S.parts||[]){const xs=p.x?[p.x,-p.x]:[0];for(const x of xs){const m=add(loftGeo(p.st,{n:p.n||12}),p.dark?dark:body);m.position.x=x;
-      if(p.mouth){const [z,w,ht,hb,yc,pw]=p.st[p.st.length-1],r=(k,dz)=>[z-dz,w*k,ht*k,hb*k,yc,pw];   // a lip curling into a dark duct instead of a flat black plate
-        const lip=add(loftGeo([r(.86,.12),r(.93,.03),r(1,0)],{n:p.n||12,capTail:false}),p.dark?dark:body);lip.position.x=x;
-        const duct=add(loftGeo([r(.8,1.1),r(.86,.12)],{n:p.n||12}),black);duct.position.x=x}}}
+  for(const p of S.parts||[]){const xs=p.x?[p.x,-p.x]:[0];for(const x of xs){const zM=p.st[p.st.length-1][0],yM=p.st[p.st.length-1][4]||0,sg=Math.sign(x)||1;
+      // rake [vertical, plan]: the mouth's top lip ahead of the bottom one, the inner lip ahead of the outer one (F-22, F-35, caret intakes)
+      const rk=geo=>{if(p.rake){const P=geo.attributes.position;for(let i=0;i<P.count;i++){const z=P.getZ(i);if(z>zM-.2-1e-4){const f=clamp((z-(zM-1.1))/.9,0,1);P.setZ(i,z+f*(p.rake[0]*(P.getY(i)-yM)-p.rake[1]*P.getX(i)*sg))}}geo.computeVertexNormals()}return geo};
+      const m=add(rk(loftGeo(p.st,{n:p.n||12})),p.dark?dark:body);m.position.x=x;
+      if(p.mouth){const [z,w,ht,hb,yc,pw,pb]=p.st[p.st.length-1],r=(k,dz)=>[z-dz,w*k,ht*k,hb*k,yc,pw,pb];   // a lip curling into a dark duct instead of a flat black plate
+        const lip=add(rk(loftGeo([r(.86,.12),r(.93,.03),r(1,0)],{n:p.n||12,capTail:false})),p.dark?dark:body);lip.position.x=x;
+        const duct=add(rk(loftGeo([r(.8,1.1),r(.86,.12)],{n:p.n||12})),black);duct.position.x=x}}}
   // control surfaces follow every station of a multi-section wing (one strip per segment) so they stay inside the planform
   const segStrips=(st,lo,hi,frac,sd,mat,kind)=>{const x0=st[0].x,span=st[st.length-1].x-x0;if(!(span>0))return;
     for(let i=0;i<st.length-1;i++){const a=st[i],b=st[i+1],fa=(a.x-x0)/span,fb=(b.x-x0)/span,l=Math.max(lo,fa),h=Math.min(hi,fb);if(h-l<.03)continue;g.add(hingeStrip(a,b,(l-fa)/(fb-fa),(h-fa)/(fb-fa),frac,sd,mat,kind))}};
@@ -731,7 +734,7 @@ function buildLoftJet(c,S,type){
   const bow=(zo,par,name)=>{const z=cZ+zo,q=prof(uOf(z)),fr=add(new THREE.TorusGeometry(q.w*1.01,.032,5,18,Math.PI),dark,name||'cframe',par||cg);
     fr.scale.set(1,q.h/q.w,1);fr.position.set(0,topAt(z)-.05,z);if(par!==g)fr.position.sub(cH);return fr};
   if(S.frame)bow(S.frame);
-  if(!/^F16/.test(type))bow(sz*.62,g,'wsbow');
+  if(!/^(F16|F22|F35)/.test(type))bow(sz*.62,g,'wsbow');
   if(type==='F15EX')bow(-.1);
   if(/^(MIG|SU)/.test(type))bow(sz*.12);
   for(const s of [1,-1]){const r=add(new THREE.BoxGeometry(.04,.04,sz*1.9),dark,'cframe',cg);r.position.set(s*sx*.96,topAt(cZ)-.03-cH.y,cZ-sz*.05-cH.z)}
@@ -743,7 +746,7 @@ function buildLoftJet(c,S,type){
     const sh=add(new THREE.BoxGeometry(.46,.3,.32),sm,null,pg);sh.position.set(0,e[1]-.36,e[2]-.18);
     const hr=add(new THREE.BoxGeometry(.5,.55,.12),dark,null,pg);hr.position.set(0,e[1]-.15,e[2]-.42)}
   if(S.irst){const ir=add(new THREE.SphereGeometry(.13,10,8),new THREE.MeshStandardMaterial({color:0x2a2a1a,roughness:.1,metalness:.8}),'irst');ir.position.set(...S.irst)}
-  {const tip=fst0[fst0.length-1],pt=add(new THREE.CylinderGeometry(.013,.02,1.1,6).rotateX(Math.PI/2),metal);pt.position.set(0,tip[4],tip[0]+.42);                       // pitot boom
+  {const tip=fst0[fst0.length-1];if(!/^(F22|F35|J20|SU57)/.test(type)){const pt=add(new THREE.CylinderGeometry(.013,.02,1.1,6).rotateX(Math.PI/2),metal);pt.position.set(0,tip[4],tip[0]+.42)}   // pitot boom (stealth jets have none)                       // pitot boom
    const aT=cz-S.canopy[4]*1.05-.7,sT=secAt(fst,aT),bl=add(new THREE.BoxGeometry(.018,.2,.14),dark);bl.position.set(0,sT[4]+sT[2]+.08,aT);                       // spine blade antenna
    const aB=cz-1.9,sB=secAt(fst,aB),bb=add(new THREE.BoxGeometry(.018,.16,.12),dark);bb.position.set(0,sB[4]-sB[3]-.07,aB);                                        // belly blade antenna
    const zD=Math.min(...S.noz.map(n=>n[2]))+3.4,sD=secAt(fst,zD);for(const sx2 of [-1,1]){const d=add(new THREE.BoxGeometry(.2,.025,.46),black);d.position.set(sx2*Math.min(.32,sD[1]*.45),sD[4]-sD[3]+.005,zD)}}   // chaff/flare dispensers
@@ -753,9 +756,9 @@ function buildLoftJet(c,S,type){
   const fm=new THREE.MeshBasicMaterial({color:c.flame,transparent:true,opacity:.85,blending:THREE.AdditiveBlending,depthWrite:false});
   const fl=new THREE.Group(); fl.name='flame'; fl.position.set(0,S.noz[0][1],S.noz[0][2]-S.noz[0][4]*.5-.1); g.add(fl);
   for(const [x,y,z,r,len] of S.noz){const ng=new THREE.Group();ng.name='nozG';ng.userData={s:Math.sign(x)};ng.position.set(x,y,z+len*.5);g.add(ng);
-    const n=add(new THREE.CylinderGeometry(r*.94,r,len,18,1,true).rotateX(Math.PI/2),metal,'noz',ng);n.position.z=-len*.5;
-    const lip=add(new THREE.TorusGeometry(r*.98,.03,4,18),dark,null,n);lip.position.z=-len*.5;
-    const th=add(new THREE.CircleGeometry(r*.85,16),black,null,ng);th.position.z=-len*.2;th.rotation.y=Math.PI;
+    const rect=S.nozRect, n=add(rect?new THREE.CylinderGeometry(r*.94,r,len,4,1,true).rotateY(Math.PI/4).rotateX(Math.PI/2).scale(1.3,.72,1):new THREE.CylinderGeometry(r*.94,r,len,18,1,true).rotateX(Math.PI/2),metal,'noz',ng);n.position.z=-len*.5;
+    if(!rect){const lip=add(new THREE.TorusGeometry(r*.98,.03,4,18),dark,null,n);lip.position.z=-len*.5}
+    const th=add(rect?new THREE.PlaneGeometry(r*1.25,r*.68):new THREE.CircleGeometry(r*.85,16),black,null,ng);th.position.z=-len*.2;th.rotation.y=Math.PI;
     const hz=add(HAZE_GEO,HAZE_MAT,'haze',ng);hz.position.z=-len;hz.scale.set(r/.5,r/.5,1);
     const cgm=new THREE.ConeGeometry(r*.82,3.6,12,1,true);cgm.rotateX(-Math.PI/2);cgm.translate(0,0,-1.8);const m=new THREE.Mesh(cgm,fm);m.position.x=x;fl.add(m)}
   // stores: rails carry the real missile sizes for this jet's weapons; pylons go away with their missile

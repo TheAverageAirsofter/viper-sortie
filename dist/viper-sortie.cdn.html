@@ -1735,8 +1735,8 @@ for(const id of ['F15C','F15EX','TYPHOON','RAFALE','J10C','J20','FA18E']){const 
 const LOFT_N=28;
 function loftGeo(st,opts){
   opts=opts||{};const N=opts.n||LOFT_N, pos=[], idx=[], sk=opts.skipTop;
-  for(const [z,w,ht,hb,yc,ne] of st){const e=2/(ne||2.4);
-    for(let j=0;j<N;j++){const a=j/N*Math.PI*2,c=Math.cos(a),s=Math.sin(a);
+  for(const [z,w,ht,hb,yc,ne,nb] of st){const eT=2/(ne||2.4),eB=2/(nb||ne||2.4);   // nb: optional exponent for the lower half (a chine where the two halves meet)
+    for(let j=0;j<N;j++){const a=j/N*Math.PI*2,c=Math.cos(a),s=Math.sin(a),e=s>=0?eT:eB;
       pos.push(Math.sign(c)*Math.pow(Math.abs(c),e)*w, (yc||0)+Math.sign(s)*Math.pow(Math.abs(s),e)*(s>=0?ht:hb), z)}}
   for(let i=0;i<st.length-1;i++){const zm=(st[i][0]+st[i+1][0])/2;
     for(let j=0;j<N;j++){const a=i*N+j,b=i*N+(j+1)%N,c=(i+1)*N+j,d=(i+1)*N+(j+1)%N;
@@ -1892,10 +1892,13 @@ function buildLoftJet(c,S,type){
     const back=fst.filter(s=>s[0]<=rz+.01).concat(mid?[mid]:[]), front=(mid?[mid]:[]).concat(fst.filter(s=>s[0]>=rz-.01));add(loftGeo(back),body,'fuse').userData.st=back;add(loftGeo(front,{capTail:false}),dark,'radome')}
   else add(loftGeo(fst),body,'fuse');
   const cz=S.canopy[0],cut=add(loftGeo(rz!=null?g.getObjectByName('fuse').userData.st:fst,{skipTop:[cz-1.3,cz+1.4]}),body,'fuseCut');cut.visible=false;
-  for(const p of S.parts||[]){const xs=p.x?[p.x,-p.x]:[0];for(const x of xs){const m=add(loftGeo(p.st,{n:p.n||12}),p.dark?dark:body);m.position.x=x;
-      if(p.mouth){const [z,w,ht,hb,yc,pw]=p.st[p.st.length-1],r=(k,dz)=>[z-dz,w*k,ht*k,hb*k,yc,pw];   // a lip curling into a dark duct instead of a flat black plate
-        const lip=add(loftGeo([r(.86,.12),r(.93,.03),r(1,0)],{n:p.n||12,capTail:false}),p.dark?dark:body);lip.position.x=x;
-        const duct=add(loftGeo([r(.8,1.1),r(.86,.12)],{n:p.n||12}),black);duct.position.x=x}}}
+  for(const p of S.parts||[]){const xs=p.x?[p.x,-p.x]:[0];for(const x of xs){const zM=p.st[p.st.length-1][0],yM=p.st[p.st.length-1][4]||0,sg=Math.sign(x)||1;
+      // rake [vertical, plan]: the mouth's top lip ahead of the bottom one, the inner lip ahead of the outer one (F-22, F-35, caret intakes)
+      const rk=geo=>{if(p.rake){const P=geo.attributes.position;for(let i=0;i<P.count;i++){const z=P.getZ(i);if(z>zM-.2-1e-4){const f=clamp((z-(zM-1.1))/.9,0,1);P.setZ(i,z+f*(p.rake[0]*(P.getY(i)-yM)-p.rake[1]*P.getX(i)*sg))}}geo.computeVertexNormals()}return geo};
+      const m=add(rk(loftGeo(p.st,{n:p.n||12})),p.dark?dark:body);m.position.x=x;
+      if(p.mouth){const [z,w,ht,hb,yc,pw,pb]=p.st[p.st.length-1],r=(k,dz)=>[z-dz,w*k,ht*k,hb*k,yc,pw,pb];   // a lip curling into a dark duct instead of a flat black plate
+        const lip=add(rk(loftGeo([r(.86,.12),r(.93,.03),r(1,0)],{n:p.n||12,capTail:false})),p.dark?dark:body);lip.position.x=x;
+        const duct=add(rk(loftGeo([r(.8,1.1),r(.86,.12)],{n:p.n||12})),black);duct.position.x=x}}}
   // control surfaces follow every station of a multi-section wing (one strip per segment) so they stay inside the planform
   const segStrips=(st,lo,hi,frac,sd,mat,kind)=>{const x0=st[0].x,span=st[st.length-1].x-x0;if(!(span>0))return;
     for(let i=0;i<st.length-1;i++){const a=st[i],b=st[i+1],fa=(a.x-x0)/span,fb=(b.x-x0)/span,l=Math.max(lo,fa),h=Math.min(hi,fb);if(h-l<.03)continue;g.add(hingeStrip(a,b,(l-fa)/(fb-fa),(h-fa)/(fb-fa),frac,sd,mat,kind))}};
@@ -1950,7 +1953,7 @@ function buildLoftJet(c,S,type){
   const bow=(zo,par,name)=>{const z=cZ+zo,q=prof(uOf(z)),fr=add(new THREE.TorusGeometry(q.w*1.01,.032,5,18,Math.PI),dark,name||'cframe',par||cg);
     fr.scale.set(1,q.h/q.w,1);fr.position.set(0,topAt(z)-.05,z);if(par!==g)fr.position.sub(cH);return fr};
   if(S.frame)bow(S.frame);
-  if(!/^F16/.test(type))bow(sz*.62,g,'wsbow');
+  if(!/^(F16|F22|F35)/.test(type))bow(sz*.62,g,'wsbow');
   if(type==='F15EX')bow(-.1);
   if(/^(MIG|SU)/.test(type))bow(sz*.12);
   for(const s of [1,-1]){const r=add(new THREE.BoxGeometry(.04,.04,sz*1.9),dark,'cframe',cg);r.position.set(s*sx*.96,topAt(cZ)-.03-cH.y,cZ-sz*.05-cH.z)}
@@ -1962,7 +1965,7 @@ function buildLoftJet(c,S,type){
     const sh=add(new THREE.BoxGeometry(.46,.3,.32),sm,null,pg);sh.position.set(0,e[1]-.36,e[2]-.18);
     const hr=add(new THREE.BoxGeometry(.5,.55,.12),dark,null,pg);hr.position.set(0,e[1]-.15,e[2]-.42)}
   if(S.irst){const ir=add(new THREE.SphereGeometry(.13,10,8),new THREE.MeshStandardMaterial({color:0x2a2a1a,roughness:.1,metalness:.8}),'irst');ir.position.set(...S.irst)}
-  {const tip=fst0[fst0.length-1],pt=add(new THREE.CylinderGeometry(.013,.02,1.1,6).rotateX(Math.PI/2),metal);pt.position.set(0,tip[4],tip[0]+.42);                       // pitot boom
+  {const tip=fst0[fst0.length-1];if(!/^(F22|F35|J20|SU57)/.test(type)){const pt=add(new THREE.CylinderGeometry(.013,.02,1.1,6).rotateX(Math.PI/2),metal);pt.position.set(0,tip[4],tip[0]+.42)}   // pitot boom (stealth jets have none)                       // pitot boom
    const aT=cz-S.canopy[4]*1.05-.7,sT=secAt(fst,aT),bl=add(new THREE.BoxGeometry(.018,.2,.14),dark);bl.position.set(0,sT[4]+sT[2]+.08,aT);                       // spine blade antenna
    const aB=cz-1.9,sB=secAt(fst,aB),bb=add(new THREE.BoxGeometry(.018,.16,.12),dark);bb.position.set(0,sB[4]-sB[3]-.07,aB);                                        // belly blade antenna
    const zD=Math.min(...S.noz.map(n=>n[2]))+3.4,sD=secAt(fst,zD);for(const sx2 of [-1,1]){const d=add(new THREE.BoxGeometry(.2,.025,.46),black);d.position.set(sx2*Math.min(.32,sD[1]*.45),sD[4]-sD[3]+.005,zD)}}   // chaff/flare dispensers
@@ -1972,9 +1975,9 @@ function buildLoftJet(c,S,type){
   const fm=new THREE.MeshBasicMaterial({color:c.flame,transparent:true,opacity:.85,blending:THREE.AdditiveBlending,depthWrite:false});
   const fl=new THREE.Group(); fl.name='flame'; fl.position.set(0,S.noz[0][1],S.noz[0][2]-S.noz[0][4]*.5-.1); g.add(fl);
   for(const [x,y,z,r,len] of S.noz){const ng=new THREE.Group();ng.name='nozG';ng.userData={s:Math.sign(x)};ng.position.set(x,y,z+len*.5);g.add(ng);
-    const n=add(new THREE.CylinderGeometry(r*.94,r,len,18,1,true).rotateX(Math.PI/2),metal,'noz',ng);n.position.z=-len*.5;
-    const lip=add(new THREE.TorusGeometry(r*.98,.03,4,18),dark,null,n);lip.position.z=-len*.5;
-    const th=add(new THREE.CircleGeometry(r*.85,16),black,null,ng);th.position.z=-len*.2;th.rotation.y=Math.PI;
+    const rect=S.nozRect, n=add(rect?new THREE.CylinderGeometry(r*.94,r,len,4,1,true).rotateY(Math.PI/4).rotateX(Math.PI/2).scale(1.3,.72,1):new THREE.CylinderGeometry(r*.94,r,len,18,1,true).rotateX(Math.PI/2),metal,'noz',ng);n.position.z=-len*.5;
+    if(!rect){const lip=add(new THREE.TorusGeometry(r*.98,.03,4,18),dark,null,n);lip.position.z=-len*.5}
+    const th=add(rect?new THREE.PlaneGeometry(r*1.25,r*.68):new THREE.CircleGeometry(r*.85,16),black,null,ng);th.position.z=-len*.2;th.rotation.y=Math.PI;
     const hz=add(HAZE_GEO,HAZE_MAT,'haze',ng);hz.position.z=-len;hz.scale.set(r/.5,r/.5,1);
     const cgm=new THREE.ConeGeometry(r*.82,3.6,12,1,true);cgm.rotateX(-Math.PI/2);cgm.translate(0,0,-1.8);const m=new THREE.Mesh(cgm,fm);m.position.x=x;fl.add(m)}
   // stores: rails carry the real missile sizes for this jet's weapons; pylons go away with their missile
@@ -2529,21 +2532,21 @@ M2.F4E={L:19.2,nz:5.8,radome:6.8,
   r9:mir([[2.8,-.78,-.2,.05],[2.8,-.78,-1.7,.05]]),r120:mir([[.55,-1.0,1.6,null],[.55,-1.0,-1.8,null]])};
 // F-35A: 15.7 m, 10.7 m span, canted twin tails, DSI intakes, internal weapons bays
 M2.F35A={L:15.67,nz:4.6,radome:6.2,internal:1,
-  fus:[[-7.0,.42,.45,.4,.05,2.3],[-5.8,.7,.55,.5,.05,2.5],[-4,.9,.62,.62,0,2.6],[-1.5,.98,.66,.68,0,2.7],[1,.92,.64,.64,0,2.6],[3.2,.78,.55,.5,0,2.4],[5,.55,.4,.38,-.02,2.2],[6.5,.35,.26,.26,-.04,2.1],[7.6,.1,.1,.1,-.05,2],[7.9,0,0,0,-.05,2]],
-  parts:[{x:.95,mouth:1,st:[[-1.2,.36,.34,.5,-.3,2.6],[.8,.44,.38,.55,-.34,3],[2.5,.43,.34,.52,-.34,3.4],[3.2,.41,.3,.5,-.34,4]]}],
-  wings:[{st:[{x:.9,zle:1.0,zte:-4.6,y:-.1,t:.04},{x:5.35,zle:-2.1,zte:-4.5,y:-.1,t:.03}]},{st:[{x:.6,zle:4.0,zte:.8,y:0,t:.02},{x:1.0,zle:1.1,zte:.8,y:0,t:.02}]},
-    {st:[{x:.8,zle:-5.1,zte:-7.2,y:-.12,t:.035},{x:3.0,zle:-6.4,zte:-7.5,y:-.2,t:.03}]}],
-  fins:[{x:.95,y:.42,cant:-.35,mirror:1,st:[{h:0,zle:-3.4,zte:-6.4,t:.05},{h:2.0,zle:-5.9,zte:-7.2,t:.04}]}],
-  canopy:[3.7,.64,.5,.4,1.4],frame:-1.1,noz:[[0,.05,-7.25,.55,1.3]],
+  fus:[[-7.0,.42,.45,.4,.05,2.3],[-5.8,.72,.6,.55,.05,2.6],[-4,.96,.78,.66,.04,2.8],[-1.5,1.04,.88,.72,.06,2.8],[1,.96,.9,.68,.06,2.6],[3.2,.8,.66,.55,.02,2.3,1.9],[5,.56,.42,.38,-.02,1.8,1.4],[6.5,.36,.27,.25,-.04,1.6,1.3],[7.6,.1,.1,.1,-.05,1.6,1.3],[7.9,0,0,0,-.05,2]],
+  parts:[{x:.98,mouth:1,rake:[.45,.45],st:[[-1.2,.36,.34,.5,-.3,2.6],[.8,.44,.38,.55,-.34,3],[2.5,.43,.34,.52,-.34,3.2],[3.2,.41,.3,.5,-.34,3.4]]}],
+  wings:[{st:[{x:.9,zle:1.2,zte:-4.8,y:-.1,t:.04},{x:5.35,zle:-1.7,zte:-3.7,y:-.1,t:.03}]},{st:[{x:.6,zle:4.0,zte:.8,y:0,t:.02},{x:1.0,zle:1.1,zte:.8,y:0,t:.02}]},
+    {st:[{x:.95,zle:-4.95,zte:-7.85,y:-.12,t:.035},{x:3.4,zle:-6.55,zte:-7.5,y:-.2,t:.03}]}],
+  fins:[{x:1.02,y:.42,cant:-.35,mirror:1,st:[{h:0,zle:-3.9,zte:-7.0,t:.05},{h:2.1,zle:-5.37,zte:-6.44,t:.04}]}],
+  canopy:[3.7,.64,.5,.4,1.4],frame:-1.1,noz:[[0,.05,-7.25,.6,1.3]],
   r9:mir([[3.4,-.28,-2.9,.0]]),r120:mir([[.5,-.5,2.0,null],[.5,-.5,-.6,null]])};
 // F-22A: 18.9 m, 13.6 m span, 2-D vectoring nozzles, canted tails, wide trapezoid wings, internal bays
 M2.F22A={L:18.9,nz:5.4,radome:7.6,internal:1,
-  fus:[[-9.3,.55,.4,.35,.15,2.3],[-8,.85,.5,.45,.1,2.5],[-5,1.05,.6,.55,.05,2.7],[-1.5,1.1,.62,.62,0,2.8],[2,.95,.6,.6,0,2.6],[4.8,.66,.48,.45,0,2.4],[7,.45,.33,.3,-.04,2.2],[8.6,.22,.2,.18,-.06,2],[9.6,0,0,0,-.08,2]],
-  parts:[{x:1.15,mouth:1,st:[[-2.5,.4,.36,.58,-.3,2.6],[.5,.5,.4,.62,-.34,3.2],[3.0,.48,.36,.6,-.36,3.8],[3.9,.46,.33,.58,-.36,4.4]]},{x:1.5,st:[[-9.5,.58,.38,.42,0,2.6],[-6,.7,.5,.5,0,2.8],[-2,.66,.5,.5,0,3]]}],
+  fus:[[-9.3,.55,.4,.35,.15,2.3],[-8,.85,.5,.45,.1,2.5],[-5,1.05,.6,.55,.05,2.7],[-1.5,1.1,.62,.62,0,2.8],[2,.95,.6,.6,0,2.4,2],[4.8,.68,.48,.42,0,1.9,1.45],[7,.46,.33,.28,-.04,1.7,1.3],[8.6,.22,.2,.17,-.06,1.6,1.3],[9.6,0,0,0,-.08,2]],
+  parts:[{x:1.15,mouth:1,rake:[.55,.5],st:[[-2.5,.4,.36,.58,-.3,2.6],[.5,.5,.4,.62,-.34,3.2],[3.0,.48,.36,.6,-.36,3.8],[3.9,.46,.33,.58,-.36,4.4]]},{x:1.0,st:[[-9.3,.62,.34,.38,.05,3.4],[-6,.76,.5,.5,0,3],[-2,.66,.5,.5,0,3]]}],
   wings:[{st:[{x:1.3,zle:3.0,zte:-6.0,y:-.05,t:.04},{x:6.78,zle:-2.0,zte:-3.9,y:-.05,t:.03}]},{st:[{x:.8,zle:7.2,zte:2.6,y:0,t:.02},{x:1.6,zle:3.4,zte:2.6,y:0,t:.02}]},
-    {st:[{x:1.3,zle:-6.4,zte:-9.6,y:-.1,t:.035},{x:3.9,zle:-8.5,zte:-9.7,y:-.1,t:.03}]}],
-  fins:[{x:1.9,y:.4,cant:-.47,mirror:1,st:[{h:0,zle:-5.2,zte:-9.0,t:.05},{h:2.4,zle:-8.2,zte:-9.8,t:.04}]}],
-  canopy:[5.0,.78,.55,.42,1.8],frame:-1.2,noz:[[.78,.08,-9.7,.55,1.0],[-.78,.08,-9.7,.55,1.0]],
+    {st:[{x:1.4,zle:-6.1,zte:-10.6,y:-.1,t:.035},{x:4.4,zle:-8.8,zte:-9.7,y:-.1,t:.03}]}],
+  fins:[{x:1.9,y:.4,cant:-.47,mirror:1,st:[{h:0,zle:-4.6,zte:-8.6,t:.05},{h:2.7,zle:-5.74,zte:-7.46,t:.04}]}],
+  nozRect:1,canopy:[5.0,.78,.55,.42,1.8],noz:[[.82,.06,-9.75,.58,1.0],[-.82,.06,-9.75,.58,1.0]],
   r9:mir([[1.2,-.1,1.5,null]]),r120:mir([[.85,-.45,2.4,null],[.85,-.45,-.4,null],[.35,-.62,.9,null]])};
 // F-104G Starfighter: 16.7 m, 6.7 m span, razor wings, T-tail, wing-tip Sidewinders
 M2.F104G={L:16.7,nz:3.8,radome:6.4,
@@ -2565,7 +2568,7 @@ M2.MIG21={L:14.8,nz:3.2,radome:6.6,
 M2.SU57={L:19.5,nz:5.8,radome:7.2,internal:1,
   fus:[[-9.5,.5,.42,.4,.1,2.4],[-8,.7,.5,.45,.1,2.6],[-5,.95,.62,.55,.05,2.8],[-1.5,1.05,.65,.6,0,2.8],[2,.9,.62,.58,0,2.6],[4.8,.65,.5,.45,0,2.3],[7.2,.45,.35,.32,-.03,2.2],[9.0,.25,.2,.2,-.05,2.1],[10.0,0,0,0,-.06,2]],
   parts:[{x:1.1,mouth:1,st:[[-2.2,.42,.35,.55,-.4,2.6],[1.4,.5,.38,.58,-.42,3.2],[3.3,.48,.36,.55,-.42,3.8],[4.0,.46,.33,.52,-.42,4.4]]},{x:1.55,st:[[-10.2,.55,.45,.5,-.05,2.8],[-6,.7,.55,.55,-.1,3],[-2,.66,.5,.55,-.12,3.2]]}],
-  wings:[{st:[{x:1.5,zle:3.0,zte:-5.8,y:0,t:.04},{x:7.05,zle:-3.2,zte:-5.0,y:0,t:.03}]},{st:[{x:.9,zle:7.2,zte:2.6,y:.05,t:.02},{x:1.7,zle:3.2,zte:2.6,y:.05,t:.02}]},
+  wings:[{st:[{x:1.5,zle:3.0,zte:-5.8,y:0,t:.04},{x:6.1,zle:-2.2,zte:-5.0,y:0,t:.03}]},{st:[{x:.9,zle:7.2,zte:2.6,y:.05,t:.02},{x:1.7,zle:3.2,zte:2.6,y:.05,t:.02}]},
     {st:[{x:1.6,zle:-7.8,zte:-10.6,y:-.05,t:.035},{x:3.9,zle:-9.8,zte:-11.0,y:-.05,t:.03}]}],
   fins:[{x:2.0,y:.4,cant:-.5,mirror:1,st:[{h:0,zle:-5.5,zte:-10.0,t:.05},{h:2.6,zle:-8.8,zte:-10.8,t:.04}]}],
   canopy:[5.6,.76,.55,.42,1.9],frame:-1.2,noz:[[1.1,.1,-11.0,.55,1.2],[-1.1,.1,-11.0,.55,1.2]],
