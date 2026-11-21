@@ -737,6 +737,19 @@ function buildLoftJet(c,S,type){
         else{segStrips(o.w.st,.12,.5,.2,s,mat,'elv');segStrips(o.w.st,.52,.95,.2,s,mat,'elv')}}}
     else for(const s of [1,-1]){const st=o.w.st.map(q=>Object.assign({},q,{x:q.x*s})),geo=wingGeo(st,false),pz=o.r.zle-o.ch*.42,piv=new THREE.Vector3(o.r.x*s,o.r.y||0,pz);
       geo.translate(-piv.x,-piv.y,-piv.z);const grp=new THREE.Group();grp.position.copy(piv);grp.name='cs';grp.userData={cs:o.kind,s,ax:[1,0,0]};add(geo,mat,null,grp);g.add(grp)}}
+  // wing-body fillets: a concave strip along the root chord that blends the wing's upper (and lower) skin into the fuselage or intake trunk beside it
+  {const r0=main.w.st[0],ch=r0.zle-r0.zte,t0=r0.t||.04,Fw=clamp(ch*.065,.16,.48),N=16,M=6,pos=[],idx=[];
+   const bodies=[[0,fst]].concat((S.parts||[]).flatMap(p=>(p.x?[p.x]:[0]).map(px=>[px,p.st])));
+   const sideX=(z,y)=>{let best=-1;for(const [px,st] of bodies){if(px<0||z<st[0][0]||z>st[st.length-1][0])continue;const q=secAt(st,z),hw=q[1],yc=q[4]||0,up=y>=yc,h=up?q[2]:q[3],e=up?(q[5]||2.4):(q[6]||q[5]||2.4);
+       if(!(h>0)||!(hw>0))continue;const v=Math.abs(y-yc)/h;if(v>=.98)continue;const xx=px+hw*Math.pow(1-Math.pow(v,e),1/e);if(xx<=r0.x+.3&&xx>best)best=xx}return best};
+   for(const lower of [0,1]){const F=lower?Fw*.6:Fw,b0=pos.length/3;
+     for(let i=0;i<=N;i++){const f=i/N,z=r0.zle-f*ch,ys=(r0.y||0)+(lower?-1:1)*5*t0*ch*nacaT(Math.max(f,1e-4)),k=Math.pow(Math.sin(Math.PI*f),.55);
+       let xf=sideX(z,ys+(lower?-1:1)*F*.75*k);const ok=xf>0&&r0.x-xf<.55;if(!ok)xf=r0.x;
+       const fw=ok?Math.max(0,r0.x-xf)+F*k:0,fh=ok?F*.75*k:0;
+       for(let j=0;j<=M;j++){const th=j/M*Math.PI/2;pos.push(xf+fw*(1-Math.cos(th)),ys+(lower?-1:1)*fh*(1-Math.sin(th)),z)}}
+     for(let i=0;i<N;i++)for(let j=0;j<M;j++){const a=b0+i*(M+1)+j,b=a+1,c=a+M+1,d=c+1;if(lower)idx.push(a,b,c,b,d,c);else idx.push(a,c,b,b,c,d)}}
+   const n=pos.length/3;for(let i=0;i<n;i++)pos.push(-pos[i*3],pos[i*3+1],pos[i*3+2]);const m0=idx.length;for(let i=0;i<m0;i+=3)idx.push(idx[i]+n,idx[i+2]+n,idx[i+1]+n);
+   const fg=new THREE.BufferGeometry();fg.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));fg.setIndex(idx);fg.computeVertexNormals();add(fg,main.w.dark?dark:body)}
   // fins: rudders on the trailing edge; the J-20's fins are all-moving
   const allMove=type==='J20';
   for(const f of S.fins||[]){const xs=f.mirror?[f.x,-f.x]:[f.x||0];xs.forEach((x,i)=>{const gr=new THREE.Group();gr.name='finG';gr.position.set(x,f.y||0,0);gr.rotation.z=(i?-1:1)*(f.cant||0);g.add(gr);

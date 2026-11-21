@@ -1956,6 +1956,19 @@ function buildLoftJet(c,S,type){
         else{segStrips(o.w.st,.12,.5,.2,s,mat,'elv');segStrips(o.w.st,.52,.95,.2,s,mat,'elv')}}}
     else for(const s of [1,-1]){const st=o.w.st.map(q=>Object.assign({},q,{x:q.x*s})),geo=wingGeo(st,false),pz=o.r.zle-o.ch*.42,piv=new THREE.Vector3(o.r.x*s,o.r.y||0,pz);
       geo.translate(-piv.x,-piv.y,-piv.z);const grp=new THREE.Group();grp.position.copy(piv);grp.name='cs';grp.userData={cs:o.kind,s,ax:[1,0,0]};add(geo,mat,null,grp);g.add(grp)}}
+  // wing-body fillets: a concave strip along the root chord that blends the wing's upper (and lower) skin into the fuselage or intake trunk beside it
+  {const r0=main.w.st[0],ch=r0.zle-r0.zte,t0=r0.t||.04,Fw=clamp(ch*.065,.16,.48),N=16,M=6,pos=[],idx=[];
+   const bodies=[[0,fst]].concat((S.parts||[]).flatMap(p=>(p.x?[p.x]:[0]).map(px=>[px,p.st])));
+   const sideX=(z,y)=>{let best=-1;for(const [px,st] of bodies){if(px<0||z<st[0][0]||z>st[st.length-1][0])continue;const q=secAt(st,z),hw=q[1],yc=q[4]||0,up=y>=yc,h=up?q[2]:q[3],e=up?(q[5]||2.4):(q[6]||q[5]||2.4);
+       if(!(h>0)||!(hw>0))continue;const v=Math.abs(y-yc)/h;if(v>=.98)continue;const xx=px+hw*Math.pow(1-Math.pow(v,e),1/e);if(xx<=r0.x+.3&&xx>best)best=xx}return best};
+   for(const lower of [0,1]){const F=lower?Fw*.6:Fw,b0=pos.length/3;
+     for(let i=0;i<=N;i++){const f=i/N,z=r0.zle-f*ch,ys=(r0.y||0)+(lower?-1:1)*5*t0*ch*nacaT(Math.max(f,1e-4)),k=Math.pow(Math.sin(Math.PI*f),.55);
+       let xf=sideX(z,ys+(lower?-1:1)*F*.75*k);const ok=xf>0&&r0.x-xf<.55;if(!ok)xf=r0.x;
+       const fw=ok?Math.max(0,r0.x-xf)+F*k:0,fh=ok?F*.75*k:0;
+       for(let j=0;j<=M;j++){const th=j/M*Math.PI/2;pos.push(xf+fw*(1-Math.cos(th)),ys+(lower?-1:1)*fh*(1-Math.sin(th)),z)}}
+     for(let i=0;i<N;i++)for(let j=0;j<M;j++){const a=b0+i*(M+1)+j,b=a+1,c=a+M+1,d=c+1;if(lower)idx.push(a,b,c,b,d,c);else idx.push(a,c,b,b,c,d)}}
+   const n=pos.length/3;for(let i=0;i<n;i++)pos.push(-pos[i*3],pos[i*3+1],pos[i*3+2]);const m0=idx.length;for(let i=0;i<m0;i+=3)idx.push(idx[i]+n,idx[i+2]+n,idx[i+1]+n);
+   const fg=new THREE.BufferGeometry();fg.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));fg.setIndex(idx);fg.computeVertexNormals();add(fg,main.w.dark?dark:body)}
   // fins: rudders on the trailing edge; the J-20's fins are all-moving
   const allMove=type==='J20';
   for(const f of S.fins||[]){const xs=f.mirror?[f.x,-f.x]:[f.x||0];xs.forEach((x,i)=>{const gr=new THREE.Group();gr.name='finG';gr.position.set(x,f.y||0,0);gr.rotation.z=(i?-1:1)*(f.cant||0);g.add(gr);
@@ -4087,16 +4100,31 @@ function buildGear(){
     tyre=new THREE.MeshStandardMaterial({color:0x151617,roughness:.92}), hub=new THREE.MeshStandardMaterial({color:0x9da3a8,roughness:.4,metalness:.6}),
     door=new THREE.MeshStandardMaterial({color:new THREE.Color((PAINT[AC.id]||PAINT_DEF).c[0]),roughness:.55,metalness:.15,side:THREE.DoubleSide}), bay=new THREE.MeshStandardMaterial({color:0x2a2c2e,roughness:.8});
   const S=M2[AC.id], G=GEAR_SPEC[AC.id]||{mx:1.2,mz:-1,mr:.35,nr:.24,nw:1}, nz=AC.fx?AC.fx.nz:3.6, legs=[], doors=[];
-  const wheel=(r,w)=>{const gw=new THREE.Group();const t=new THREE.Mesh(new THREE.CylinderGeometry(r,r,w,16).rotateZ(Math.PI/2),tyre);gw.add(t);
-    const h=new THREE.Mesh(new THREE.CylinderGeometry(r*.55,r*.55,w+.02,10).rotateZ(Math.PI/2),hub);gw.add(h);return gw};
+  // tyre: a lathed, rounded section on a hub with a rim lip, brake disc and boss
+  const wheel=(r,w)=>{const gw=new THREE.Group(),R0=r*.6,pts=[];for(let i=0;i<=12;i++){const a=-Math.PI/2+i/12*Math.PI,c=Math.cos(a);pts.push(new THREE.Vector2(R0+(r-R0)*Math.pow(c,.45),w*.5*Math.sin(a)))}
+    gw.add(new THREE.Mesh(new THREE.LatheGeometry(pts,20).rotateZ(Math.PI/2),tyre));
+    gw.add(new THREE.Mesh(new THREE.CylinderGeometry(R0*1.02,R0*1.02,w*.86,18).rotateZ(Math.PI/2),hub));
+    const disc=new THREE.Mesh(new THREE.CylinderGeometry(R0*.78,R0*.78,w*.9,14).rotateZ(Math.PI/2),bay);gw.add(disc);
+    gw.add(new THREE.Mesh(new THREE.CylinderGeometry(R0*.32,R0*.38,w*1.02,10).rotateZ(Math.PI/2),hub));return gw};
+  const _u=new THREE.Vector3(0,1,0);
+  const rod=(a,b,rad,mat,par)=>{const d=new THREE.Vector3().subVectors(b,a),l=d.length(),c=new THREE.Mesh(new THREE.CylinderGeometry(rad,rad,l,7),mat);c.position.copy(a).addScaledVector(d,.5);c.quaternion.setFromUnitVectors(_u,d.normalize());par.add(c);return c};
+  const V=(x,y,z)=>new THREE.Vector3(x,y,z);
   const leg=(x,z,r,nose)=>{const top=S?bellyAt(S,z,x)+.15:-.5, wy=-GEAR_H+r, L=top-wy, th=(G.navy?1.5:1)*(nose?.07:.09);
     const gl=new THREE.Group(); gl.position.set(x,top,z); gearObj.add(gl);
-    const st=new THREE.Mesh(new THREE.CylinderGeometry(th,th,L*.62,8),m); st.position.y=-L*.31; gl.add(st);
-    const ol=new THREE.Mesh(new THREE.CylinderGeometry(th*.7,th*.7,L*.45,8),ch); ol.position.y=-L*.72; gl.add(ol);
-    const tl=new THREE.Mesh(new THREE.BoxGeometry(.04,L*.22,.16),m); tl.position.set(0,-L*.66,nose?-.1:.12); tl.rotation.x=nose?.35:-.35; gl.add(tl);
+    const st=new THREE.Mesh(new THREE.CylinderGeometry(th*.85,th,L*.6,10),m); st.position.y=-L*.3; gl.add(st);                       // main strut, tapering
+    const col=new THREE.Mesh(new THREE.CylinderGeometry(th*1.12,th*1.12,L*.06,10),m); col.position.y=-L*.58; gl.add(col);             // gland nut
+    const ol=new THREE.Mesh(new THREE.CylinderGeometry(th*.68,th*.68,L*.36,10),ch); ol.position.y=-L*.76; gl.add(ol);                 // chrome oleo
+    const yk=new THREE.Mesh(new THREE.BoxGeometry(th*2.2,th*1.5,th*2.2),m); yk.position.y=-L*.94; gl.add(yk);                         // axle yoke
+    const fz=th*1.5; rod(V(0,-L*.6,fz*.6),V(0,-L*.74,fz*1.7),th*.32,m,gl); rod(V(0,-L*.74,fz*1.7),V(0,-L*.92,fz*.7),th*.32,m,gl);    // torque links (the scissor)
+    rod(V(0,-L*.34,0),V(0,-.02,nose?L*.55:-L*.5),th*.42,m,gl);                                                                       // drag brace up to the airframe
+    rod(V(0,-L*.2,0),V(nose?0:-Math.sign(x)*L*.32,-.02,nose?-L*.25:0),th*.3,m,gl);                                                   // retraction jack
     if(G.navy){const br=new THREE.Mesh(new THREE.CylinderGeometry(th*.6,th*.6,L*.75,6),m);br.position.set(0,-L*.4,nose?.0:-.32);br.rotation.x=nose?0:.5;gl.add(br)}
     const n=nose?G.nw:1, w=nose?r*.55:r*.65;
-    for(let i=0;i<n;i++){const wh=wheel(r,w);wh.position.set(n>1?(i?-1:1)*(w*.5+th+.02):x>0?-th-w*.5+.0:x<0?th+w*.5:0,-L,0);if(!nose)wh.position.x=0;gl.add(wh)}
+    // main wheels sit beside the strut on a stub axle; a single nose wheel runs in a fork, twin nose wheels share an axle
+    if(!nose){const sx=Math.sign(x)||1,ox=sx*(th*1.1+w*.55);const wh=wheel(r,w);wh.position.set(ox,-L,0);gl.add(wh);rod(V(0,-L,0),V(ox,-L,0),th*.45,m,gl)}
+    else if(n>1){for(let i=0;i<n;i++){const wh=wheel(r,w);wh.position.set((i?-1:1)*(w*.5+th+.02),-L,0);gl.add(wh)}rod(V(-(w+th),-L,0),V(w+th,-L,0),th*.4,m,gl)}
+    else{const wh=wheel(r,w);wh.position.set(0,-L,0);gl.add(wh);for(const sd of [1,-1]){const fk=new THREE.Mesh(new THREE.BoxGeometry(.035,L*.1+r*.25,th*1.6),m);fk.position.set(sd*(w*.5+.03),-L*.93-r*.05,0);gl.add(fk)}
+      const cr=new THREE.Mesh(new THREE.BoxGeometry(w+.1,.05,th*1.6),m);cr.position.set(0,-L*.88,0);gl.add(cr)}
     if(nose&&G.mud){const mg=new THREE.Mesh(new THREE.CylinderGeometry(r*1.18,r*1.18,(n>1?w*2+th*2+.1:w+.12),14,1,true,-Math.PI*.15,Math.PI*1.1).rotateZ(Math.PI/2),door);mg.position.y=-L;gl.add(mg)}
     if(nose){const ll=new THREE.Mesh(new THREE.SphereGeometry(.07,8,6),new THREE.MeshBasicMaterial({color:0xfff6dd}));ll.name='llight';ll.position.set(0,-L*.55,.16);gl.add(ll)}
     legs.push({o:gl,nose,s:Math.sign(x)});
@@ -8091,7 +8119,7 @@ if(/[?&]test\b/.test(location.search))window.__vs={buildSAM,buildAAA,buildRadar,
   target:(type,dz,away,speed)=>{const e=spawnFighter('red',type,new V3(0,P.pos.y,dz),new V3(0,P.pos.y,dz+(away?9999:-9999)),{ir:0,rdr:0,speed:speed||220});e.drone=true;return e.id},
   lock:()=>{if(enemies[0])lockOn(enemies[0])},fire:w=>{if(w==='9X')fire9=true;else fire120=true},gun:on=>{gunHeld=on},
   missiles:()=>missiles.filter(m=>m.on),
-  st:()=>{const e=enemies[0];return{can9,can120,aim9:P.aim9,aim120:P.aim120,rounds:P.rounds,alive:!!(e&&e.alive),hp:e?e.hp:0,msl:missiles.filter(m=>m.on).length,stt:!!R.stt,sttAcq:R.acqT,d:e?e.pos.distanceTo(P.pos):0,msg:$('msg')?$('msg').textContent:''}}},mslGeoFor,MSL_MAT,M2dims:()=>{const o={};for(const id in M2){const S=M2[id],zs=S.fus.map(f=>f[0]).concat(S.noz.map(n=>n[2]-n[4]/2)),L=Math.max(...zs)-Math.min(...zs),sp=2*Math.max(...S.wings.flatMap(w=>w.st.map(q=>q.x)));const k=M2K[id]||[1,1,1];o[id]=[+(L*k[2]).toFixed(2),+(sp*k[0]).toFixed(2)]}return o},ROSTER_IDS,restart:()=>startGame(),spawnAll:()=>{let n=0;for(const id of FIGHTERS){spawnFighter('red',id,P.pos.clone().add(new V3(rand(-4000,4000),rand(-300,300),rand(8000,14000))),P.pos);n++}return n},tableRows:id=>({gear:!!GEAR_SPEC[id],snd:!!ENG_SND[id],hp:!!JET_HP[id],rcs:RCS[id]!=null,paint:!!PAINT[id]||!!(AC_DEFS[id].model),band:!!BANDITS[id],fighter:FIGHTERS.indexOf(id)>=0}),get preset(){return preset},PRESETS,get daily(){return daily},dailyAdd,endTest:o=>{deathCause=o.cause||'win';score=o.score||0;kills=o.kills||0;missionT=o.t||90;P.alive=o.alive!==false;P.rescued=!!o.rescued;state='over';careerAward();showOverlay('over')},get AC(){return AC}};
+  st:()=>{const e=enemies[0];return{can9,can120,aim9:P.aim9,aim120:P.aim120,rounds:P.rounds,alive:!!(e&&e.alive),hp:e?e.hp:0,msl:missiles.filter(m=>m.on).length,stt:!!R.stt,sttAcq:R.acqT,d:e?e.pos.distanceTo(P.pos):0,msg:$('msg')?$('msg').textContent:''}}},mslGeoFor,MSL_MAT,HG,M2dims:()=>{const o={};for(const id in M2){const S=M2[id],zs=S.fus.map(f=>f[0]).concat(S.noz.map(n=>n[2]-n[4]/2)),L=Math.max(...zs)-Math.min(...zs),sp=2*Math.max(...S.wings.flatMap(w=>w.st.map(q=>q.x)));const k=M2K[id]||[1,1,1];o[id]=[+(L*k[2]).toFixed(2),+(sp*k[0]).toFixed(2)]}return o},ROSTER_IDS,restart:()=>startGame(),spawnAll:()=>{let n=0;for(const id of FIGHTERS){spawnFighter('red',id,P.pos.clone().add(new V3(rand(-4000,4000),rand(-300,300),rand(8000,14000))),P.pos);n++}return n},tableRows:id=>({gear:!!GEAR_SPEC[id],snd:!!ENG_SND[id],hp:!!JET_HP[id],rcs:RCS[id]!=null,paint:!!PAINT[id]||!!(AC_DEFS[id].model),band:!!BANDITS[id],fighter:FIGHTERS.indexOf(id)>=0}),get preset(){return preset},PRESETS,get daily(){return daily},dailyAdd,endTest:o=>{deathCause=o.cause||'win';score=o.score||0;kills=o.kills||0;missionT=o.t||90;P.alive=o.alive!==false;P.rescued=!!o.rescued;state='over';careerAward();showOverlay('over')},get AC(){return AC}};
 
 /* ---------- hangar: pick the aircraft, edit the loadout, change paint, read every spec; the jet turns on a turntable behind the panel ---------- */
 const hgEl=$('hangar');

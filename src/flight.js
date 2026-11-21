@@ -216,16 +216,31 @@ function buildGear(){
     tyre=new THREE.MeshStandardMaterial({color:0x151617,roughness:.92}), hub=new THREE.MeshStandardMaterial({color:0x9da3a8,roughness:.4,metalness:.6}),
     door=new THREE.MeshStandardMaterial({color:new THREE.Color((PAINT[AC.id]||PAINT_DEF).c[0]),roughness:.55,metalness:.15,side:THREE.DoubleSide}), bay=new THREE.MeshStandardMaterial({color:0x2a2c2e,roughness:.8});
   const S=M2[AC.id], G=GEAR_SPEC[AC.id]||{mx:1.2,mz:-1,mr:.35,nr:.24,nw:1}, nz=AC.fx?AC.fx.nz:3.6, legs=[], doors=[];
-  const wheel=(r,w)=>{const gw=new THREE.Group();const t=new THREE.Mesh(new THREE.CylinderGeometry(r,r,w,16).rotateZ(Math.PI/2),tyre);gw.add(t);
-    const h=new THREE.Mesh(new THREE.CylinderGeometry(r*.55,r*.55,w+.02,10).rotateZ(Math.PI/2),hub);gw.add(h);return gw};
+  // tyre: a lathed, rounded section on a hub with a rim lip, brake disc and boss
+  const wheel=(r,w)=>{const gw=new THREE.Group(),R0=r*.6,pts=[];for(let i=0;i<=12;i++){const a=-Math.PI/2+i/12*Math.PI,c=Math.cos(a);pts.push(new THREE.Vector2(R0+(r-R0)*Math.pow(c,.45),w*.5*Math.sin(a)))}
+    gw.add(new THREE.Mesh(new THREE.LatheGeometry(pts,20).rotateZ(Math.PI/2),tyre));
+    gw.add(new THREE.Mesh(new THREE.CylinderGeometry(R0*1.02,R0*1.02,w*.86,18).rotateZ(Math.PI/2),hub));
+    const disc=new THREE.Mesh(new THREE.CylinderGeometry(R0*.78,R0*.78,w*.9,14).rotateZ(Math.PI/2),bay);gw.add(disc);
+    gw.add(new THREE.Mesh(new THREE.CylinderGeometry(R0*.32,R0*.38,w*1.02,10).rotateZ(Math.PI/2),hub));return gw};
+  const _u=new THREE.Vector3(0,1,0);
+  const rod=(a,b,rad,mat,par)=>{const d=new THREE.Vector3().subVectors(b,a),l=d.length(),c=new THREE.Mesh(new THREE.CylinderGeometry(rad,rad,l,7),mat);c.position.copy(a).addScaledVector(d,.5);c.quaternion.setFromUnitVectors(_u,d.normalize());par.add(c);return c};
+  const V=(x,y,z)=>new THREE.Vector3(x,y,z);
   const leg=(x,z,r,nose)=>{const top=S?bellyAt(S,z,x)+.15:-.5, wy=-GEAR_H+r, L=top-wy, th=(G.navy?1.5:1)*(nose?.07:.09);
     const gl=new THREE.Group(); gl.position.set(x,top,z); gearObj.add(gl);
-    const st=new THREE.Mesh(new THREE.CylinderGeometry(th,th,L*.62,8),m); st.position.y=-L*.31; gl.add(st);
-    const ol=new THREE.Mesh(new THREE.CylinderGeometry(th*.7,th*.7,L*.45,8),ch); ol.position.y=-L*.72; gl.add(ol);
-    const tl=new THREE.Mesh(new THREE.BoxGeometry(.04,L*.22,.16),m); tl.position.set(0,-L*.66,nose?-.1:.12); tl.rotation.x=nose?.35:-.35; gl.add(tl);
+    const st=new THREE.Mesh(new THREE.CylinderGeometry(th*.85,th,L*.6,10),m); st.position.y=-L*.3; gl.add(st);                       // main strut, tapering
+    const col=new THREE.Mesh(new THREE.CylinderGeometry(th*1.12,th*1.12,L*.06,10),m); col.position.y=-L*.58; gl.add(col);             // gland nut
+    const ol=new THREE.Mesh(new THREE.CylinderGeometry(th*.68,th*.68,L*.36,10),ch); ol.position.y=-L*.76; gl.add(ol);                 // chrome oleo
+    const yk=new THREE.Mesh(new THREE.BoxGeometry(th*2.2,th*1.5,th*2.2),m); yk.position.y=-L*.94; gl.add(yk);                         // axle yoke
+    const fz=th*1.5; rod(V(0,-L*.6,fz*.6),V(0,-L*.74,fz*1.7),th*.32,m,gl); rod(V(0,-L*.74,fz*1.7),V(0,-L*.92,fz*.7),th*.32,m,gl);    // torque links (the scissor)
+    rod(V(0,-L*.34,0),V(0,-.02,nose?L*.55:-L*.5),th*.42,m,gl);                                                                       // drag brace up to the airframe
+    rod(V(0,-L*.2,0),V(nose?0:-Math.sign(x)*L*.32,-.02,nose?-L*.25:0),th*.3,m,gl);                                                   // retraction jack
     if(G.navy){const br=new THREE.Mesh(new THREE.CylinderGeometry(th*.6,th*.6,L*.75,6),m);br.position.set(0,-L*.4,nose?.0:-.32);br.rotation.x=nose?0:.5;gl.add(br)}
     const n=nose?G.nw:1, w=nose?r*.55:r*.65;
-    for(let i=0;i<n;i++){const wh=wheel(r,w);wh.position.set(n>1?(i?-1:1)*(w*.5+th+.02):x>0?-th-w*.5+.0:x<0?th+w*.5:0,-L,0);if(!nose)wh.position.x=0;gl.add(wh)}
+    // main wheels sit beside the strut on a stub axle; a single nose wheel runs in a fork, twin nose wheels share an axle
+    if(!nose){const sx=Math.sign(x)||1,ox=sx*(th*1.1+w*.55);const wh=wheel(r,w);wh.position.set(ox,-L,0);gl.add(wh);rod(V(0,-L,0),V(ox,-L,0),th*.45,m,gl)}
+    else if(n>1){for(let i=0;i<n;i++){const wh=wheel(r,w);wh.position.set((i?-1:1)*(w*.5+th+.02),-L,0);gl.add(wh)}rod(V(-(w+th),-L,0),V(w+th,-L,0),th*.4,m,gl)}
+    else{const wh=wheel(r,w);wh.position.set(0,-L,0);gl.add(wh);for(const sd of [1,-1]){const fk=new THREE.Mesh(new THREE.BoxGeometry(.035,L*.1+r*.25,th*1.6),m);fk.position.set(sd*(w*.5+.03),-L*.93-r*.05,0);gl.add(fk)}
+      const cr=new THREE.Mesh(new THREE.BoxGeometry(w+.1,.05,th*1.6),m);cr.position.set(0,-L*.88,0);gl.add(cr)}
     if(nose&&G.mud){const mg=new THREE.Mesh(new THREE.CylinderGeometry(r*1.18,r*1.18,(n>1?w*2+th*2+.1:w+.12),14,1,true,-Math.PI*.15,Math.PI*1.1).rotateZ(Math.PI/2),door);mg.position.y=-L;gl.add(mg)}
     if(nose){const ll=new THREE.Mesh(new THREE.SphereGeometry(.07,8,6),new THREE.MeshBasicMaterial({color:0xfff6dd}));ll.name='llight';ll.position.set(0,-L*.55,.16);gl.add(ll)}
     legs.push({o:gl,nose,s:Math.sign(x)});
