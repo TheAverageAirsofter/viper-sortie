@@ -71,7 +71,7 @@ function groundH(x,z){const d=Math.hypot(x*1.6,z);
   if(d<2600)return BASE_Y; let h=rawH(x,z); if(d<5200){const t=(d-2600)/2600, s=t*t*(3-2*t); h=BASE_Y+(h-BASE_Y)*s} return CANYON?canyonH(x,z,h):h}
 // Valley strike carves a real canyon into the terrain: a winding flat floor, steep walls up to a rim (or the natural ground if that is higher), and a bowl round the target
 let CANYON=null;   // {z0, tx, tz, F (floor), R (rim), cx(z) centre line}
-const CAN_W0=320, CAN_W1=1100, CAN_W2=3200;
+const CAN_W0=150, CAN_W1=700, CAN_W2=2600;   // floor half-width, foot of the rim, where the walls blend back into the land
 function canProf(dd,h){const C=CANYON;if(dd>=CAN_W2)return h;const top=Math.max(C.R,h);if(dd<CAN_W0)return C.F;
   if(dd<CAN_W1){const t=(dd-CAN_W0)/(CAN_W1-CAN_W0),s=t*t*(3-2*t);return C.F+(top-C.F)*Math.pow(s,.8)}
   const t=(dd-CAN_W1)/(CAN_W2-CAN_W1),s=t*t*(3-2*t);return top+(h-top)*s}
@@ -84,6 +84,7 @@ const TSIZE=36000,TSTEP=800;
 let tGeo,tPos,tBase,tCol;
 function buildTerrainGeo(seg){
   tGeo=new THREE.PlaneGeometry(TSIZE,TSIZE,seg,seg); tGeo.rotateX(-Math.PI/2);
+  {const P=tGeo.attributes.position,H=TSIZE/2,w=v=>{const u=v/H;return H*(.25*u+.75*u*u*u)};for(let i=0;i<P.count;i++){P.setX(i,w(P.getX(i)));P.setZ(i,w(P.getZ(i)))}}   // vertices bunch up under the player (about 60 m apart) and spread out towards the horizon
   tPos=tGeo.attributes.position; tBase=tPos.array.slice();
   tCol=new Float32Array(tPos.count*3); tGeo.setAttribute('color',new THREE.BufferAttribute(tCol,3));
   return tGeo;
@@ -103,12 +104,12 @@ const NOISE=(()=>{const S=256,P=[4,8,16,32,64],vals=new Float32Array(S*S*3);
   return t})();
 /* terrain: smooth-shaded, coloured per pixel from height, slope and noise — beaches, meadows, forest, dry upland, rock, snow */
 const terrMat=new THREE.MeshLambertMaterial({color:0xffffff});
-const TERR_U={mapId:{value:MAP_ID[MAP]||0}};
-terrMat.onBeforeCompile=sh=>{sh.uniforms.nTex={value:NOISE};sh.uniforms.mapId=TERR_U.mapId;
+const TERR_U={mapId:{value:MAP_ID[MAP]||0},snowY:{value:1150}};   // snowY: the alpine snow line (Valley strike brings it down to the canyon floor)
+terrMat.onBeforeCompile=sh=>{sh.uniforms.nTex={value:NOISE};sh.uniforms.mapId=TERR_U.mapId;sh.uniforms.snowY=TERR_U.snowY;
   sh.vertexShader=sh.vertexShader.replace('#include <common>','#include <common>\nvarying vec3 vWPos;varying vec3 vWN;')
     .replace('#include <project_vertex>','#include <project_vertex>\nvWPos=(modelMatrix*vec4(transformed,1.)).xyz;vWN=normalize(mat3(modelMatrix)*objectNormal);');
   sh.fragmentShader=sh.fragmentShader.replace('#include <common>',`#include <common>
-uniform sampler2D nTex;uniform float mapId;varying vec3 vWPos;varying vec3 vWN;
+uniform sampler2D nTex;uniform float mapId;uniform float snowY;varying vec3 vWPos;varying vec3 vWN;
 float hh(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
 // patchwork farmland on flat lowland: rotated 200 m lots in crop, stubble, plough and pasture colours with row stripes
 vec3 fields(vec3 base,float h,float sl,float n1,float n2){
@@ -133,10 +134,11 @@ vec3 terr(){float h=vWPos.y;float sl=1.-normalize(vWN).y;
    return c*(.86+.28*n4*(.55+.45*n3));}
  if(mapId>1.5&&mapId<2.5){vec3 c=mix(vec3(.22,.36,.15),vec3(.33,.42,.19),smoothstep(.3,.72,n2));
    c=mix(c,vec3(.11,.21,.10),smoothstep(.45,.7,n1)*(1.-smoothstep(900.,1150.,h)));
-   vec3 rk=mix(vec3(.47,.46,.44),vec3(.30,.30,.30),n3);
+   float nv=texture2D(nTex,vec2(vWPos.x+vWPos.z,vWPos.y*2.2)/140.).b;   // cliffs: noise across the face and up it, so walls don't streak
+   vec3 rk=mix(vec3(.47,.46,.44),vec3(.30,.30,.30),n3*.5+nv*.5)*(.82+.3*nv)*(.92+.08*sin(h*.09+nv*4.));
    c=mix(c,rk,smoothstep(.22,.38,sl+(n3-.5)*.14));
-   c=mix(c,rk,smoothstep(1000.,1250.,h+(n2-.5)*200.));
-   c=mix(c,vec3(.94,.96,.99),smoothstep(1150.,1350.,h+(n1-.5)*260.)*smoothstep(.55,.25,sl));
+   c=mix(c,rk,smoothstep(snowY-150.,snowY+100.,h+(n2-.5)*200.));
+   c=mix(c,vec3(.86,.89,.93),smoothstep(snowY,snowY+200.,h+(n1-.5)*260.)*smoothstep(.62,.3,sl+(nv-.5)*.12));
    c=mix(vec3(.55,.52,.45),c,smoothstep(3.,10.,h));
    return c*(.84+.32*n4*(.55+.45*n3));}
  vec3 c=mix(vec3(.25,.39,.16),vec3(.40,.48,.21),smoothstep(.3,.72,n2));

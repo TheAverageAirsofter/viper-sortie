@@ -534,14 +534,16 @@ function setupCruise(){sortie={kind:'CRUISE',left:6,t:0,second:false};for(const 
 /* ---------------- Valley strike: a low-level run up a valley under the radar, a pop-up attack on two hardened bunkers, then out past the SAMs ---------------- */
 const VAL_CEIL=150, VAL_TOT=210, VAL_RING=new THREE.TorusGeometry(110,4,6,36);   // radar ceiling above the ground (m), time on target (s), the gates you fly through
 const VAL_MAT=[new THREE.MeshBasicMaterial({color:0xffc94a,transparent:true,opacity:.75,fog:true}),new THREE.MeshBasicMaterial({color:0x5cff8a,transparent:true,opacity:.3,fog:true})];
-let valRings=[];
-function valleyClear(){for(const r of valRings)scene.remove(r);valRings=[];if(CANYON){CANYON=null;tCx=NaN}}
+let valRings=[], valMap=null;
+function valleyClear(){for(const r of valRings)scene.remove(r);valRings=[];if(CANYON){CANYON=null;tCx=NaN}TERR_U.snowY.value=1150;if(valMap){MAP=valMap;valMap=null;applyEnv()}}
 // the canyon's centre line winds north; gates sit on it every 1.5 km
 function valleyRoute(z0,z1){const ph=rand(0,6.28),A=rand(1600,2400),cx=z=>A*Math.sin((z-z0)/5200+ph)-A*Math.sin(ph)+800*Math.sin((z-z0)/2100+ph*2)-800*Math.sin(ph*2);
   const pts=[];for(let z=z0;z<=z1;z+=1500)pts.push(new V3(cx(z),0,z));return{pts,cx}}
 function setupValley(){valleyClear();
   const rt=valleyRoute(6000,rand(28000,32000)),route=rt.pts,end=route[route.length-1],tz=end.z+2400,tx=rt.cx(tz);
-  CANYON={z0:6000,tz,tx,F:40,R:470,cx:rt.cx};tCx=NaN;   // carve it, and make the terrain mesh rebuild
+  if(MAP!=='ALPINE'){valMap=MAP;MAP='ALPINE';applyEnv()}   // a snowy mountain canyon; your map comes back after the sortie
+  TERR_U.snowY.value=120;   // snow down to the floor, bare rock on the steep walls
+  CANYON={z0:6000,tz,tx,F:300,R:1650,cx:rt.cx};tCx=NaN;   // carve it, and make the terrain mesh rebuild
   for(const p of route)p.y=groundH(p.x,p.z);
   route.forEach((p,i)=>{if(i%2)return;const n=route[Math.min(i+1,route.length-1)],m=new THREE.Mesh(VAL_RING,VAL_MAT[0]);
     m.position.set(p.x,p.y+105,p.z);m.rotation.y=Math.atan2(n.x-p.x,n.z-p.z);scene.add(m);valRings.push(m)});
