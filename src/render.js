@@ -513,7 +513,7 @@ for(const id of ['F15C','F15EX','TYPHOON','RAFALE','J10C','J20','FA18E']){const 
    fuselage and nacelles: cross-sections [z, halfWidth, heightAbove, depthBelow, centreY, superellipse n] lofted nose-to-tail;
    wings, canards and stabilators: spanwise sections {x, zle, zte, y, t} with a diamond airfoil (t = thickness/chord);
    fins: sections {h, zle, zte} lofted upward, then canted. +z is forward, +x is the left wing, y up; 1 unit = 1 m. */
-const LOFT_N=18;
+const LOFT_N=28;
 function loftGeo(st,opts){
   opts=opts||{};const N=opts.n||LOFT_N, pos=[], idx=[], sk=opts.skipTop;
   for(const [z,w,ht,hb,yc,ne] of st){const e=2/(ne||2.4);
@@ -525,15 +525,20 @@ function loftGeo(st,opts){
       idx.push(a,c,b,b,c,d)}}
   if(opts.capTail!==false){const base=pos.length/3;const s0=st[0];pos.push(0,s0[4]||0,s0[0]);for(let j=0;j<N;j++)idx.push(base,j,(j+1)%N)}
   const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));g.setIndex(idx);g.computeVertexNormals();return g}
-// spanwise surface (both sides unless half): diamond section, max thickness at 40 % chord
+// spanwise surface (both sides unless half): a symmetric NACA 4-digit section (rounded leading edge, thin trailing edge), t = thickness / chord
+const AF_X=[0,.025,.1,.25,.45,.7,1], AF_N=AF_X.length*2-2;   // 12 points around each section
+const nacaT=x=>.2969*Math.sqrt(x)-.126*x-.3516*x*x+.2843*x*x*x-.1036*x*x*x*x;   // half-thickness / (5 t), closed trailing edge
 function wingGeo(st,mirror){
-  const pos=[],idx=[];
-  const sec=(s,sg)=>{const c=s.zle-s.zte,zm=s.zle-c*.4,t=(s.t||.04)*c/2,x=s.x*sg,y=s.y||0;return[[x,y,s.zle],[x,y+t,zm],[x,y,s.zte],[x,y-t,zm]]};
+  const pos=[],idx=[],N=AF_N;
+  const sec=(s,sg)=>{const c=s.zle-s.zte,t=(s.t||.04),x=s.x*sg,y=s.y||0,out=[];
+    for(let i=0;i<AF_X.length;i++){const f=AF_X[i];out.push([x,y+5*t*c*nacaT(f),s.zle-f*c])}            // upper: leading edge to trailing edge
+    for(let i=AF_X.length-2;i>0;i--){const f=AF_X[i];out.push([x,y-5*t*c*nacaT(f),s.zle-f*c])}           // lower: back to the leading edge
+    return out};
   for(const sg of mirror===false?[1]:[1,-1]){const b0=pos.length/3;
     st.forEach(s=>sec(s,sg).forEach(p=>pos.push(...p)));
-    for(let i=0;i<st.length-1;i++)for(let j=0;j<4;j++){const a=b0+i*4+j,b=b0+i*4+(j+1)%4,c=b0+(i+1)*4+j,d=b0+(i+1)*4+(j+1)%4;if(sg>0)idx.push(a,b,c,b,d,c);else idx.push(a,c,b,b,c,d)}
-    const L=b0+(st.length-1)*4;if(sg>0)idx.push(L,L+1,L+2,L,L+2,L+3);else idx.push(L,L+2,L+1,L,L+3,L+2)}
-  const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));g.setIndex(idx);g.computeVertexNormals();g.userData.secN=4;return g}   // secN: four vertices per section, used to orient the paint normals
+    for(let i=0;i<st.length-1;i++)for(let j=0;j<N;j++){const a=b0+i*N+j,b=b0+i*N+(j+1)%N,c=b0+(i+1)*N+j,d=b0+(i+1)*N+(j+1)%N;if(sg>0)idx.push(a,b,c,b,d,c);else idx.push(a,c,b,b,c,d)}
+    const L=b0+(st.length-1)*N;for(let j=1;j<N-1;j++){if(sg>0)idx.push(L,L+j,L+j+1);else idx.push(L,L+j+1,L+j)}}   // tip cap
+  const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));g.setIndex(idx);g.computeVertexNormals();g.userData.secN=N;return g}   // secN: points per section, used to orient the paint normals
 // fin: sections {h, zle, zte, t} stacked upward from y=0, thickness along x
 function finGeo(st){const ws=st.map(s=>({x:s.h,zle:s.zle,zte:s.zte,t:s.t||.05,y:0}));const g=wingGeo(ws,false);
   const p=g.attributes.position;for(let i=0;i<p.count;i++){const x=p.getX(i),y=p.getY(i);p.setXYZ(i,y,x,p.getZ(i))}g.computeVertexNormals();return g}
@@ -655,7 +660,8 @@ function buildLoftJet(c,S,type){
   const body0=new THREE.MeshStandardMaterial({color:c.body,roughness:.5,metalness:.18,side:THREE.DoubleSide}), body=paintMat(type,body0);
   const dark=new THREE.MeshStandardMaterial({color:new THREE.Color(PS.c[1]).multiplyScalar(.62),roughness:.5,metalness:.3,side:THREE.DoubleSide});
   const metal=new THREE.MeshStandardMaterial({color:0x6b6a68,roughness:.35,metalness:.85,side:THREE.DoubleSide});
-  const glass=new THREE.MeshPhysicalMaterial({color:new THREE.Color(c.glass).multiplyScalar(.5),roughness:.03,metalness:.3,emissive:c.glassE,transparent:true,opacity:.5,envMapIntensity:2.4,clearcoat:1,clearcoatRoughness:.02,side:THREE.DoubleSide,depthWrite:false});glass.__ibl=true;
+  const gold=/^(F16|F22|F35|F15EX|F2A)/.test(type);   // gold-coated canopies; the rest are a clear smoke tint
+  const glass=new THREE.MeshPhysicalMaterial({color:new THREE.Color(gold?0x3a2e12:0x24303a),roughness:.03,metalness:gold?.6:.3,emissive:0x000000,transparent:true,opacity:.5,envMapIntensity:2.4,clearcoat:1,clearcoatRoughness:.02,side:THREE.DoubleSide,depthWrite:false});glass.__ibl=true;
   glass.onBeforeCompile=sh=>{sh.fragmentShader=sh.fragmentShader.replace('#include <dithering_fragment>','#include <dithering_fragment>\n float fr=pow(1.-abs(dot(normalize(normal),normalize(vViewPosition))),2.4);gl_FragColor.a=mix(.2,.93,fr);gl_FragColor.rgb+=vec3(.2,.16,.08)*fr;')};   // clear when you look straight through, a bright gold coating at grazing angles
   const white=new THREE.MeshStandardMaterial({color:0xe6e6e0,roughness:.5});
   const black=new THREE.MeshStandardMaterial({color:0x0b0c0d,roughness:.8,side:THREE.DoubleSide});

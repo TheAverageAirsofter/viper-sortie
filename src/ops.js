@@ -2,33 +2,75 @@
    9M38: Mach 3 (900 m/s), 3–42 km, up to 25 km altitude, semi-active with radio correction (GlobalSecurity) */
 const BUK={burn:15,acc:62,cd:5e-5,gmax:22,life:60,fuze:17,gimbal:1.2,chaffP:.1,flareP:0,sarh:true,termR:12000,dlR:45000,minR:3000,maxR:38000};
 let ground=[];
-function buildSAM(){const g=new THREE.Group();
-  const olive=new THREE.MeshLambertMaterial({color:0x4d5a3a}),dk=new THREE.MeshLambertMaterial({color:0x2e3427}),wh=new THREE.MeshLambertMaterial({color:0xd8d8d0});
-  const hull=new THREE.Mesh(new THREE.BoxGeometry(3.2,1.8,9),olive);hull.position.y=1.4;g.add(hull);
-  const tur=new THREE.Group();tur.position.y=2.4;g.add(tur);
-  const dish=new THREE.Mesh(new THREE.CylinderGeometry(1.1,1.1,.3,12).rotateX(Math.PI/2),dk);dish.position.set(0,1.3,1.6);tur.add(dish);
-  for(const x of [-.7,.7])for(const y of [.4,1.0]){const m=new THREE.Mesh(new THREE.CylinderGeometry(.2,.2,5.5,6).rotateX(Math.PI/2),wh);m.position.set(x,y,-1);m.rotation.x=-.5;tur.add(m)}
+/* ground targets: tracked SAM and AAA vehicles, an early-warning radar on a trailer, a concrete hardened shelter, a 6x6 truck and a frigate.
+   Parts share a few materials; turrets and antennas are groups so the AI can slew and spin them (userData.tur / userData.spin). */
+const GM={olive:new THREE.MeshStandardMaterial({color:0x4f5b3b,roughness:.85,metalness:.05}),dk:new THREE.MeshStandardMaterial({color:0x2c3126,roughness:.8,metalness:.1}),
+  rub:new THREE.MeshStandardMaterial({color:0x1b1c1a,roughness:.95}),wh:new THREE.MeshStandardMaterial({color:0xdcdcd2,roughness:.55}),steel:new THREE.MeshStandardMaterial({color:0x5c6064,roughness:.45,metalness:.6}),
+  glass:new THREE.MeshStandardMaterial({color:0x1d2a33,roughness:.1,metalness:.6}),con:new THREE.MeshStandardMaterial({color:0x8d8a80,roughness:.95}),canvas:new THREE.MeshStandardMaterial({color:0x5f6447,roughness:.95}),
+  navy:new THREE.MeshStandardMaterial({color:0x6d747b,roughness:.7,metalness:.15}),deck:new THREE.MeshStandardMaterial({color:0x474c52,roughness:.85}),red:new THREE.MeshStandardMaterial({color:0x7a2a24,roughness:.8})};
+const gBox=(g,w,h,d,m,x,y,z,ry)=>{const o=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),m);o.position.set(x||0,y||0,z||0);if(ry)o.rotation.y=ry;g.add(o);return o};
+const gCyl=(g,r1,r2,h,m,x,y,z,axis,seg)=>{const geo=new THREE.CylinderGeometry(r1,r2,h,seg||12);if(axis==='z')geo.rotateX(Math.PI/2);if(axis==='x')geo.rotateZ(Math.PI/2);const o=new THREE.Mesh(geo,m);o.position.set(x||0,y||0,z||0);g.add(o);return o};
+// a half-cylinder roof along z (shelter arches, truck canvas): a half-disc profile extruded over the length
+const gArch=(g,r,len,m,x,y,z,sy)=>{const sh=new THREE.Shape();sh.moveTo(r,0);sh.absarc(0,0,r,0,Math.PI,false);sh.lineTo(r,0);const geo=new THREE.ExtrudeGeometry(sh,{depth:len,bevelEnabled:false,curveSegments:16});geo.translate(0,0,-len/2);const o=new THREE.Mesh(geo,m);o.position.set(x||0,y||0,z||0);o.scale.y=sy||1;g.add(o);return o};
+// a tracked hull with sloped glacis, side skirts, road wheels and track runs
+function gTracks(g,w,L,h,m){
+  const hull=new THREE.Shape();hull.moveTo(-L/2,0);hull.lineTo(L/2-1.2,0);hull.lineTo(L/2,h*.55);hull.lineTo(L/2-1.5,h);hull.lineTo(-L/2+.3,h);hull.lineTo(-L/2,h*.6);hull.closePath();
+  const geo=new THREE.ExtrudeGeometry(hull,{depth:w*.78,bevelEnabled:false});geo.rotateY(-Math.PI/2);geo.translate(w*.39,.55,0);g.add(new THREE.Mesh(geo,m));
+  for(const s of [-1,1]){gBox(g,.5,.75,L*.94,GM.rub,s*(w/2-.25),.62,0);gBox(g,.08,.5,L*.86,m,s*(w/2+.02),1.0,0);
+    for(let i=0;i<6;i++)gCyl(g,.36,.36,.42,GM.dk,s*(w/2-.25),.42,-L*.38+i*L*.152,'x',10)}}
+function buildSAM(){const g=new THREE.Group();gTracks(g,3.2,7.2,1.6,GM.olive);
+  const tur=new THREE.Group();tur.position.set(0,2.2,-.6);g.add(tur);gCyl(tur,1.2,1.35,.35,GM.olive,0,0,0);
+  for(const x of [-.75,0,.75]){const rail=gBox(tur,.16,.12,4.8,GM.dk,x,.55,0);rail.rotation.x=-.42;
+    const msl=new THREE.Group();msl.position.set(x,.78,0);msl.rotation.x=-.42;tur.add(msl);gCyl(msl,.17,.17,4.6,GM.wh,0,0,0,'z');gCyl(msl,0,.17,.7,GM.wh,0,0,2.65,'z');
+    for(const a of [0,Math.PI/2]){const f=gBox(msl,1.1,.03,.6,GM.wh,0,0,-1.9);f.rotation.z=a+Math.PI/4;const f2=gBox(msl,.8,.03,.4,GM.wh,0,0,.6);f2.rotation.z=a+Math.PI/4}}
+  const dish=gCyl(tur,1,1,.25,GM.dk,0,1.7,1.2,'z',20);dish.rotation.x=.25;gCyl(tur,.08,.08,1.3,GM.steel,0,1.05,1.1);
   g.userData.tur=tur;return g}
-function buildAAA(){const g=new THREE.Group();const olive=new THREE.MeshLambertMaterial({color:0x56603e}),dk=new THREE.MeshLambertMaterial({color:0x2a2e24});
-  const hull=new THREE.Mesh(new THREE.BoxGeometry(3,1.6,6.5),olive);hull.position.y=1.2;g.add(hull);
-  const tur=new THREE.Group();tur.position.y=2.2;g.add(tur);tur.add(new THREE.Mesh(new THREE.BoxGeometry(2.4,1,2.6),olive));
-  for(const x of [-.5,-.2,.2,.5]){const b=new THREE.Mesh(new THREE.CylinderGeometry(.05,.05,2.5,4).rotateX(Math.PI/2),dk);b.position.set(x,.4,1.6);tur.add(b)}
+function buildAAA(){const g=new THREE.Group();gTracks(g,3,6.5,1.4,GM.olive);
+  const tur=new THREE.Group();tur.position.set(0,2.0,.2);g.add(tur);
+  const t=new THREE.Shape();t.moveTo(-1.3,-1.4);t.lineTo(1.3,-1.4);t.lineTo(1.1,1.4);t.lineTo(-1.1,1.4);t.closePath();const tg=new THREE.ExtrudeGeometry(t,{depth:1.1,bevelEnabled:false});tg.rotateX(-Math.PI/2);tur.add(new THREE.Mesh(tg,GM.olive));
+  for(const x of [-.55,-.22,.22,.55]){gCyl(tur,.045,.045,2.6,GM.dk,x,.75,2.4,'z',6);gCyl(tur,.07,.07,.35,GM.dk,x,.75,3.6,'z',6)}
+  const dish=gCyl(tur,.55,.55,.12,GM.dk,0,1.7,-.7,'z',16);dish.rotation.x=-.3;gCyl(tur,.06,.06,.6,GM.steel,0,1.35,-.7);
   g.userData.tur=tur;return g}
-// early-warning radar (rotating antenna, cues the SAMs) and a hardened command bunker
-function buildRadar(){const g=new THREE.Group();const olive=new THREE.MeshLambertMaterial({color:0x4d5a3a}),dk=new THREE.MeshLambertMaterial({color:0x2e3427});
-  const hull=new THREE.Mesh(new THREE.BoxGeometry(3,2,8),olive);hull.position.y=1.5;g.add(hull);const mast=new THREE.Mesh(new THREE.CylinderGeometry(.25,.25,6,6),dk);mast.position.y=5;g.add(mast);
-  const tur=new THREE.Group();tur.position.y=8;g.add(tur);const ant=new THREE.Mesh(new THREE.BoxGeometry(9,2.2,.4),dk);tur.add(ant);g.userData.spin=tur;return g}
-function buildBunker(){const g=new THREE.Group();const con=new THREE.MeshLambertMaterial({color:0x8a8a80}),dk=new THREE.MeshLambertMaterial({color:0x3a3a36});
-  const b=new THREE.Mesh(new THREE.BoxGeometry(22,6,14),con);b.position.y=2;g.add(b);const top=new THREE.Mesh(new THREE.BoxGeometry(18,2,10),con);top.position.y=6;g.add(top);
-  const door=new THREE.Mesh(new THREE.BoxGeometry(5,4,.4),dk);door.position.set(0,2,7.1);g.add(door);return g}
-function buildTruck(){const g=new THREE.Group();const ol=new THREE.MeshLambertMaterial({color:0x55603e}),dk=new THREE.MeshLambertMaterial({color:0x2a2e24});
-  const cab=new THREE.Mesh(new THREE.BoxGeometry(2.4,2.2,2.2),ol);cab.position.set(0,1.6,3);g.add(cab);const box=new THREE.Mesh(new THREE.BoxGeometry(2.5,2.6,5.6),dk);box.position.set(0,1.8,-.8);g.add(box);return g}
-// enemy frigate: 125 m, radar mast, vertical-launch SAMs, a gun forward
-function buildShip(){const g=new THREE.Group();const gr=new THREE.MeshLambertMaterial({color:0x6c7278}),dk=new THREE.MeshLambertMaterial({color:0x3e4348});
-  const h=new THREE.Mesh(new THREE.BoxGeometry(14,8,110),gr);h.position.y=2;g.add(h);const bow=new THREE.Mesh(new THREE.CylinderGeometry(0,7,18,4,1).rotateX(Math.PI/2).rotateZ(Math.PI/4),gr);bow.scale.set(1,.6,1);bow.position.set(0,3,63);g.add(bow);
-  const sup=new THREE.Mesh(new THREE.BoxGeometry(10,9,30),gr);sup.position.set(0,10,-5);g.add(sup);const mast=new THREE.Mesh(new THREE.CylinderGeometry(.6,1.2,18,6),dk);mast.position.set(0,23,-2);g.add(mast);
-  const tur=new THREE.Group();tur.position.set(0,24,-2);g.add(tur);tur.add(new THREE.Mesh(new THREE.BoxGeometry(6,1.4,.4),dk));
-  const vls=new THREE.Mesh(new THREE.BoxGeometry(8,1.2,9),dk);vls.position.set(0,6.6,24);g.add(vls);const gun=new THREE.Mesh(new THREE.BoxGeometry(3,2,4),gr);gun.position.set(0,7,40);g.add(gun);
+// early-warning radar: a trailer with a tall mast and a rotating Yagi array
+function buildRadar(){const g=new THREE.Group();
+  gBox(g,2.6,1.6,7,GM.olive,0,1.6,0);for(const s of [-1,1])for(const z of [-2.2,2.2])gCyl(g,.5,.5,.4,GM.rub,s*1.2,.5,z,'x',12);
+  gBox(g,2.4,2,2.4,GM.olive,0,3.4,-2.2);gBox(g,.08,.8,1.4,GM.glass,1.22,3.6,-2.2);
+  gCyl(g,.18,.28,7,GM.steel,0,6.4,1);
+  const tur=new THREE.Group();tur.position.set(0,10,1);g.add(tur);gBox(tur,10,.12,.12,GM.steel,0,1.3,0);gBox(tur,10,.12,.12,GM.steel,0,-1.3,0);
+  for(let i=0;i<9;i++){const x=-4.4+i*1.1;gBox(tur,.06,2.8,.06,GM.steel,x,0,0);for(const y of [-1,0,1])gBox(tur,.05,.05,1.6,GM.steel,x,y*.9,.6)}   // dipoles pointing forward
+  g.userData.spin=tur;return g}
+// hardened aircraft / command shelter: a concrete arch with a blast door and sandbag walls
+function buildBunker(){const g=new THREE.Group();
+  gArch(g,7,22,GM.con,0,0,0,.75);
+  gBox(g,14.2,5.4,.8,GM.con,0,2.7,-11);const door=gBox(g,10,4.6,.5,GM.steel,0,2.4,11.1);
+  for(let i=-2;i<=2;i++)gBox(g,.1,4.4,.55,GM.dk,i*2,2.4,11.2);
+  for(const s of [-1,1])for(let k=0;k<5;k++)gBox(g,1.2,.45,.6,GM.canvas,s*(9.5+(k%2)*.2),.25+k*.45,8+k*.05);
+  gCyl(g,.12,.12,3,GM.steel,4,9,0);gBox(g,1,.6,.08,GM.steel,4,10.6,0);   // antenna mast on the roof
+  return g}
+// 6x6 military truck: cab with windscreen, bonnet, three axles, canvas-covered bed with hoops
+function buildTruck(){const g=new THREE.Group();
+  gBox(g,2.3,.35,7.6,GM.dk,0,1.1,0);                                                    // chassis
+  gBox(g,2.3,1.5,1.9,GM.olive,0,2.1,2.6);gBox(g,2.0,.9,1.4,GM.olive,0,1.7,3.95);          // cab and bonnet
+  const ws=gBox(g,1.9,.7,.06,GM.glass,0,2.45,3.56);ws.rotation.x=-.25;for(const s of [-1,1])gBox(g,.05,.55,1.0,GM.glass,s*1.16,2.35,2.6);
+  gBox(g,2.4,.25,.3,GM.dk,0,1.25,4.7);                                                   // bumper
+  gArch(g,1.25,4.6,GM.canvas,0,2.38,-1.4,.6);for(const z of [-3.4,-1.4,.6])gArch(g,1.28,.08,GM.dk,0,2.38,z,.6);   // canvas over hoops
+  gBox(g,2.5,1.1,4.7,GM.canvas,0,1.85,-1.4);
+  for(const z of [3.0,-.4,-2.3])for(const s of [-1,1]){gCyl(g,.55,.55,.45,GM.rub,s*1.05,.55,z,'x',14);gCyl(g,.3,.3,.47,GM.steel,s*1.05,.55,z,'x',8)}
+  return g}
+// frigate: a lofted hull with a raked bow, superstructure, mast with a spinning radar, gun, VLS, funnel and hangar
+function buildShip(){const g=new THREE.Group();
+  const hull=loftGeo([[-62,6.2,4,4.2,0,4],[-50,7,6,5.4,0,4],[-20,7.2,6.4,5.6,0,4.2],[20,7.1,6.4,5.6,0,4.2],[42,6,6.6,5,0,3.4],[55,3.8,7,4,0,2.6],[62,1,7.4,2.4,0,2],[64,0,7.6,0,0,2]]);
+  const h=new THREE.Mesh(hull,GM.navy);h.position.y=1;g.add(h);
+  gBox(g,13.8,.3,104,GM.deck,0,7.25,-6);                                                 // main deck
+  gBox(g,11,7,24,GM.navy,0,11,-6);gBox(g,8,4,11,GM.navy,0,16.5,-1);gBox(g,8.6,1.4,.1,GM.glass,0,17.4,4.55);   // superstructure and bridge windows
+  gBox(g,9,6,12,GM.navy,0,10.4,-30);                                                       // hangar
+  const fun=gBox(g,4.5,6,6,GM.navy,0,16,-16);fun.rotation.x=-.08;gBox(g,4.6,.8,6.1,GM.dk,0,19.2,-16.2);
+  gCyl(g,.6,1.1,16,GM.dk,0,26,-2,undefined,8);gBox(g,7,.25,.25,GM.dk,0,30,-2);
+  const tur=new THREE.Group();tur.position.set(0,34.5,-2);g.add(tur);gBox(tur,7,1.6,.3,GM.dk);gBox(tur,.5,.5,1.5,GM.dk,0,-.6,-.7);
+  gBox(g,8,.6,9,GM.dk,0,7.7,22);for(let i=0;i<8;i++)gBox(g,.9,.08,.9,GM.navy,-2.8+(i%4)*1.85,8.05,19.5+(i>>2)*3.2);   // VLS hatches
+  const gun=new THREE.Group();gun.position.set(0,8.2,36);g.add(gun);const gh=new THREE.CylinderGeometry(1.6,2.2,2.2,12);gun.add(new THREE.Mesh(gh,GM.navy));gCyl(gun,.18,.22,7,GM.dk,0,.2,4,'z',8);
+  gBox(g,12,.1,18,GM.deck,0,7.42,-50);for(let k=0;k<2;k++){const c=new THREE.Mesh(new THREE.TorusGeometry(3.5-k*1.6,.12,4,24).rotateX(Math.PI/2),GM.wh);c.position.set(0,7.5,-50);g.add(c)}   // flight deck markings
+  for(const s of [-1,1])gBox(g,.15,1,96,GM.steel,s*7.1,8,-6);                              // rails
   g.userData.spin=tur;return g}
 const ISLES=[], isleMat=new THREE.MeshLambertMaterial({color:0xcdbb8e});
 function clearIsles(){ISLES.forEach(o=>scene.remove(o));ISLES.length=0}

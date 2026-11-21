@@ -1161,3 +1161,26 @@ Object.assign(PAINT,{
   JH7A:{p:2,c:['#7d8a78','#98a08c','#7f95a8'],b:'#b4b9be',nat:'prc',num:'80227'}});
 // Balance pass: sustained turn and climb brought toward the War Thunder wiki figures (see WTREF in progress.js)
 for(const [id,o] of [['A10A',{MASS:19200}],['A7E',{MASS:15300}],['A4E',{MASS:8200}],['ALPHAJET',{MASS:6410}],['JAGUAR',{MASS:12700}],['G91Y',{MASS:6745}],['F4C',{MASS:18011}],['J35D',{KIND:0.22}],['J29F',{MASS:8100}],['J6A',{KIND:0.247}],['MIG21MF',{MASS:8136,KIND:0.222}],['F100D',{KIND:0.28}],['MIG19PT',{KIND:0.247}],['MIG21F13',{MASS:8600}],['HUNTER',{MASS:9226}],['MIRAGE3C',{MASS:10030}],['MIG21',{KIND:0.265}],['F4F',{KIND:0.173}],['KFIR',{KIND:0.197}],['J35F',{KIND:0.22}],['LIGHTNING',{MASS:20090}],['M2000',{KIND:0.213}],['MIG23ML',{KIND:0.192}],['MIG25PD',{MASS:40404}]])if(AC_DEFS[id])Object.assign(AC_DEFS[id],o);
+/* Deeper fuselages. The lofted cross-sections were about two-thirds of the real fuselage depth, so every jet read as a pencil in side view.
+   Each fuselage section gets KF times its depth and each intake / nacelle KP times, about its own centre line; whatever sits on the skin moves with it:
+   the canopy and dorsal fins rise with the top surface, ventral fins and belly stores drop with the bottom. Shared rows (aliases) are scaled once. */
+(function(){
+  const KF=1.32, KP=1.22, seen=new Set(), once=o=>{if(!o||seen.has(o))return false;seen.add(o);return true};
+  // how much the top / bottom skin moved at (x, z): the fuselage, or the intake / nacelle under that point
+  const gain=(S,x,z,top)=>{let g=0;const s=secAt(S.fus,z);if(Math.abs(x)<=s[1]*1.08)g=(top?s[2]:s[3])*(1-1/KF);
+    for(const p of S.parts||[]){if(z<p.st[0][0]-.3||z>p.st[p.st.length-1][0]+.3)continue;const ps=secAt(p.st,z);for(const px of p.x?[p.x,-p.x]:[0])if(Math.abs(x-px)<=ps[1]*1.08)g=Math.max(g,(top?ps[2]:ps[3])*(1-1/KP))}
+    return g};
+  const deep=(st,k)=>{for(const r of st)if(once(r)){r[2]*=k;r[3]*=k}};
+  const models=new Set(Object.values(M2).filter(Boolean));
+  for(const S of models){
+    if(!S.fus)continue;
+    deep(S.fus,KF);for(const p of S.parts||[])deep(p.st,KP);
+    if(once(S.canopy))S.canopy[1]+=gain(S,0,S.canopy[0],true);
+    for(const f of S.fins||[])if(once(f)){const b=f.st[0],z=(b.zle+b.zte)/2;
+      if(Math.abs(f.cant||0)>1.5)f.y=(f.y||0)-gain(S,f.x||0,z,false);else f.y=(f.y||0)+gain(S,f.x||0,z,true)}
+    for(const r of [...(S.r9||[]),...(S.r120||[]),...(S.r120lr||[])])if(once(r)){const s=secAt(S.fus,r[2]);
+      if(r[1]<(s[4]||0)&&Math.abs(r[0])<=s[1]*1.1){const g=gain(S,r[0],r[2],false);r[1]-=g;if(r[3]!=null)r[3]-=g}}
+    if(S.irst&&once(S.irst))S.irst[1]+=gain(S,S.irst[0],S.irst[2],true);
+  }
+  for(const id in M2)if(M2[id]&&M2[id].fus)m2Fit(id);   // eye point, nav lights and cockpit cut-out follow the new canopy
+})();

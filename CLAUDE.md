@@ -92,3 +92,6 @@ The `exe` job in `android.yml` (runs after the `apk` job, so the same dispatch a
 
 ## Settings stored in localStorage
 vsProg (progression), vsPreset (battle preset), vsDaily (daily task progress: day, counters, done flags; resets at local midnight), vsTitle ('0' skips the title screen), vsFx ('0' turns off grain, letterbox, flare and camera drift), vsUiSnd ('0' mutes menu sounds), vsLessonsDone (completed training lessons), viperQuality, viperPal, viperLayout, viperText, viperRange, viperMission, vsLb_<mission>, vsTips, vsSeen, plus the original viper* keys.
+
+## Models
+Wings and fins use a NACA 4-digit airfoil section (`wingGeo` in render.js, `AF_X` stations); fuselages loft at `LOFT_N`=28 sides. A deepen pass at the end of roster.js scales every `M2` fuselage (`KF`) and intake/nacelle (`KP`) cross-section, then moves canopies, fins, belly rails and IRST to the new surface and re-runs `m2Fit`. Canopy glass is gold-tinted on F-16/F-22/F-35/F-15EX/F-2, smoke elsewhere. Ground targets (`buildSAM`, `buildAAA`, `buildRadar`, `buildBunker`, `buildTruck`, `buildShip` in ops.js) share the `GM` materials and `gBox` / `gCyl` / `gArch` / `gTracks` helpers. `node tools/model-sheet.js OUTDIR F16,SU27,g:buildSAM` renders perspective, side and top views of any jet or ground builder for review.
