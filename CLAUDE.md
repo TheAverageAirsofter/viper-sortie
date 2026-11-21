@@ -78,6 +78,7 @@ Team battles roll weather and time of day and let them drift (`btConditions`, Se
 - Radar sub-modes (combat.js): `R.sub` PD / MTI / SRC (`radarSub`, `radarBlind`, `radarSubK`, `clutter`, button `rSub`, key `'`); radars without TWS are always SRC. A clutter meter shows on the scope. `tools/radar-test.js`.
 - Air Assault (`ASSAULT`, battle.js `setupAssault` / `aaTick`): 15 waves `AA_ORDER` of bombers (3,500 m) and attackers (1,500 m) from 20 km, tickets = `BT.pts.blue`, howitzers (`g.how`) drain tickets until destroyed.
 - Destroy rules (state.js): `CRIT_WINDOW` 90 s / `HIT_WINDOW` 15 s credit for crashes (`crashAI`), pilots may bail out (`aiBail`, a chute in `DEBRIS`).
+- Training: `FLAPS` and `CCIP` lessons (`LESSONS` in state.js, `setupLesson` / `updateLesson` / `coachText`); `tools/lessons-test.js`. The lesson list is two columns on short landscape screens.
 - Saved battle lineup: Hangar > Loadout > Battle lineup (`vsLineup`, `btBuildLineup`).
 
 ## Tasks, pass, accessibility

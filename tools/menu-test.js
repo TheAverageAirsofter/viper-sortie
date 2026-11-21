@@ -51,7 +51,7 @@ const path = require('path'), assert = require('assert');
   assert.match(await p.textContent('#sdName'), /Dead zone/i, 'description follows the focused setting'); assert((await p.textContent('#sdText')).length > 10);
   await p.keyboard.press('e'); await p.waitForTimeout(200); assert.match(await p.evaluate(() => document.querySelector('#sTabs [aria-selected=true]').textContent), /Display/, 'E switches tab');
   // --- training list with ticks; campaign map; pilot
-  await p.click('#mBack'); await p.click('#mNav [data-go=train]'); assert.equal((await p.$$('#pLessons .les')).length, 5); await p.click('#pLessons .les:nth-child(4) .les, #pLessons li:nth-child(4) .les'); assert.match(await leg(p, 'bLesson'), /Landing/); assert.match(await leg(p, 'bMission'), /train/i);
+  await p.click('#mBack'); await p.click('#mNav [data-go=train]'); assert.equal((await p.$$('#pLessons .les')).length, 7); await p.click('#pLessons .les:nth-child(4) .les, #pLessons li:nth-child(4) .les'); assert.match(await leg(p, 'bLesson'), /Landing/); assert.match(await leg(p, 'bMission'), /train/i);
   await p.click('#mBack'); await p.click('#mNav [data-go=camp]'); assert(await p.isVisible('#opSvg')); assert.match(await leg(p, 'bMission'), /campaign/i);
   await p.click('#mBack'); await p.click('#mWallet'); assert(await p.isVisible('#pgCareer'));
   await p.click('#mBack'); await p.click('#bHangar'); assert(await p.isVisible('#hangar')); await p.click('#hgClose'); assert(await p.isVisible('#mNav'));

@@ -49,7 +49,7 @@ let friends=[], mission='WAVES', banditType='F16', missionT=0, missionDone=false
 try{mission=localStorage.getItem('viperMission')||'WAVES';banditType=localStorage.getItem('viperBandit')||'F16'}catch(e){}
 const RUSH_KILLS=8, RUSH_TIME=300;   // time-attack: bandits keep arriving, four at a time
 const MISSIONS={WAVES:'Waves',STRIKE:'Strike / SEAD',INTERCEPT:'Intercept bombers',RUSH:'Bandit rush (8 in 5 min)',ESCORT:'Escort the C-130','2V4':'2 v 4 with wingman','4SHIP':'4-ship vs 6',CONVOY:'Convoy attack',GROUNDWAR:'Ground war (CAS)',BATTLE:'Air battle (domination)',COMBINED:'Combined arms battle',NAVAL:'Naval battle',ASSAULT:'Air assault (defend the base)',ANTISHIP:'Anti-ship strike',CRUISE:'Cruise missile defence',CAMPAIGN:'Campaign',ONLINE:'Online dogfight',TRAINING:'Training'};
-const LESSONS={BFM:'Dogfighting basics',DEFENSE:'Missile defense',BVR:'Long-range shot',LANDING:'Landing',REFUEL:'Air refueling'};
+const LESSONS={BFM:'Dogfighting basics',DEFENSE:'Missile defense',BVR:'Long-range shot',LANDING:'Landing',REFUEL:'Air refueling',FLAPS:'Flaps and slow flight',CCIP:'Ground attack (CCIP)'};
 let lesson='BFM'; try{if(LESSONS[localStorage.getItem('vsLesson')])lesson=localStorage.getItem('vsLesson')}catch(e){}
 let trainDefeated=0, trainConnT=0;
 const BANDITS={F16:'F-16',F16B70:'F-16 Block 70',GRIPEN:'Gripen',GRIPENE:'Gripen E',MIG29:'MiG-29',MIG29UPG:'MiG-29UPG',MIG35:'MiG-35',SU27:'Su-27S',SU35:'Su-35S',F15C:'F-15C',F15EX:'F-15EX',TYPHOON:'Typhoon',RAFALE:'Rafale',J10C:'J-10C',J20:'J-20',FA18E:'F/A-18E',MIG29K:'MiG-29K',SU33:'Su-33',MIXED:'Mixed'};
@@ -200,6 +200,13 @@ function setupLesson(){
   } else if(lesson==='LANDING'){
     P.pos.set(RWY.x,BASE_Y+650,RWY.z0-11500); playerJet.quaternion.identity(); P.vel.set(0,-5,120); axes(P); setThr(.45); throttle=.45;
     message('LANDING · RUNWAY 11 KM AHEAD',2.6);
+  } else if(lesson==='FLAPS'){
+    P.pos.set(0,3500,0); playerJet.quaternion.identity(); P.vel.set(0,0,95); axes(P); setThr(.55); throttle=.55; P.gear=false;P.flaps=0;P.flapManual=false;
+    trainConnT=0;message('FLAPS · SET COMBAT FLAPS AND HOLD A SLOW, STEADY TURN',2.8);
+  } else if(lesson==='CCIP'){
+    P.pos.set(0,3200,0); playerJet.quaternion.identity(); P.vel.set(0,0,200); axes(P);
+    for(let i=0;i<3;i++)spawnGround('truck',(i-1)*220,9000+i*160,false);
+    AG.sight=1;agSync();message('GROUND ATTACK · TURN ON THE BALLISTIC COMPUTER · DESTROY THE 3 TRUCKS',3);
   } else if(lesson==='REFUEL'){
     if(!AC.refuel){message(AC.name.toUpperCase()+' HAS NO REFUELING PROBE · PICK ANOTHER JET',3);setTimeout(()=>endMission(false,AC.name+' cannot refuel in the air'),1500);return}
     tankerStart(); updateTanker(0);
@@ -221,6 +228,10 @@ function lessonMissile(r){   // called when a missile aimed at you ends
 function updateLesson(dt){
   if(state!=='play'||missionDone)return;
   if((lesson==='BFM'||lesson==='BVR')&&!enemies.length)endMission(true,lesson==='BFM'?'Gunned the bandit':'Splashed the drone at long range');
+  if(lesson==='FLAPS'){   // 12 s with flaps out, below 200 kt, banked and not stalled
+    const ok=P.flaps>=1&&P.kcas<200&&Math.abs(bankOf(P))>.35&&P.nAero>1.05&&!P.spin;trainConnT=ok?trainConnT+dt:Math.max(0,trainConnT-dt*.5);
+    if(trainConnT>12)endMission(true,'Held a slow turn with flaps out')}
+  if(lesson==='CCIP'&&!ground.some(g=>g.alive))endMission(true,'Three trucks destroyed');
   if(lesson==='REFUEL'&&TK.conn){trainConnT+=dt;if(trainConnT>25)endMission(true,'Held contact for 25 seconds')}
 }
 function coachText(){
@@ -255,6 +266,15 @@ function coachText(){
     if(dz>300){if(dy>40)w.push('High · descend');else if(dy<-30)w.push('Low · level off');}
     else if(P.vel.y<-4)w.push('Flare · ease back to slow the sink below 4 m/s');
     return w.join(' · ')||'On glide path · 3° to the threshold, keep '+Math.round(P.kcas)+' kt';}
+  if(lesson==='FLAPS'){
+    if(!P.flaps)return 'Press FLAPS (O) to set combat flaps: more lift, so you can turn tighter and slower';
+    if(P.nAero<1.05)return 'STALL warning · lower the nose, add power, ease the turn';
+    if(P.kcas>=200)return 'Too fast · throttle back to under 200 kt';
+    if(Math.abs(bankOf(P))<=.35)return 'Bank about 30° and hold the turn · '+Math.max(0,12-trainConnT).toFixed(0)+' s of slow turn to go';
+    return 'Good · hold it · '+Math.max(0,12-trainConnT).toFixed(0)+' s to go · '+Math.round(P.kcas)+' kt';}
+  if(lesson==='CCIP'){const n=ground.filter(g=>g.alive).length;
+    if(AG.sight<1)return 'Press the sight key (I) or the STD button until BC shows: the cross-hairs mark where rounds will land';
+    return 'Dive toward a truck, put the CCIP cross on it and fire below 2.5 km · '+n+' left';}
   if(lesson==='REFUEL'){if(!AC.refuel)return '';
     if(TK.conn)return 'Contact · hold position · '+Math.round(P.fuel/AC.fuelCap*100)+'% · '+Math.max(0,25-trainConnT).toFixed(0)+' s to go';
     if(TK.dist>400)return 'Close on the tanker · match its speed (~'+Math.round(TK.v*Math.sqrt(atm(TK.pos.y).sig)*1.944)+' kt) as you get near';

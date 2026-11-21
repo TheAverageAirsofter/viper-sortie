@@ -3964,7 +3964,7 @@ let friends=[], mission='WAVES', banditType='F16', missionT=0, missionDone=false
 try{mission=localStorage.getItem('viperMission')||'WAVES';banditType=localStorage.getItem('viperBandit')||'F16'}catch(e){}
 const RUSH_KILLS=8, RUSH_TIME=300;   // time-attack: bandits keep arriving, four at a time
 const MISSIONS={WAVES:'Waves',STRIKE:'Strike / SEAD',INTERCEPT:'Intercept bombers',RUSH:'Bandit rush (8 in 5 min)',ESCORT:'Escort the C-130','2V4':'2 v 4 with wingman','4SHIP':'4-ship vs 6',CONVOY:'Convoy attack',GROUNDWAR:'Ground war (CAS)',BATTLE:'Air battle (domination)',COMBINED:'Combined arms battle',NAVAL:'Naval battle',ASSAULT:'Air assault (defend the base)',ANTISHIP:'Anti-ship strike',CRUISE:'Cruise missile defence',CAMPAIGN:'Campaign',ONLINE:'Online dogfight',TRAINING:'Training'};
-const LESSONS={BFM:'Dogfighting basics',DEFENSE:'Missile defense',BVR:'Long-range shot',LANDING:'Landing',REFUEL:'Air refueling'};
+const LESSONS={BFM:'Dogfighting basics',DEFENSE:'Missile defense',BVR:'Long-range shot',LANDING:'Landing',REFUEL:'Air refueling',FLAPS:'Flaps and slow flight',CCIP:'Ground attack (CCIP)'};
 let lesson='BFM'; try{if(LESSONS[localStorage.getItem('vsLesson')])lesson=localStorage.getItem('vsLesson')}catch(e){}
 let trainDefeated=0, trainConnT=0;
 const BANDITS={F16:'F-16',F16B70:'F-16 Block 70',GRIPEN:'Gripen',GRIPENE:'Gripen E',MIG29:'MiG-29',MIG29UPG:'MiG-29UPG',MIG35:'MiG-35',SU27:'Su-27S',SU35:'Su-35S',F15C:'F-15C',F15EX:'F-15EX',TYPHOON:'Typhoon',RAFALE:'Rafale',J10C:'J-10C',J20:'J-20',FA18E:'F/A-18E',MIG29K:'MiG-29K',SU33:'Su-33',MIXED:'Mixed'};
@@ -4115,6 +4115,13 @@ function setupLesson(){
   } else if(lesson==='LANDING'){
     P.pos.set(RWY.x,BASE_Y+650,RWY.z0-11500); playerJet.quaternion.identity(); P.vel.set(0,-5,120); axes(P); setThr(.45); throttle=.45;
     message('LANDING · RUNWAY 11 KM AHEAD',2.6);
+  } else if(lesson==='FLAPS'){
+    P.pos.set(0,3500,0); playerJet.quaternion.identity(); P.vel.set(0,0,95); axes(P); setThr(.55); throttle=.55; P.gear=false;P.flaps=0;P.flapManual=false;
+    trainConnT=0;message('FLAPS · SET COMBAT FLAPS AND HOLD A SLOW, STEADY TURN',2.8);
+  } else if(lesson==='CCIP'){
+    P.pos.set(0,3200,0); playerJet.quaternion.identity(); P.vel.set(0,0,200); axes(P);
+    for(let i=0;i<3;i++)spawnGround('truck',(i-1)*220,9000+i*160,false);
+    AG.sight=1;agSync();message('GROUND ATTACK · TURN ON THE BALLISTIC COMPUTER · DESTROY THE 3 TRUCKS',3);
   } else if(lesson==='REFUEL'){
     if(!AC.refuel){message(AC.name.toUpperCase()+' HAS NO REFUELING PROBE · PICK ANOTHER JET',3);setTimeout(()=>endMission(false,AC.name+' cannot refuel in the air'),1500);return}
     tankerStart(); updateTanker(0);
@@ -4136,6 +4143,10 @@ function lessonMissile(r){   // called when a missile aimed at you ends
 function updateLesson(dt){
   if(state!=='play'||missionDone)return;
   if((lesson==='BFM'||lesson==='BVR')&&!enemies.length)endMission(true,lesson==='BFM'?'Gunned the bandit':'Splashed the drone at long range');
+  if(lesson==='FLAPS'){   // 12 s with flaps out, below 200 kt, banked and not stalled
+    const ok=P.flaps>=1&&P.kcas<200&&Math.abs(bankOf(P))>.35&&P.nAero>1.05&&!P.spin;trainConnT=ok?trainConnT+dt:Math.max(0,trainConnT-dt*.5);
+    if(trainConnT>12)endMission(true,'Held a slow turn with flaps out')}
+  if(lesson==='CCIP'&&!ground.some(g=>g.alive))endMission(true,'Three trucks destroyed');
   if(lesson==='REFUEL'&&TK.conn){trainConnT+=dt;if(trainConnT>25)endMission(true,'Held contact for 25 seconds')}
 }
 function coachText(){
@@ -4170,6 +4181,15 @@ function coachText(){
     if(dz>300){if(dy>40)w.push('High · descend');else if(dy<-30)w.push('Low · level off');}
     else if(P.vel.y<-4)w.push('Flare · ease back to slow the sink below 4 m/s');
     return w.join(' · ')||'On glide path · 3° to the threshold, keep '+Math.round(P.kcas)+' kt';}
+  if(lesson==='FLAPS'){
+    if(!P.flaps)return 'Press FLAPS (O) to set combat flaps: more lift, so you can turn tighter and slower';
+    if(P.nAero<1.05)return 'STALL warning · lower the nose, add power, ease the turn';
+    if(P.kcas>=200)return 'Too fast · throttle back to under 200 kt';
+    if(Math.abs(bankOf(P))<=.35)return 'Bank about 30° and hold the turn · '+Math.max(0,12-trainConnT).toFixed(0)+' s of slow turn to go';
+    return 'Good · hold it · '+Math.max(0,12-trainConnT).toFixed(0)+' s to go · '+Math.round(P.kcas)+' kt';}
+  if(lesson==='CCIP'){const n=ground.filter(g=>g.alive).length;
+    if(AG.sight<1)return 'Press the sight key (I) or the STD button until BC shows: the cross-hairs mark where rounds will land';
+    return 'Dive toward a truck, put the CCIP cross on it and fire below 2.5 km · '+n+' left';}
   if(lesson==='REFUEL'){if(!AC.refuel)return '';
     if(TK.conn)return 'Contact · hold position · '+Math.round(P.fuel/AC.fuelCap*100)+'% · '+Math.max(0,25-trainConnT).toFixed(0)+' s to go';
     if(TK.dist>400)return 'Close on the tanker · match its speed (~'+Math.round(TK.v*Math.sqrt(atm(TK.pos.y).sig)*1.944)+' kt) as you get near';
@@ -6962,7 +6982,7 @@ const _careerAward=careerAward;
 careerAward=function(){lbAdd();return _careerAward.apply(this,arguments)};
 
 /* ---------- test hook (only with ?test in the URL) ---------- */
-if(/[?&]test\b/.test(location.search))window.__vs={spawnFighter,clockNow:()=>clock,cycleRadarSub,radarBlind,radarSub,clutter,R,AA,killEnemy,aaSpawnWave,AG,agRelease,agSight,agWpn,ccip,agReset,btConditions,NET,netScoreCheck,netTeamScore,sbHtml,killGround,get pass(){return pass},passAdd,passClaim,weeklyAdd,scene,rinfoReset:()=>{renderer.info.autoReset=false;renderer.info.reset()},rinfo:()=>({c:renderer.info.render.calls,t:renderer.info.render.triangles,g:renderer.info.memory.geometries,tx:renderer.info.memory.textures}),KB,kbRebuild,playerGunHit,wingHit,BT,die,btRespawn,TMAP,mapStep,KBM,SC,damageSystem,hitAI,killEnemy,setThr,HEAT,explode,puff,camera,LT,townLights,flashLt,P,fly,dlz,flyout,AC_DEFS,feed,WAR,WAR_V,warBuild,warSpawn,warModules,warDie,warFlags,updateWar,warAlive,buildJet,PLAYER_COLORS,M2,V3,atm,clamp,lbAdd,showOverlay:k=>showOverlay(k),setScore:(n,k)=>{score=n;kills=k},get state(){return state},get enemies(){return enemies},missiles:()=>missiles.filter(m=>m.on),setAC:id=>{AC=AC_DEFS[id];applyAC()},wt:{   // weapon-test hooks: a clean sky, one drone, scripted launches
+if(/[?&]test\b/.test(location.search))window.__vs={get ground(){return ground},deathCause:()=>deathCause,spawnFighter,clockNow:()=>clock,cycleRadarSub,radarBlind,radarSub,clutter,R,AA,killEnemy,aaSpawnWave,AG,agRelease,agSight,agWpn,ccip,agReset,btConditions,NET,netScoreCheck,netTeamScore,sbHtml,killGround,get pass(){return pass},passAdd,passClaim,weeklyAdd,scene,rinfoReset:()=>{renderer.info.autoReset=false;renderer.info.reset()},rinfo:()=>({c:renderer.info.render.calls,t:renderer.info.render.triangles,g:renderer.info.memory.geometries,tx:renderer.info.memory.textures}),KB,kbRebuild,playerGunHit,wingHit,BT,die,btRespawn,TMAP,mapStep,KBM,SC,damageSystem,hitAI,killEnemy,setThr,HEAT,explode,puff,camera,LT,townLights,flashLt,P,fly,dlz,flyout,AC_DEFS,feed,WAR,WAR_V,warBuild,warSpawn,warModules,warDie,warFlags,updateWar,warAlive,buildJet,PLAYER_COLORS,M2,V3,atm,clamp,lbAdd,showOverlay:k=>showOverlay(k),setScore:(n,k)=>{score=n;kills=k},get state(){return state},get enemies(){return enemies},missiles:()=>missiles.filter(m=>m.on),setAC:id=>{AC=AC_DEFS[id];applyAC()},wt:{   // weapon-test hooks: a clean sky, one drone, scripted launches
   begin:id=>{AC=AC_DEFS[id];applyAC();startGame();return AC.id},
   clear:()=>{waveClearT=1e9;for(const e of enemies){e.alive=false;scene.remove(e.obj)}enemies.length=0;P.pos.set(0,6000,0);P.vel.set(0,0,250);throttle=.7;return state},
   target:(type,dz,away,speed)=>{const e=spawnFighter('red',type,new V3(0,P.pos.y,dz),new V3(0,P.pos.y,dz+(away?9999:-9999)),{ir:0,rdr:0,speed:speed||220});e.drone=true;return e.id},
@@ -7262,7 +7282,7 @@ const MIS_DESC={ASSAULT:'Defend the base against 15 waves of bombers and attacke
   CAMPAIGN:'A moving front line. Losses stay lost.',ONLINE:'Dogfight other pilots in a shared room.',TRAINING:'Guided lessons: dogfighting, missile defence, landing, refuelling.'};
 const MAP_DESC={ISLANDS:'Green islands and sheltered bays.',DESERT:'Dry canyons and low valleys.',ALPINE:'Snowy peaks under heavy cloud.',OCEAN:'Open sea. Nothing to hide behind.'};
 const MAP_NAME=k=>({ISLANDS:'Islands',DESERT:'Desert canyons',ALPINE:'Snowy alps',OCEAN:'Open ocean'})[k]||k;
-const LES_DESC={BFM:'Basic fighter manoeuvres and gun shots',DEFENSE:'Defeat three inbound missiles',BVR:'Long-range radar missile shot',LANDING:'Land on the runway',REFUEL:'Take fuel from the tanker'};
+const LES_DESC={FLAPS:'Set flaps and hold a slow, steady turn',CCIP:'Use the ballistic computer to hit ground targets',BFM:'Basic fighter manoeuvres and gun shots',DEFENSE:'Defeat three inbound missiles',BVR:'Long-range radar missile shot',LANDING:'Land on the runway',REFUEL:'Take fuel from the tanker'};
 const MIS_BRIEF={ASSAULT:'Bombers at 3,500 m and attackers at 1,500 m come in waves from about 20 km out. Each one that reaches the base costs tickets, and howitzers drain tickets until you destroy them. Survive 15 waves.',NAVAL:'Three enemy frigates with SAMs and guns sit out at sea. Every frigate afloat bleeds your team points, every one sunk costs them 100. Their fighters press on toward your base. Use bombs and guided missiles, keep clear of the SAM rings and respawn from your lineup when you are shot down.',COMBINED:'Combined arms: a tank battle rages around zone A while two more zones are contested in the air. Armour kills and zone control drain the enemy points; bomb the red vehicles, hold the sky and respawn from your lineup.',BATTLE:'Two teams of four. Hold more of the three zones than the enemy and their points run down; every loss costs points too. When you are shot down you spectate a team-mate and pick the next jet from your lineup. First side to zero loses.',WAVES:'Bandit groups arrive in waves from every bearing. Each wave is bigger and meaner than the last. Stay alive, keep your energy up and push the score.',
   STRIKE:'A SAM and AAA site covers the approach to the target. Suppress it, destroy the objective, then bring the jet home.',
   INTERCEPT:'Four bombers are inbound on the base. Kill them before they reach the release point; escorts will try to stop you.',
@@ -7274,7 +7294,7 @@ const MIS_BRIEF={ASSAULT:'Bombers at 3,500 m and attackers at 1,500 m come in wa
   CONVOY:'Trucks are running for the border. Stop at least four of the five before they escape.',
   ANTISHIP:'A frigate sits north-east of the base with SAM cover. Find it, sink it and avoid the missile envelope.',
   CRUISE:'Cruise missiles are inbound on the base. They are fast and low. Shoot down as many as you can.'};
-const LES_BRIEF={BFM:'Learn to turn, use energy and put the gun on target. Kill three drones with the guns.',DEFENSE:'Three missiles are coming for you. Break, chaff and flare your way through them.',
+const LES_BRIEF={FLAPS:'Flaps add lift and drag so you can fly slower and turn tighter. Set combat flaps, stay under 200 kt, bank and hold the turn for 12 seconds without stalling.',CCIP:'The ballistic computer shows where your rounds, rockets and bombs will land. Turn it on, dive on the three trucks and destroy them.',BFM:'Learn to turn, use energy and put the gun on target. Kill three drones with the guns.',DEFENSE:'Three missiles are coming for you. Break, chaff and flare your way through them.',
   BVR:'Lock a contact at long range and shoot it down with a radar missile before it ever sees you.',LANDING:'Fly the pattern, line up with the runway and put the jet on the ground in one piece.',REFUEL:'Join up with the tanker, plug in and take on fuel in flight.'};
 const WXN={CLEAR:'Clear',SCATTERED:'Partly cloudy',OVERCAST:'Overcast',RAIN:'Rain'}, TMN={DAY:'Day',DUSK:'Dusk',NIGHT:'Night'};
 const startCur=()=>!startOnRunway?'air':startCV?'cv':'rwy';
