@@ -94,7 +94,8 @@ function updateAI(e,dt){
     else if(th.radar&&sk(e).notch){e.mode='NOTCH';dir.copy(side).addScaledVector(UP,-.18).normalize();thr=.9}
     else {e.mode='DRAG';dir.copy(l).addScaledVector(UP,-.1).normalize();thr=1}
     if(th.radar&&th.d<7000&&e.chaffCd<=0){e.chaffCd=th.d<2500?.4:1.1;if(Math.random()<sk(e).cmP){aiDispense(e,'chaff');e.cmDrop={t:clock,type:'chaff'}}}
-    if(!th.radar&&th.d<4000&&e.flareCd<=0){e.flareCd=th.d<2500?.35:.6;if(Math.random()<sk(e).cmP){aiDispense(e,'flare');e.cmDrop={t:clock,type:'flare'}}}
+    if(!th.radar&&th.d<3000&&e.flareCd<=0){e.flareCd=th.d<1500?.7:1.1;   // spaced flare bursts, not a continuous stream
+      if(Math.random()<sk(e).cmP){aiDispense(e,'flare');e.cmDrop={t:clock,type:'flare'}}}
   } else if(own&&(own.spec.sarh||own.t<9)){
     // crank: keep him 45° off the nose so the radar can support the missile while closing slower
     e.mode='CRANK'; const los=_s5.subVectors(tg.pos,e.pos); los.y*=.3; los.normalize();
@@ -152,7 +153,7 @@ function updateAI(e,dt){
     const sI=e.espec.IR,sR=e.espec.RDR;
     const D=sk(e), irMax=D.rne?Math.min(e.zI?e.zI.rne*1.15:0,e.zI?e.zI.rmax*D.iK:0):(e.zI?e.zI.rmax*D.iK:0);
     if(e.zI&&dT>sI.minR&&dT<Math.min(irMax,sI.maxR)&&off<sI.cone*.8&&(!sI.rear||rearOK(e.pos,tg))){e.ir--;e.mslCd=rand(5,9)*D.cd;launchAI(e,'IR')}
-    else if(e.zR&&e.lockT>2&&dT>sR.minR&&dT<e.zR.rmax*D.rK*(jam?.6:1)&&off<.4&&!(sR.launchG&&e.n>sR.launchG)){e.rdr--;e.mslCd=rand(8,13)*D.cd;launchAI(e,'RDR')}
+    else if(e.zR&&e.lockT>2&&dT>sR.minR&&dT<e.zR.rmax*D.rK*.72*(jam?.6:1)&&off<.4&&!(sR.launchG&&e.n>sR.launchG)){e.rdr--;e.mslCd=rand(8,13)*D.cd;launchAI(e,'RDR')}
   }
 }
 

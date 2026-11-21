@@ -5419,10 +5419,10 @@ function aiBail(e,by){   // the pilot of a doomed jet may get out: a chute drift
   if(by)message('PILOT EJECTED',1.4)}
 function aiGunHit(t,amt,by){
   const s=t.sys||(t.sys={wL:0,wR:0,eng:0,fireT:0,fatal:false,pilot:0,ctl:1,spin:0,by:false});s.by=by||s.by;let label='';
-  if(Math.random()<.03*amt*(1+3*s.pilot))return 'PILOT KILLED';
+  if(Math.random()<.045*amt*(1+3*s.pilot))return 'PILOT KILLED';
   const r=Math.random();
-  if(r<.3){const side=Math.random()<.5?'wL':'wR';if(s[side]<1){s[side]=Math.min(1,s[side]+.12*amt+.05);if(s[side]>=1){s.spin=1;label='WING TORN OFF';breakWing(t.obj,side,t.pos,t.vel)}else label='WING DAMAGE'}}
-  else if(r<.42&&!s.eng){s.eng=1;s.fireT=9;s.fatal=Math.random()<.4;label='ENGINE FIRE'}
+  if(r<.3){const side=Math.random()<.5?'wL':'wR';if(s[side]<1){s[side]=Math.min(1,s[side]+.2*amt+.06);if(s[side]>=1){s.spin=1;label='WING TORN OFF';breakWing(t.obj,side,t.pos,t.vel)}else label='WING DAMAGE'}}
+  else if(r<.42&&!s.eng){s.eng=1;s.fireT=9;s.fatal=Math.random()<.55;label='ENGINE FIRE'}
   else if(r<.5&&s.ctl>.6){s.ctl=.55;label='CONTROLS DAMAGED'}
   else if(r<.55&&s.pilot<1){s.pilot=Math.min(1,s.pilot+.5);label='PILOT WOUNDED'}
   t.hp=Math.max(.3,3*(1-(.35*(s.wL+s.wR)+.3*(s.eng>0)+.2*s.pilot)));
@@ -6065,7 +6065,8 @@ function updateAI(e,dt){
     else if(th.radar&&sk(e).notch){e.mode='NOTCH';dir.copy(side).addScaledVector(UP,-.18).normalize();thr=.9}
     else {e.mode='DRAG';dir.copy(l).addScaledVector(UP,-.1).normalize();thr=1}
     if(th.radar&&th.d<7000&&e.chaffCd<=0){e.chaffCd=th.d<2500?.4:1.1;if(Math.random()<sk(e).cmP){aiDispense(e,'chaff');e.cmDrop={t:clock,type:'chaff'}}}
-    if(!th.radar&&th.d<4000&&e.flareCd<=0){e.flareCd=th.d<2500?.35:.6;if(Math.random()<sk(e).cmP){aiDispense(e,'flare');e.cmDrop={t:clock,type:'flare'}}}
+    if(!th.radar&&th.d<3000&&e.flareCd<=0){e.flareCd=th.d<1500?.7:1.1;   // spaced flare bursts, not a continuous stream
+      if(Math.random()<sk(e).cmP){aiDispense(e,'flare');e.cmDrop={t:clock,type:'flare'}}}
   } else if(own&&(own.spec.sarh||own.t<9)){
     // crank: keep him 45° off the nose so the radar can support the missile while closing slower
     e.mode='CRANK'; const los=_s5.subVectors(tg.pos,e.pos); los.y*=.3; los.normalize();
@@ -6123,7 +6124,7 @@ function updateAI(e,dt){
     const sI=e.espec.IR,sR=e.espec.RDR;
     const D=sk(e), irMax=D.rne?Math.min(e.zI?e.zI.rne*1.15:0,e.zI?e.zI.rmax*D.iK:0):(e.zI?e.zI.rmax*D.iK:0);
     if(e.zI&&dT>sI.minR&&dT<Math.min(irMax,sI.maxR)&&off<sI.cone*.8&&(!sI.rear||rearOK(e.pos,tg))){e.ir--;e.mslCd=rand(5,9)*D.cd;launchAI(e,'IR')}
-    else if(e.zR&&e.lockT>2&&dT>sR.minR&&dT<e.zR.rmax*D.rK*(jam?.6:1)&&off<.4&&!(sR.launchG&&e.n>sR.launchG)){e.rdr--;e.mslCd=rand(8,13)*D.cd;launchAI(e,'RDR')}
+    else if(e.zR&&e.lockT>2&&dT>sR.minR&&dT<e.zR.rmax*D.rK*.72*(jam?.6:1)&&off<.4&&!(sR.launchG&&e.n>sR.launchG)){e.rdr--;e.mslCd=rand(8,13)*D.cd;launchAI(e,'RDR')}
   }
 }
 
@@ -6367,6 +6368,7 @@ function launch(type,target){
   const isNine=type==='9X';
   const idx=isNine?AC.srN-P.aim9:AC.mrN-P.aim120;
   if(isNine)P.aim9--; else P.aim120--;
+  if(!isNine&&P.aim120===0)setTimeout(()=>{if(state==='play')message('LAST '+AC.mrName+' · '+AC.srName+' AND GUN LEFT · LAND AND STOP AT BASE TO REARM',2.8)},1600);
   const rail=playerJet.getObjectByName((isNine?'r9_':'r120_')+idx);
   const m=take(missiles); m.on=true; m.type=type; m.t=0; m.target=target; m.m.visible=true;
   mslSet(m,isNine?AC.srFull:(AC.id==='SU35'&&suLR?'R-37M':AC.mrFull));
@@ -6428,7 +6430,7 @@ function updateWeapons(dt){
     b.life-=dt; if(b.life<=0){kill(b);continue}
     b.prev.copy(b.m.position); b.vel.y-=G*dt; b.vel.multiplyScalar(gunDrag(b.vel.length(),atm(b.m.position.y).sig,dt)); b.m.position.addScaledVector(b.vel,dt);
     for(const e of enemies){ if(!e.alive)continue;
-      if(distSeg(e.pos,b.prev,b.m.position)<(e.kind==='fighter'?7:14)){kill(b);gunHits++;const p=b.m.position;puff(p.x,p.y,p.z,0,0,0,1,.8,.3,1,5,16,.25);
+      if(distSeg(e.pos,b.prev,b.m.position)<(e.kind==='fighter'?8.5:14)){kill(b);gunHits++;const p=b.m.position;puff(p.x,p.y,p.z,0,0,0,1,.8,.3,1,5,16,.25);
         hitAI(e,AC.gunDmg*BELT().air,'GUNS',true);break}}
   }
   // missiles: proportional navigation, g-limited by airspeed
@@ -6579,7 +6581,8 @@ function aiDecoyRoll(m,tg,kind,flareP,chaffP,dt){
   if(drop&&!m.seen)m.seen=new Set();
   if(drop&&!m.seen.has(tg.cmDrop)){m.seen.add(tg.cmDrop);
     _s1.subVectors(tg.pos,m.m.position).normalize(); const beam=Math.abs(tg.vel.dot(_s1))<70;
-    if(kind==='IR'&&drop==='flare'&&Math.random()<flareP){m.target=null;m.reason='DECOYED BY FLARES';return}
+    const tail=tg.fwd.dot(_s1)>.7;   // chasing the hot exhaust: the engine plume swamps the flares
+    if(kind==='IR'&&drop==='flare'&&Math.random()<flareP*(tail?.4:.75)){m.target=null;m.reason='DECOYED BY FLARES';return}
     if(kind==='RDR'&&drop==='chaff'&&Math.random()<chaffP*(beam?1:.15)){m.target=null;m.reason='DECOYED BY CHAFF';return}
   }
   if(kind==='RDR')notchCheck(m,tg,dt,sk(tg).notchP||.3);

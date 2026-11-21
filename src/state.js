@@ -312,10 +312,10 @@ function aiBail(e,by){   // the pilot of a doomed jet may get out: a chute drift
   if(by)message('PILOT EJECTED',1.4)}
 function aiGunHit(t,amt,by){
   const s=t.sys||(t.sys={wL:0,wR:0,eng:0,fireT:0,fatal:false,pilot:0,ctl:1,spin:0,by:false});s.by=by||s.by;let label='';
-  if(Math.random()<.03*amt*(1+3*s.pilot))return 'PILOT KILLED';
+  if(Math.random()<.045*amt*(1+3*s.pilot))return 'PILOT KILLED';
   const r=Math.random();
-  if(r<.3){const side=Math.random()<.5?'wL':'wR';if(s[side]<1){s[side]=Math.min(1,s[side]+.12*amt+.05);if(s[side]>=1){s.spin=1;label='WING TORN OFF';breakWing(t.obj,side,t.pos,t.vel)}else label='WING DAMAGE'}}
-  else if(r<.42&&!s.eng){s.eng=1;s.fireT=9;s.fatal=Math.random()<.4;label='ENGINE FIRE'}
+  if(r<.3){const side=Math.random()<.5?'wL':'wR';if(s[side]<1){s[side]=Math.min(1,s[side]+.2*amt+.06);if(s[side]>=1){s.spin=1;label='WING TORN OFF';breakWing(t.obj,side,t.pos,t.vel)}else label='WING DAMAGE'}}
+  else if(r<.42&&!s.eng){s.eng=1;s.fireT=9;s.fatal=Math.random()<.55;label='ENGINE FIRE'}
   else if(r<.5&&s.ctl>.6){s.ctl=.55;label='CONTROLS DAMAGED'}
   else if(r<.55&&s.pilot<1){s.pilot=Math.min(1,s.pilot+.5);label='PILOT WOUNDED'}
   t.hp=Math.max(.3,3*(1-(.35*(s.wL+s.wR)+.3*(s.eng>0)+.2*s.pilot)));

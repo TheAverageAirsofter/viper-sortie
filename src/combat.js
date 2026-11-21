@@ -238,6 +238,7 @@ function launch(type,target){
   const isNine=type==='9X';
   const idx=isNine?AC.srN-P.aim9:AC.mrN-P.aim120;
   if(isNine)P.aim9--; else P.aim120--;
+  if(!isNine&&P.aim120===0)setTimeout(()=>{if(state==='play')message('LAST '+AC.mrName+' · '+AC.srName+' AND GUN LEFT · LAND AND STOP AT BASE TO REARM',2.8)},1600);
   const rail=playerJet.getObjectByName((isNine?'r9_':'r120_')+idx);
   const m=take(missiles); m.on=true; m.type=type; m.t=0; m.target=target; m.m.visible=true;
   mslSet(m,isNine?AC.srFull:(AC.id==='SU35'&&suLR?'R-37M':AC.mrFull));
@@ -299,7 +300,7 @@ function updateWeapons(dt){
     b.life-=dt; if(b.life<=0){kill(b);continue}
     b.prev.copy(b.m.position); b.vel.y-=G*dt; b.vel.multiplyScalar(gunDrag(b.vel.length(),atm(b.m.position.y).sig,dt)); b.m.position.addScaledVector(b.vel,dt);
     for(const e of enemies){ if(!e.alive)continue;
-      if(distSeg(e.pos,b.prev,b.m.position)<(e.kind==='fighter'?7:14)){kill(b);gunHits++;const p=b.m.position;puff(p.x,p.y,p.z,0,0,0,1,.8,.3,1,5,16,.25);
+      if(distSeg(e.pos,b.prev,b.m.position)<(e.kind==='fighter'?8.5:14)){kill(b);gunHits++;const p=b.m.position;puff(p.x,p.y,p.z,0,0,0,1,.8,.3,1,5,16,.25);
         hitAI(e,AC.gunDmg*BELT().air,'GUNS',true);break}}
   }
   // missiles: proportional navigation, g-limited by airspeed
@@ -450,7 +451,8 @@ function aiDecoyRoll(m,tg,kind,flareP,chaffP,dt){
   if(drop&&!m.seen)m.seen=new Set();
   if(drop&&!m.seen.has(tg.cmDrop)){m.seen.add(tg.cmDrop);
     _s1.subVectors(tg.pos,m.m.position).normalize(); const beam=Math.abs(tg.vel.dot(_s1))<70;
-    if(kind==='IR'&&drop==='flare'&&Math.random()<flareP){m.target=null;m.reason='DECOYED BY FLARES';return}
+    const tail=tg.fwd.dot(_s1)>.7;   // chasing the hot exhaust: the engine plume swamps the flares
+    if(kind==='IR'&&drop==='flare'&&Math.random()<flareP*(tail?.4:.75)){m.target=null;m.reason='DECOYED BY FLARES';return}
     if(kind==='RDR'&&drop==='chaff'&&Math.random()<chaffP*(beam?1:.15)){m.target=null;m.reason='DECOYED BY CHAFF';return}
   }
   if(kind==='RDR')notchCheck(m,tg,dt,sk(tg).notchP||.3);
