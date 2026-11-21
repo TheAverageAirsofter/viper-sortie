@@ -312,7 +312,17 @@ function rawH(x,z){
   return h;
 }
 function groundH(x,z){const d=Math.hypot(x*1.6,z);
-  if(d<2600)return BASE_Y; const h=rawH(x,z); if(d>5200)return h; const t=(d-2600)/2600, s=t*t*(3-2*t); return BASE_Y+(h-BASE_Y)*s}
+  if(d<2600)return BASE_Y; let h=rawH(x,z); if(d<5200){const t=(d-2600)/2600, s=t*t*(3-2*t); h=BASE_Y+(h-BASE_Y)*s} return CANYON?canyonH(x,z,h):h}
+// Valley strike carves a real canyon into the terrain: a winding flat floor, steep walls up to a rim (or the natural ground if that is higher), and a bowl round the target
+let CANYON=null;   // {z0, tx, tz, F (floor), R (rim), cx(z) centre line}
+const CAN_W0=320, CAN_W1=1100, CAN_W2=3200;
+function canProf(dd,h){const C=CANYON;if(dd>=CAN_W2)return h;const top=Math.max(C.R,h);if(dd<CAN_W0)return C.F;
+  if(dd<CAN_W1){const t=(dd-CAN_W0)/(CAN_W1-CAN_W0),s=t*t*(3-2*t);return C.F+(top-C.F)*Math.pow(s,.8)}
+  const t=(dd-CAN_W1)/(CAN_W2-CAN_W1),s=t*t*(3-2*t);return top+(h-top)*s}
+function canyonH(x,z,h){const C=CANYON,db=Math.max(0,Math.hypot(x-C.tx,z-C.tz)-620);let dc=1e9,k=0;
+  if(z>C.z0-2600&&z<C.tz+200){const t=Math.min(1,(z-(C.z0-2600))/2600);k=t*t*(3-2*t);const sl=(C.cx(z+50)-C.cx(z-50))/100;dc=Math.abs(x-C.cx(z))/Math.sqrt(1+sl*sl)}
+  if(db<=dc)return canProf(db,h);
+  return h+(canProf(dc,h)-h)*k}   // the mouth deepens in over 2.6 km
 const onRunway=(x,z)=>Math.abs(x-RWY.x)<RWY.w/2+6&&z>RWY.z0-40&&z<RWY.z1+40;
 const TSIZE=36000,TSTEP=800;
 let tGeo,tPos,tBase,tCol;
@@ -3862,15 +3872,14 @@ function setupCruise(){sortie={kind:'CRUISE',left:6,t:0,second:false};for(const 
 const VAL_CEIL=150, VAL_TOT=210, VAL_RING=new THREE.TorusGeometry(110,4,6,36);   // radar ceiling above the ground (m), time on target (s), the gates you fly through
 const VAL_MAT=[new THREE.MeshBasicMaterial({color:0xffc94a,transparent:true,opacity:.75,fog:true}),new THREE.MeshBasicMaterial({color:0x5cff8a,transparent:true,opacity:.3,fog:true})];
 let valRings=[];
-function valleyClear(){for(const r of valRings)scene.remove(r);valRings=[]}
-// follow the low ground north: at each step pick the lowest spot within 1.5 km of the last one, then smooth the line
-function valleyRoute(z0,z1){let x=0;const pts=[];   // dry ground only: water counts as high
-  for(let z=z0;z<=z1;z+=1500){let bx=x,bh=1e9;for(let dx=-1500;dx<=1500;dx+=150){const xx=x+dx;if(Math.abs(xx)>9000)continue;
-      const hs=[groundH(xx,z),groundH(xx+300,z),groundH(xx-300,z),groundH(xx,z+400)],h=hs.reduce((q,v)=>q+v+(v<4?700:0),0)+Math.abs(dx)*.08;/* land, not lakes */if(h<bh){bh=h;bx=xx}}x=bx;pts.push(new V3(x,0,z))}
-  for(let k=0;k<2;k++)for(let i=1;i<pts.length-1;i++)pts[i].x=(pts[i-1].x+pts[i].x*2+pts[i+1].x)/4;
-  for(const p of pts)p.y=Math.max(groundH(p.x,p.z),0);return pts}
+function valleyClear(){for(const r of valRings)scene.remove(r);valRings=[];if(CANYON){CANYON=null;tCx=NaN}}
+// the canyon's centre line winds north; gates sit on it every 1.5 km
+function valleyRoute(z0,z1){const ph=rand(0,6.28),A=rand(1600,2400),cx=z=>A*Math.sin((z-z0)/5200+ph)-A*Math.sin(ph)+800*Math.sin((z-z0)/2100+ph*2)-800*Math.sin(ph*2);
+  const pts=[];for(let z=z0;z<=z1;z+=1500)pts.push(new V3(cx(z),0,z));return{pts,cx}}
 function setupValley(){valleyClear();
-  const route=valleyRoute(4500,rand(28000,32000)),end=route[route.length-1],tx=end.x,tz=end.z+2600;
+  const rt=valleyRoute(6000,rand(28000,32000)),route=rt.pts,end=route[route.length-1],tz=end.z+2400,tx=rt.cx(tz);
+  CANYON={z0:6000,tz,tx,F:40,R:470,cx:rt.cx};tCx=NaN;   // carve it, and make the terrain mesh rebuild
+  for(const p of route)p.y=groundH(p.x,p.z);
   route.forEach((p,i)=>{if(i%2)return;const n=route[Math.min(i+1,route.length-1)],m=new THREE.Mesh(VAL_RING,VAL_MAT[0]);
     m.position.set(p.x,p.y+105,p.z);m.rotation.y=Math.atan2(n.x-p.x,n.z-p.z);scene.add(m);valRings.push(m)});
   // two hardened bunkers in the bowl with guns round them; SAMs on the rim stay quiet until something wakes them; an early-warning radar on the highest ground nearby
@@ -3879,7 +3888,7 @@ function setupValley(){valleyClear();
   const sams=[spawnGround('sam',tx-4200,tz-1600),spawnGround('sam',tx+4400,tz-2600),spawnGround('sam',tx+700,tz-9500)];for(const g of sams)g.dormant=true;
   let rx=tx,rz=tz+3000,rh=-1e9;for(let a=0;a<16;a++){const x=tx+Math.cos(a/16*6.283)*3600,z=tz+Math.sin(a/16*6.283)*3600,h=groundH(x,z);if(h>rh){rh=h;rx=x;rz=z}}
   const ewr=spawnGround('radar',rx,rz);
-  const s0=route[0],s1=route[1];P.pos.set(s0.x,Math.max(groundH(s0.x,s0.z-2200),0)+130,s0.z-2200);P.vel.set(s1.x-s0.x,0,s1.z-s0.z+2200).setLength(230);
+  const s0=route[0],sz=s0.z-2600,sx=rt.cx(sz);P.pos.set(sx,Math.max(groundH(sx,sz),0)+140,sz);P.vel.set(rt.cx(sz+400)-sx,0,400).setLength(230);
   playerJet.quaternion.setFromUnitVectors(ZF,_s1.copy(P.vel).normalize());axes(P);
   sortie={kind:'VALLEY',route,ring:0,missed:0,det:0,comp:false,t:0,phase:'in',ewr,sams,tx,tz,warnT:0};
   message('VALLEY STRIKE · FLY THE GATES BELOW '+VAL_CEIL+' M · '+fmtT(VAL_TOT)+' TO TARGET · TWO BUNKERS'+(AC.strike?'':' · NO STRIKE FIT, USE GUNS'),3.4);
@@ -7187,7 +7196,7 @@ const _careerAward=careerAward;
 careerAward=function(){lbAdd();return _careerAward.apply(this,arguments)};
 
 /* ---------- test hook (only with ?test in the URL) ---------- */
-if(/[?&]test\b/.test(location.search))window.__vs={get sortie(){return sortie},valRings:()=>valRings,buildSAM,buildAAA,buildRadar,buildBunker,buildTruck,buildShip,get ground(){return ground},deathCause:()=>deathCause,spawnFighter,clockNow:()=>clock,cycleRadarSub,radarBlind,radarSub,clutter,R,AA,killEnemy,aaSpawnWave,AG,agRelease,agSight,agWpn,ccip,agReset,btConditions,NET,netScoreCheck,netTeamScore,sbHtml,killGround,get pass(){return pass},passAdd,passClaim,weeklyAdd,scene,rinfoReset:()=>{renderer.info.autoReset=false;renderer.info.reset()},rinfo:()=>({c:renderer.info.render.calls,t:renderer.info.render.triangles,g:renderer.info.memory.geometries,tx:renderer.info.memory.textures}),KB,kbRebuild,playerGunHit,wingHit,BT,die,btRespawn,TMAP,mapStep,KBM,SC,damageSystem,hitAI,killEnemy,setThr,HEAT,explode,puff,camera,LT,townLights,flashLt,P,fly,dlz,flyout,AC_DEFS,feed,WAR,WAR_V,warBuild,warSpawn,warModules,warDie,warFlags,updateWar,warAlive,buildJet,PLAYER_COLORS,M2,V3,atm,clamp,lbAdd,showOverlay:k=>showOverlay(k),setScore:(n,k)=>{score=n;kills=k},get state(){return state},get enemies(){return enemies},missiles:()=>missiles.filter(m=>m.on),setAC:id=>{AC=AC_DEFS[id];applyAC()},wt:{   // weapon-test hooks: a clean sky, one drone, scripted launches
+if(/[?&]test\b/.test(location.search))window.__vs={get sortie(){return sortie},get CANYON(){return CANYON},groundH,valRings:()=>valRings,buildSAM,buildAAA,buildRadar,buildBunker,buildTruck,buildShip,get ground(){return ground},deathCause:()=>deathCause,spawnFighter,clockNow:()=>clock,cycleRadarSub,radarBlind,radarSub,clutter,R,AA,killEnemy,aaSpawnWave,AG,agRelease,agSight,agWpn,ccip,agReset,btConditions,NET,netScoreCheck,netTeamScore,sbHtml,killGround,get pass(){return pass},passAdd,passClaim,weeklyAdd,scene,rinfoReset:()=>{renderer.info.autoReset=false;renderer.info.reset()},rinfo:()=>({c:renderer.info.render.calls,t:renderer.info.render.triangles,g:renderer.info.memory.geometries,tx:renderer.info.memory.textures}),KB,kbRebuild,playerGunHit,wingHit,BT,die,btRespawn,TMAP,mapStep,KBM,SC,damageSystem,hitAI,killEnemy,setThr,HEAT,explode,puff,camera,LT,townLights,flashLt,P,fly,dlz,flyout,AC_DEFS,feed,WAR,WAR_V,warBuild,warSpawn,warModules,warDie,warFlags,updateWar,warAlive,buildJet,PLAYER_COLORS,M2,V3,atm,clamp,lbAdd,showOverlay:k=>showOverlay(k),setScore:(n,k)=>{score=n;kills=k},get state(){return state},get enemies(){return enemies},missiles:()=>missiles.filter(m=>m.on),setAC:id=>{AC=AC_DEFS[id];applyAC()},wt:{   // weapon-test hooks: a clean sky, one drone, scripted launches
   begin:id=>{AC=AC_DEFS[id];applyAC();startGame();return AC.id},
   clear:()=>{waveClearT=1e9;for(const e of enemies){e.alive=false;scene.remove(e.obj)}enemies.length=0;P.pos.set(0,6000,0);P.vel.set(0,0,250);throttle=.7;return state},
   target:(type,dz,away,speed)=>{const e=spawnFighter('red',type,new V3(0,P.pos.y,dz),new V3(0,P.pos.y,dz+(away?9999:-9999)),{ir:0,rdr:0,speed:speed||220});e.drone=true;return e.id},

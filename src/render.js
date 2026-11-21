@@ -68,7 +68,17 @@ function rawH(x,z){
   return h;
 }
 function groundH(x,z){const d=Math.hypot(x*1.6,z);
-  if(d<2600)return BASE_Y; const h=rawH(x,z); if(d>5200)return h; const t=(d-2600)/2600, s=t*t*(3-2*t); return BASE_Y+(h-BASE_Y)*s}
+  if(d<2600)return BASE_Y; let h=rawH(x,z); if(d<5200){const t=(d-2600)/2600, s=t*t*(3-2*t); h=BASE_Y+(h-BASE_Y)*s} return CANYON?canyonH(x,z,h):h}
+// Valley strike carves a real canyon into the terrain: a winding flat floor, steep walls up to a rim (or the natural ground if that is higher), and a bowl round the target
+let CANYON=null;   // {z0, tx, tz, F (floor), R (rim), cx(z) centre line}
+const CAN_W0=320, CAN_W1=1100, CAN_W2=3200;
+function canProf(dd,h){const C=CANYON;if(dd>=CAN_W2)return h;const top=Math.max(C.R,h);if(dd<CAN_W0)return C.F;
+  if(dd<CAN_W1){const t=(dd-CAN_W0)/(CAN_W1-CAN_W0),s=t*t*(3-2*t);return C.F+(top-C.F)*Math.pow(s,.8)}
+  const t=(dd-CAN_W1)/(CAN_W2-CAN_W1),s=t*t*(3-2*t);return top+(h-top)*s}
+function canyonH(x,z,h){const C=CANYON,db=Math.max(0,Math.hypot(x-C.tx,z-C.tz)-620);let dc=1e9,k=0;
+  if(z>C.z0-2600&&z<C.tz+200){const t=Math.min(1,(z-(C.z0-2600))/2600);k=t*t*(3-2*t);const sl=(C.cx(z+50)-C.cx(z-50))/100;dc=Math.abs(x-C.cx(z))/Math.sqrt(1+sl*sl)}
+  if(db<=dc)return canProf(db,h);
+  return h+(canProf(dc,h)-h)*k}   // the mouth deepens in over 2.6 km
 const onRunway=(x,z)=>Math.abs(x-RWY.x)<RWY.w/2+6&&z>RWY.z0-40&&z<RWY.z1+40;
 const TSIZE=36000,TSTEP=800;
 let tGeo,tPos,tBase,tCol;
