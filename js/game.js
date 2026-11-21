@@ -3424,6 +3424,7 @@ function updateGround(dt){
     const tur=g.obj.userData.tur; if(tur)tur.rotation.y=Math.atan2(_s1.x,_s1.z);
     const agl=P.pos.y-Math.max(groundH(P.pos.x,P.pos.z),0);
     if(g.kind==='sam'||g.kind==='ship'){
+      if(g.dormant){g.lockT=0;g.tgt=null;g.spiking=false;continue}   // Valley strike: quiet until the raid is detected
       // pulse-doppler radar: needs line of sight, loses you in the beam (near-zero closure) and in ground clutter below ~30 m
       const radial=Math.abs(P.vel.dot(_s1)), seen=!P.scramble&&d<45000*rcsK(P,g.pos)&&agl>30&&P.pos.y<25000&&radial>35&&(g.losT=(g.losT||0)-dt,g.losT>0?g.los:(g.losT=.5,g.los=losClear(g.pos.clone().setY(g.pos.y+6),P.pos)));
       if(seen){g.lockT+=dt*(CM.ecm&&d>9000?.4:1)*(ewr?1.5:1);g.tgt=P;g.seenT=clock} else {g.lockT=Math.max(0,g.lockT-dt*1.5);if(g.lockT<=0)g.tgt=null}
@@ -3448,7 +3449,7 @@ function launchSAM(g){
   m.m.position.copy(g.pos).setY(g.pos.y+4); m.prev.copy(m.m.position); m.vel.set(0,40,0).addScaledVector(g.fwd,20);
   recLaunch(m,'SAM site',P); message('SAM LAUNCH',1.8); buzz([60,50,60,50,60]); for(let i=0;i<5;i++)setTimeout(()=>sndBeep(1300,.06,.05),i*100);
 }
-function clearGround(){for(const g of ground)scene.remove(g.obj);ground=[];warClear()}
+function clearGround(){for(const g of ground)scene.remove(g.obj);ground=[];warClear();valleyClear()}
 let sortieGround=0;
 function killGround(g){if(!g.alive)return;g.alive=false;sortieGround++;if(BT.on&&BT.naval&&g.kind==='ship'&&!BT.over){BT.pts.red=Math.max(0,BT.pts.red-100);BT.sp+=3}explode(g.pos.clone().setY(g.pos.y+3),true);g.obj.rotation.z=.3;g.obj.position.y-=1;
   kills++;score+=200*Math.max(1,wave);scKill(({sam:'SAM',aaa:'AAA',radar:'RADAR',bunker:'BUNKER',truck:'TRUCK',ship:'FRIGATE',tank:'TANK',ifv:'IFV',spaa:'AA VEHICLE'})[g.kind]+' DESTROYED',0);SC.list[SC.list.length-1].pts=200*Math.max(1,wave);message(({sam:'SAM SITE DESTROYED',aaa:'AAA DESTROYED',radar:'EW RADAR DESTROYED',bunker:'BUNKER DESTROYED',truck:'TRUCK DESTROYED',ship:'FRIGATE SUNK',tank:'TANK DESTROYED',ifv:'IFV DESTROYED',spaa:'AA VEHICLE DESTROYED'})[g.kind],1.6);recEvent('You destroyed '+({sam:'a SAM launcher',aaa:'an AAA gun',radar:'the early-warning radar',bunker:'the command bunker',truck:'a convoy truck',ship:'the frigate',tank:'a '+g.type,ifv:'a '+g.type,spaa:'a '+g.type})[g.kind]);if(g.war)warWreck(g);if(g.kind==='ship'){g.obj.rotation.z=.25;g.obj.position.y=-4}if(typeof campaignKill==='function')campaignKill(g)}
@@ -3857,10 +3858,57 @@ function setupConvoy(cx,cz){const [x,z]=findLand(cx,cz);const p=landPath(x,z,900
   sortie={kind:'CONVOY',need:4,center:new V3(x,0,z)}; return p}
 function setupShip(){const g=spawnGround('ship',19600,21200,true);g.orbit={c:new V3(19600,0,21200),r:900,a:Math.random()*6.28};g.spd=7;sortie={kind:'SHIP',center:g.pos}}
 function setupCruise(){sortie={kind:'CRUISE',left:6,t:0,second:false};for(const x of [-6000,0,6000])spawnCruise(new V3(x,400,58000),new V3(x*.1,60,0))}
+/* ---------------- Valley strike: a low-level run up a valley under the radar, a pop-up attack on two hardened bunkers, then out past the SAMs ---------------- */
+const VAL_CEIL=150, VAL_TOT=210, VAL_RING=new THREE.TorusGeometry(110,4,6,36);   // radar ceiling above the ground (m), time on target (s), the gates you fly through
+const VAL_MAT=[new THREE.MeshBasicMaterial({color:0xffc94a,transparent:true,opacity:.75,fog:true}),new THREE.MeshBasicMaterial({color:0x5cff8a,transparent:true,opacity:.3,fog:true})];
+let valRings=[];
+function valleyClear(){for(const r of valRings)scene.remove(r);valRings=[]}
+// follow the low ground north: at each step pick the lowest spot within 1.5 km of the last one, then smooth the line
+function valleyRoute(z0,z1){let x=0;const pts=[];   // dry ground only: water counts as high
+  for(let z=z0;z<=z1;z+=1500){let bx=x,bh=1e9;for(let dx=-1500;dx<=1500;dx+=150){const xx=x+dx;if(Math.abs(xx)>9000)continue;
+      const hs=[groundH(xx,z),groundH(xx+300,z),groundH(xx-300,z),groundH(xx,z+400)],h=hs.reduce((q,v)=>q+v+(v<4?700:0),0)+Math.abs(dx)*.08;/* land, not lakes */if(h<bh){bh=h;bx=xx}}x=bx;pts.push(new V3(x,0,z))}
+  for(let k=0;k<2;k++)for(let i=1;i<pts.length-1;i++)pts[i].x=(pts[i-1].x+pts[i].x*2+pts[i+1].x)/4;
+  for(const p of pts)p.y=Math.max(groundH(p.x,p.z),0);return pts}
+function setupValley(){valleyClear();
+  const route=valleyRoute(4500,rand(28000,32000)),end=route[route.length-1],tx=end.x,tz=end.z+2600;
+  route.forEach((p,i)=>{if(i%2)return;const n=route[Math.min(i+1,route.length-1)],m=new THREE.Mesh(VAL_RING,VAL_MAT[0]);
+    m.position.set(p.x,p.y+105,p.z);m.rotation.y=Math.atan2(n.x-p.x,n.z-p.z);scene.add(m);valRings.push(m)});
+  // two hardened bunkers in the bowl with guns round them; SAMs on the rim stay quiet until something wakes them; an early-warning radar on the highest ground nearby
+  spawnGround('bunker',tx-260,tz,true);spawnGround('bunker',tx+280,tz+240,true);
+  spawnGround('aaa',tx-900,tz-600);spawnGround('aaa',tx+850,tz-450);spawnGround('aaa',tx+80,tz+950);
+  const sams=[spawnGround('sam',tx-4200,tz-1600),spawnGround('sam',tx+4400,tz-2600),spawnGround('sam',tx+700,tz-9500)];for(const g of sams)g.dormant=true;
+  let rx=tx,rz=tz+3000,rh=-1e9;for(let a=0;a<16;a++){const x=tx+Math.cos(a/16*6.283)*3600,z=tz+Math.sin(a/16*6.283)*3600,h=groundH(x,z);if(h>rh){rh=h;rx=x;rz=z}}
+  const ewr=spawnGround('radar',rx,rz);
+  const s0=route[0],s1=route[1];P.pos.set(s0.x,Math.max(groundH(s0.x,s0.z-2200),0)+130,s0.z-2200);P.vel.set(s1.x-s0.x,0,s1.z-s0.z+2200).setLength(230);
+  playerJet.quaternion.setFromUnitVectors(ZF,_s1.copy(P.vel).normalize());axes(P);
+  sortie={kind:'VALLEY',route,ring:0,missed:0,det:0,comp:false,t:0,phase:'in',ewr,sams,tx,tz,warnT:0};
+  message('VALLEY STRIKE · FLY THE GATES BELOW '+VAL_CEIL+' M · '+fmtT(VAL_TOT)+' TO TARGET · TWO BUNKERS'+(AC.strike?'':' · NO STRIKE FIT, USE GUNS'),3.4);
+  radio(myCall()+', you are cleared low level up the valley. Stay under the radar, time on target '+fmtT(VAL_TOT)+'.')}
+// something gave you away (or the bombs went off): the SAMs come up and a pair of fighters scrambles from the north
+function valleyAlert(why){const S=sortie;if(!S||S.comp)return;S.comp=true;
+  for(const g of S.sams){g.dormant=false;g.lockT=0;g.mslCd=rand(2,5)}
+  spawnPair(pickBanditType(),new V3(S.tx+rand(-3000,3000),6500,S.tz+24000),new V3(S.tx,1500,S.tz-6000));
+  if(why){message(why+' · SAMS ARE UP · BANDITS SCRAMBLING',2.6);radio(myCall()+', you are '+why.toLowerCase()+'. Expect SAMs and fighters.')}}
+function valleyCheck(dt){const S=sortie;S.t+=dt;S.warnT=Math.max(0,S.warnT-dt);
+  const r=valRings[S.ring];
+  if(r){if(P.pos.distanceTo(r.position)<240){r.material=VAL_MAT[1];S.ring++;if(S.ring<valRings.length)message('GATE '+S.ring+' / '+valRings.length,.7)}
+    else if(P.pos.z>r.position.z+500){r.material=VAL_MAT[1];S.ring++;S.missed++}}
+  const agl=P.pos.y-Math.max(groundH(P.pos.x,P.pos.z),0);
+  if(!S.comp&&S.ewr.alive){const d=P.pos.distanceTo(S.ewr.pos),see=d<26000&&agl>VAL_CEIL&&losClear(S.ewr.pos.clone().setY(S.ewr.pos.y+14),P.pos);
+    S.det=clamp(S.det+(see?dt/3.5:-dt/8),0,1);if(see&&S.warnT<=0){message('RADAR CEILING · GET LOW',1.1);S.warnT=2}
+    if(S.det>=1)valleyAlert('DETECTED')}
+  if(S.phase==='in'&&S.t>VAL_TOT)valleyAlert('LATE ON TARGET');
+  if(S.phase==='in'&&!ground.some(g=>g.objective&&g.alive)){S.phase='out';const was=S.comp;valleyAlert(null);
+    message('BOTH BUNKERS DESTROYED · EGRESS SOUTH'+(was?'':' · SAMS ARE UP'),3);radio(myCall()+', good hits. Get out low and fast, bandits scrambling from the north.')}
+  if(S.phase==='out'&&Math.hypot(P.pos.x,P.pos.z)<9000)endMission(true,'Bunkers destroyed and home safe'+(S.missed?'':' · every gate flown'))}
+function valleyStatus(){const S=sortie,left=ground.filter(g=>g.objective&&g.alive).length;
+  if(S.phase==='out')return'EGRESS · BASE '+Math.max(0,(Math.hypot(P.pos.x,P.pos.z)-9000)/1000).toFixed(1)+' KM';
+  return(S.ring<valRings.length?'GATE '+(S.ring+1)+'/'+valRings.length+' · ':'')+'BUNKERS '+left+' · '+(S.comp?'COMPROMISED':'TOT '+fmtT(VAL_TOT-S.t)+' · RADAR '+Math.round(S.det*100)+'%')}
 function setupCAP(cz,n){for(let i=0;i<n;i+=2)spawnPair(pickBanditType(),new V3(rand(-6000,6000),rand(5000,8000),cz+rand(-3000,3000)),new V3(0,5000,0));sortie={kind:'CAP'}}
 function sortieStatus(){if(!sortie)return'';const left=ground.filter(g=>g.objective&&g.alive).length;
-  return sortie.kind==='GROUNDWAR'?warStatus():sortie.kind==='CONVOY'?'TRUCKS LEFT '+ground.filter(g=>g.kind==='truck'&&g.alive).length:sortie.kind==='SHIP'?'FRIGATE '+(left?'AFLOAT':'SUNK'):sortie.kind==='CRUISE'?'CRUISE MISSILES '+(enemies.filter(e=>e.kind==='cruise').length+(sortie.second?0:3)):sortie.kind==='STRIKE'?'TARGETS LEFT '+left:'BANDITS '+enemies.length}
+  return sortie.kind==='VALLEY'?valleyStatus():sortie.kind==='GROUNDWAR'?warStatus():sortie.kind==='CONVOY'?'TRUCKS LEFT '+ground.filter(g=>g.kind==='truck'&&g.alive).length:sortie.kind==='SHIP'?'FRIGATE '+(left?'AFLOAT':'SUNK'):sortie.kind==='CRUISE'?'CRUISE MISSILES '+(enemies.filter(e=>e.kind==='cruise').length+(sortie.second?0:3)):sortie.kind==='STRIKE'?'TARGETS LEFT '+left:'BANDITS '+enemies.length}
 function sortieCheck(dt){if(!sortie)return;const k=sortie.kind;
+  if(k==='VALLEY'){valleyCheck(dt);return}
   if(k==='GROUNDWAR'){warCheck(dt);return}
   if(k==='CONVOY'){const tr=ground.filter(g=>g.kind==='truck');const dead=tr.filter(g=>!g.alive).length;if(dead>=sortie.need)endMission(true,'Convoy stopped');else if(tr.some(g=>g.alive&&g.s>=g.path.len))endMission(false,'The convoy got through')}
   else if(k==='SHIP'||k==='STRIKE'){if(!ground.some(g=>g.objective&&g.alive))endMission(true,k==='SHIP'?'Frigate sunk':'Target area destroyed')}
@@ -4119,7 +4167,7 @@ const isBT=()=>mission==='BATTLE'||mission==='COMBINED'||mission==='NAVAL'||miss
 let friends=[], mission='WAVES', banditType='F16', missionT=0, missionDone=false, spawnQ=[];
 try{mission=localStorage.getItem('viperMission')||'WAVES';banditType=localStorage.getItem('viperBandit')||'F16'}catch(e){}
 const RUSH_KILLS=8, RUSH_TIME=300;   // time-attack: bandits keep arriving, four at a time
-const MISSIONS={WAVES:'Waves',STRIKE:'Strike / SEAD',INTERCEPT:'Intercept bombers',RUSH:'Bandit rush (8 in 5 min)',ESCORT:'Escort the C-130','2V4':'2 v 4 with wingman','4SHIP':'4-ship vs 6',CONVOY:'Convoy attack',GROUNDWAR:'Ground war (CAS)',BATTLE:'Air battle (domination)',COMBINED:'Combined arms battle',NAVAL:'Naval battle',ASSAULT:'Air assault (defend the base)',ANTISHIP:'Anti-ship strike',CRUISE:'Cruise missile defence',CAMPAIGN:'Campaign',ONLINE:'Online dogfight',TRAINING:'Training'};
+const MISSIONS={WAVES:'Waves',STRIKE:'Strike / SEAD',INTERCEPT:'Intercept bombers',RUSH:'Bandit rush (8 in 5 min)',ESCORT:'Escort the C-130','2V4':'2 v 4 with wingman','4SHIP':'4-ship vs 6',CONVOY:'Convoy attack',GROUNDWAR:'Ground war (CAS)',BATTLE:'Air battle (domination)',COMBINED:'Combined arms battle',NAVAL:'Naval battle',ASSAULT:'Air assault (defend the base)',ANTISHIP:'Anti-ship strike',VALLEY:'Valley strike (low level)',CRUISE:'Cruise missile defence',CAMPAIGN:'Campaign',ONLINE:'Online dogfight',TRAINING:'Training'};
 const LESSONS={BFM:'Dogfighting basics',DEFENSE:'Missile defense',BVR:'Long-range shot',LANDING:'Landing',REFUEL:'Air refueling',FLAPS:'Flaps and slow flight',CCIP:'Ground attack (CCIP)'};
 let lesson='BFM'; try{if(LESSONS[localStorage.getItem('vsLesson')])lesson=localStorage.getItem('vsLesson')}catch(e){}
 let trainDefeated=0, trainConnT=0;
@@ -4210,6 +4258,7 @@ function setupMission(){
   if(mission==='COMBINED'){setupGroundWar();const c=sortie.center.clone();setupBattle();BT.ground=true;BT.zones[0].x=c.x;BT.zones[0].z=c.z;btAssign();message('COMBINED ARMS · BLUE ARMOUR HOLDS ZONE A · SUPPORT IT FROM THE AIR',3.4);return}
   if(mission==='GROUNDWAR'){setupGroundWar();spawnPair(pickBanditType(),new V3(sortie.center.x,7000,sortie.center.z+16000),new V3(0,5000,0));message('GROUND WAR · SUPPORT THE BLUE ARMOUR (GEPARD COVERS IT) · DESTROY THE '+sortie.need+' RED VEHICLES · ZSU-23-4 AND ZSU-57-2 WILL SHOOT AT YOU',3.6);return}
   if(mission==='ANTISHIP'){P.pos.set(0,6000,0);P.vel.set(0,0,240);setupShip();spawnPair(pickBanditType(),new V3(19600,7000,36000),new V3(0,5000,0));message('ANTI-SHIP · SINK THE FRIGATE NE OF THE BASE · IT HAS SAMS',3);return}
+  if(mission==='VALLEY'){setupValley();return}
   if(mission==='CRUISE'){P.pos.set(0,5000,6000);P.vel.set(0,0,240);setupCruise();message('CRUISE MISSILES INBOUND FROM THE NORTH · LOW AND FAST · PROTECT THE BASE',3.2);return}
   if(mission==='STRIKE'){
     P.pos.set(0,6500,0); P.vel.set(0,0,240);
@@ -6870,7 +6919,7 @@ let last=performance.now();
 // AIM-120D: ~30 % more range than the C-7 (86 nm class), two-way datalink, GPS-aided INS (USAF F-16s carry it; approved for some exports)
 function effAC(id){const b0=effAC0(id); let v=ldGet(id);
   if(!ldValid(id,v))v=ldDefault(id);
-  if((mission==='STRIKE'||mission==='NAVAL'||mission==='COMBINED')&&!Object.values(v.ag).some(n=>n>0)&&STRIKE_LOAD[id])v=ldStrike(id);
+  if((mission==='STRIKE'||mission==='NAVAL'||mission==='COMBINED'||mission==='VALLEY')&&!Object.values(v.ag).some(n=>n>0)&&STRIKE_LOAD[id])v=ldStrike(id);
   const c=ldCap(id), d=ldDefault(id), H=JET_HP[id]||{tankKg:0};
   const mrKg=MRKG[b0.mrFull]||180, srKg=SRKG[b0.srFull]||95, agList=Object.entries(v.ag).filter(([,n])=>n>0);
   const agKg=agList.reduce((a,[k,n])=>a+AGKG[k]*n+(AGW[k].perSt>1?Math.ceil(n/AGW[k].perSt)*145:0),0), tkFuel=v.tk*H.tankKg;
@@ -7138,7 +7187,7 @@ const _careerAward=careerAward;
 careerAward=function(){lbAdd();return _careerAward.apply(this,arguments)};
 
 /* ---------- test hook (only with ?test in the URL) ---------- */
-if(/[?&]test\b/.test(location.search))window.__vs={buildSAM,buildAAA,buildRadar,buildBunker,buildTruck,buildShip,get ground(){return ground},deathCause:()=>deathCause,spawnFighter,clockNow:()=>clock,cycleRadarSub,radarBlind,radarSub,clutter,R,AA,killEnemy,aaSpawnWave,AG,agRelease,agSight,agWpn,ccip,agReset,btConditions,NET,netScoreCheck,netTeamScore,sbHtml,killGround,get pass(){return pass},passAdd,passClaim,weeklyAdd,scene,rinfoReset:()=>{renderer.info.autoReset=false;renderer.info.reset()},rinfo:()=>({c:renderer.info.render.calls,t:renderer.info.render.triangles,g:renderer.info.memory.geometries,tx:renderer.info.memory.textures}),KB,kbRebuild,playerGunHit,wingHit,BT,die,btRespawn,TMAP,mapStep,KBM,SC,damageSystem,hitAI,killEnemy,setThr,HEAT,explode,puff,camera,LT,townLights,flashLt,P,fly,dlz,flyout,AC_DEFS,feed,WAR,WAR_V,warBuild,warSpawn,warModules,warDie,warFlags,updateWar,warAlive,buildJet,PLAYER_COLORS,M2,V3,atm,clamp,lbAdd,showOverlay:k=>showOverlay(k),setScore:(n,k)=>{score=n;kills=k},get state(){return state},get enemies(){return enemies},missiles:()=>missiles.filter(m=>m.on),setAC:id=>{AC=AC_DEFS[id];applyAC()},wt:{   // weapon-test hooks: a clean sky, one drone, scripted launches
+if(/[?&]test\b/.test(location.search))window.__vs={get sortie(){return sortie},valRings:()=>valRings,buildSAM,buildAAA,buildRadar,buildBunker,buildTruck,buildShip,get ground(){return ground},deathCause:()=>deathCause,spawnFighter,clockNow:()=>clock,cycleRadarSub,radarBlind,radarSub,clutter,R,AA,killEnemy,aaSpawnWave,AG,agRelease,agSight,agWpn,ccip,agReset,btConditions,NET,netScoreCheck,netTeamScore,sbHtml,killGround,get pass(){return pass},passAdd,passClaim,weeklyAdd,scene,rinfoReset:()=>{renderer.info.autoReset=false;renderer.info.reset()},rinfo:()=>({c:renderer.info.render.calls,t:renderer.info.render.triangles,g:renderer.info.memory.geometries,tx:renderer.info.memory.textures}),KB,kbRebuild,playerGunHit,wingHit,BT,die,btRespawn,TMAP,mapStep,KBM,SC,damageSystem,hitAI,killEnemy,setThr,HEAT,explode,puff,camera,LT,townLights,flashLt,P,fly,dlz,flyout,AC_DEFS,feed,WAR,WAR_V,warBuild,warSpawn,warModules,warDie,warFlags,updateWar,warAlive,buildJet,PLAYER_COLORS,M2,V3,atm,clamp,lbAdd,showOverlay:k=>showOverlay(k),setScore:(n,k)=>{score=n;kills=k},get state(){return state},get enemies(){return enemies},missiles:()=>missiles.filter(m=>m.on),setAC:id=>{AC=AC_DEFS[id];applyAC()},wt:{   // weapon-test hooks: a clean sky, one drone, scripted launches
   begin:id=>{AC=AC_DEFS[id];applyAC();startGame();return AC.id},
   clear:()=>{waveClearT=1e9;for(const e of enemies){e.alive=false;scene.remove(e.obj)}enemies.length=0;P.pos.set(0,6000,0);P.vel.set(0,0,250);throttle=.7;return state},
   target:(type,dz,away,speed)=>{const e=spawnFighter('red',type,new V3(0,P.pos.y,dz),new V3(0,P.pos.y,dz+(away?9999:-9999)),{ir:0,rdr:0,speed:speed||220});e.drone=true;return e.id},
@@ -7423,6 +7472,7 @@ const MIS_ART={
   GROUNDWAR:['#5a4e2d','#241f10','<path d="M6 46h84"/><rect x="10" y="34" width="16" height="8"/><path d="M26 36h12"/><rect x="58" y="34" width="16" height="8"/><path d="M58 36h-12"/><path d="M40 22l8 8M48 22l-8 8"/>'],
   CONVOY:['#5c5a2d','#242310','<path d="M8 44h80"/><rect x="12" y="34" width="14" height="9"/><rect x="34" y="34" width="14" height="9"/><rect x="56" y="34" width="14" height="9"/><path d="M76 40l8-4v8z"/>'],
   ANTISHIP:['#1e4a6a','#0b1c2c','<path d="M14 36h68l-8 10H24zM38 36v-8h16v8M46 28v-8"/><path d="M8 52q8-5 16 0t16 0t16 0t16 0" stroke-width="1.6"/>'],
+  VALLEY:['#3d4a2a','#141a0c','<path d="M6 50L24 22l14 18 10-12 12 16 10-20 20 26"/><path d="M12 46q20-8 36-4t40-10" stroke="'+RED+'" stroke-dasharray="3 3"/><circle cx="74" cy="30" r="4" stroke="'+RED+'"/>'],
   CRUISE:['#5c2d1e','#241009','<path d="M16 12l24 14M30 8l24 14M44 4l24 14"/><path d="M40 26l-7-1M54 22l-7-1M68 18l-7-1" stroke="'+RED+'"/><path d="M8 52h80"/>'],
   CAMPAIGN:['#2d4a3a','#0e1c15','<path d="M8 22l20 10 18-8 20 14 22-6" stroke-dasharray="3 4"/><path d="M8 40l24-6 20 8 18-10 18 4"/><circle cx="48" cy="24" r="3" fill="'+RED+'" stroke="none"/>'],
   ONLINE:['#4a2d5c','#1a0e24','<circle cx="48" cy="30" r="5" fill="'+GRN+'"/><circle cx="18" cy="16" r="3.5"/><circle cx="78" cy="16" r="3.5"/><circle cx="20" cy="46" r="3.5"/><circle cx="78" cy="46" r="3.5"/><path d="M21 18l23 9M75 18L52 27M23 44l21-10M75 44L52 33"/>'],
@@ -7432,7 +7482,7 @@ const MAP_ART={
   DESERT:['#c9a566','#8a6a3a','<path d="M0 44q18-14 36-2t36-4 24 4" stroke="#f3dfb0"/><path d="M0 52q22-10 44-2t52-2" stroke="#6b4e24"/><circle cx="74" cy="14" r="6" stroke="#fff3c4"/>'],
   ALPINE:['#9fb4c6','#51647a','<path d="M4 50l20-30 12 16 12-22 16 26 8-10 20 20z" fill="#eef3f7" stroke="#cfd9e3"/>'],
   OCEAN:['#2a6a9a','#0f2f4c','<path d="M0 22q12-6 24 0t24 0t24 0t24 0M0 36q12-6 24 0t24 0t24 0t24 0M0 50q12-6 24 0t24 0t24 0t24 0" stroke="#9fd4ff"/>']};
-const MIS_DESC={ASSAULT:'Defend the base against 15 waves of bombers and attackers; kill the howitzers.',NAVAL:'Sink three enemy frigates before their pressure runs your points out.',COMBINED:'Air and armour fight over the same zones; your tanks hold the front, you win the sky.',BATTLE:'Team battle: capture three zones, drain the enemy points, respawn from a lineup of jets.',WAVES:'Endless bandit groups. Survive and rack up score.',STRIKE:'Take out the SAM and AAA site, then fly home.',INTERCEPT:'Four bombers inbound. Stop them before the release point.',
+const MIS_DESC={VALLEY:'Low-level run up a valley under the radar, pop up on two bunkers, then get home past the SAMs.',ASSAULT:'Defend the base against 15 waves of bombers and attackers; kill the howitzers.',NAVAL:'Sink three enemy frigates before their pressure runs your points out.',COMBINED:'Air and armour fight over the same zones; your tanks hold the front, you win the sky.',BATTLE:'Team battle: capture three zones, drain the enemy points, respawn from a lineup of jets.',WAVES:'Endless bandit groups. Survive and rack up score.',STRIKE:'Take out the SAM and AAA site, then fly home.',INTERCEPT:'Four bombers inbound. Stop them before the release point.',
   RUSH:'Bandit rush: 8 kills in 5 minutes.',ESCORT:'Protect a C-130 across the sector.','2V4':'You and your wingman against four bandits.','4SHIP':'Lead a four-ship against six, with a SAM belt.',
   GROUNDWAR:'Blue and red armour fight each other. Back the blue side from the air and destroy the red force.',CONVOY:'Stop at least 4 of 5 trucks before they escape.',ANTISHIP:'Sink the frigate NE of the base. It has SAMs.',CRUISE:'Cruise missiles inbound on the base. Shoot them down.',
   CAMPAIGN:'A moving front line. Losses stay lost.',ONLINE:'Dogfight other pilots in a shared room.',TRAINING:'Guided lessons: dogfighting, missile defence, landing, refuelling.'};
@@ -7449,6 +7499,7 @@ const MIS_BRIEF={ASSAULT:'Bombers at 3,500 m and attackers at 1,500 m come in wa
   GROUNDWAR:'M1A1 Abrams, Leopard 2A4, Challenger and M60A3 tanks with Bradley and Marder IFVs, a Gepard and an M163 Vulcan hold the south (the Gepard shoots at bandits). T-80B, T-72A and T-62 tanks, BMP-2s and two ZSU anti-aircraft tracks come from the north. The tanks fight on their own: kill the red armour with bombs, rockets and guns before it grinds the blue force down, and keep away from the ZSUs.',
   CONVOY:'Trucks are running for the border. Stop at least four of the five before they escape.',
   ANTISHIP:'A frigate sits north-east of the base with SAM cover. Find it, sink it and avoid the missile envelope.',
+  VALLEY:'Fly a low-level route up a valley through the gates, under a 150 m radar ceiling, and arrive within the time on target. Pop up and destroy the two hardened bunkers in the bowl, then get home past the SAMs and the fighters that scramble. If the early-warning radar sees you too long, or you are late, the SAMs come up early.',
   CRUISE:'Cruise missiles are inbound on the base. They are fast and low. Shoot down as many as you can.'};
 const LES_BRIEF={FLAPS:'Flaps add lift and drag so you can fly slower and turn tighter. Set combat flaps, stay under 200 kt, bank and hold the turn for 12 seconds without stalling.',CCIP:'The ballistic computer shows where your rounds, rockets and bombs will land. Turn it on, dive on the three trucks and destroy them.',BFM:'Learn to turn, use energy and put the gun on target. Kill three drones with the guns.',DEFENSE:'Three missiles are coming for you. Break, chaff and flare your way through them.',
   BVR:'Lock a contact at long range and shoot it down with a radar missile before it ever sees you.',LANDING:'Fly the pattern, line up with the runway and put the jet on the ground in one piece.',REFUEL:'Join up with the tanker, plug in and take on fuel in flight.'};

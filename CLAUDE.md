@@ -45,6 +45,7 @@ node tools/war-test.js        # ground war: WT armour fights itself, kills, miss
 node tools/weapons-test.js    # missile sanity for every type, live shots (rear-aspect seekers, SARH lock, AMRAAM, gun); slow (~8 min)
 node tools/dims-test.js       # model length and span against tools/real-dims.json (add a row for every new aircraft)
 node tools/visuals-test.js    # night lights, lightning, explosion, heat shimmer, every aircraft model
+node tools/valley-test.js     # Valley strike: gates, dormant SAMs, radar ceiling detection, egress win
 ```
 Headless Chromium is at /opt/pw-browsers/chromium in the cloud sandbox (tools/launch.js finds it). Tests that click through gameplay set `vsTips` in localStorage to skip the controls guide.
 
@@ -89,6 +90,9 @@ progress.js: `WEEKLY` tasks (Monday reset, `weeklyAdd`) and the monthly season p
 
 ## Windows exe
 The `exe` job in `android.yml` (runs after the `apk` job, so the same dispatch and version number publish both) packs `www/` (from `tools/make-www.js`, plus `fonts/`) with Electron (`desktop/main.js`, electron-builder portable) into a single `viper-sortie.exe` and attaches it to the same release. F11 / Alt+Enter toggles full screen; Shift+Esc leaves it. Unsigned, so Windows SmartScreen shows a warning on first run. The sandbox cannot build it; only Actions can.
+
+## Valley strike
+`VALLEY` mission (ops.js `setupValley` / `valleyCheck` / `valleyStatus`): `valleyRoute` follows the lowest dry ground north for about 30 km and places gate rings (`valRings`, cleared by `clearGround`); two objective bunkers in a bowl with AAA, three SAMs with `g.dormant` (updateGround skips them) and an early-warning radar on the high ground. Above `VAL_CEIL` (150 m AGL) in the radar's line of sight a detection meter fills; full detection or missing the time on target (`VAL_TOT`) calls `valleyAlert` (SAMs wake, a pair scrambles from the north); destroying both bunkers does too, and reaching 9 km from base wins. `effAC` gives jets without ground stores their strike loadout for this mission, as for STRIKE.
 
 ## Settings stored in localStorage
 vsProg (progression), vsPreset (battle preset), vsDaily (daily task progress: day, counters, done flags; resets at local midnight), vsTitle ('0' skips the title screen), vsFx ('0' turns off grain, letterbox, flare and camera drift), vsUiSnd ('0' mutes menu sounds), vsLessonsDone (completed training lessons), viperQuality, viperPal, viperLayout, viperText, viperRange, viperMission, vsLb_<mission>, vsTips, vsSeen, plus the original viper* keys.

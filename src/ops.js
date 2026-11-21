@@ -97,6 +97,7 @@ function updateGround(dt){
     const tur=g.obj.userData.tur; if(tur)tur.rotation.y=Math.atan2(_s1.x,_s1.z);
     const agl=P.pos.y-Math.max(groundH(P.pos.x,P.pos.z),0);
     if(g.kind==='sam'||g.kind==='ship'){
+      if(g.dormant){g.lockT=0;g.tgt=null;g.spiking=false;continue}   // Valley strike: quiet until the raid is detected
       // pulse-doppler radar: needs line of sight, loses you in the beam (near-zero closure) and in ground clutter below ~30 m
       const radial=Math.abs(P.vel.dot(_s1)), seen=!P.scramble&&d<45000*rcsK(P,g.pos)&&agl>30&&P.pos.y<25000&&radial>35&&(g.losT=(g.losT||0)-dt,g.losT>0?g.los:(g.losT=.5,g.los=losClear(g.pos.clone().setY(g.pos.y+6),P.pos)));
       if(seen){g.lockT+=dt*(CM.ecm&&d>9000?.4:1)*(ewr?1.5:1);g.tgt=P;g.seenT=clock} else {g.lockT=Math.max(0,g.lockT-dt*1.5);if(g.lockT<=0)g.tgt=null}
@@ -121,7 +122,7 @@ function launchSAM(g){
   m.m.position.copy(g.pos).setY(g.pos.y+4); m.prev.copy(m.m.position); m.vel.set(0,40,0).addScaledVector(g.fwd,20);
   recLaunch(m,'SAM site',P); message('SAM LAUNCH',1.8); buzz([60,50,60,50,60]); for(let i=0;i<5;i++)setTimeout(()=>sndBeep(1300,.06,.05),i*100);
 }
-function clearGround(){for(const g of ground)scene.remove(g.obj);ground=[];warClear()}
+function clearGround(){for(const g of ground)scene.remove(g.obj);ground=[];warClear();valleyClear()}
 let sortieGround=0;
 function killGround(g){if(!g.alive)return;g.alive=false;sortieGround++;if(BT.on&&BT.naval&&g.kind==='ship'&&!BT.over){BT.pts.red=Math.max(0,BT.pts.red-100);BT.sp+=3}explode(g.pos.clone().setY(g.pos.y+3),true);g.obj.rotation.z=.3;g.obj.position.y-=1;
   kills++;score+=200*Math.max(1,wave);scKill(({sam:'SAM',aaa:'AAA',radar:'RADAR',bunker:'BUNKER',truck:'TRUCK',ship:'FRIGATE',tank:'TANK',ifv:'IFV',spaa:'AA VEHICLE'})[g.kind]+' DESTROYED',0);SC.list[SC.list.length-1].pts=200*Math.max(1,wave);message(({sam:'SAM SITE DESTROYED',aaa:'AAA DESTROYED',radar:'EW RADAR DESTROYED',bunker:'BUNKER DESTROYED',truck:'TRUCK DESTROYED',ship:'FRIGATE SUNK',tank:'TANK DESTROYED',ifv:'IFV DESTROYED',spaa:'AA VEHICLE DESTROYED'})[g.kind],1.6);recEvent('You destroyed '+({sam:'a SAM launcher',aaa:'an AAA gun',radar:'the early-warning radar',bunker:'the command bunker',truck:'a convoy truck',ship:'the frigate',tank:'a '+g.type,ifv:'a '+g.type,spaa:'a '+g.type})[g.kind]);if(g.war)warWreck(g);if(g.kind==='ship'){g.obj.rotation.z=.25;g.obj.position.y=-4}if(typeof campaignKill==='function')campaignKill(g)}
@@ -530,10 +531,57 @@ function setupConvoy(cx,cz){const [x,z]=findLand(cx,cz);const p=landPath(x,z,900
   sortie={kind:'CONVOY',need:4,center:new V3(x,0,z)}; return p}
 function setupShip(){const g=spawnGround('ship',19600,21200,true);g.orbit={c:new V3(19600,0,21200),r:900,a:Math.random()*6.28};g.spd=7;sortie={kind:'SHIP',center:g.pos}}
 function setupCruise(){sortie={kind:'CRUISE',left:6,t:0,second:false};for(const x of [-6000,0,6000])spawnCruise(new V3(x,400,58000),new V3(x*.1,60,0))}
+/* ---------------- Valley strike: a low-level run up a valley under the radar, a pop-up attack on two hardened bunkers, then out past the SAMs ---------------- */
+const VAL_CEIL=150, VAL_TOT=210, VAL_RING=new THREE.TorusGeometry(110,4,6,36);   // radar ceiling above the ground (m), time on target (s), the gates you fly through
+const VAL_MAT=[new THREE.MeshBasicMaterial({color:0xffc94a,transparent:true,opacity:.75,fog:true}),new THREE.MeshBasicMaterial({color:0x5cff8a,transparent:true,opacity:.3,fog:true})];
+let valRings=[];
+function valleyClear(){for(const r of valRings)scene.remove(r);valRings=[]}
+// follow the low ground north: at each step pick the lowest spot within 1.5 km of the last one, then smooth the line
+function valleyRoute(z0,z1){let x=0;const pts=[];   // dry ground only: water counts as high
+  for(let z=z0;z<=z1;z+=1500){let bx=x,bh=1e9;for(let dx=-1500;dx<=1500;dx+=150){const xx=x+dx;if(Math.abs(xx)>9000)continue;
+      const hs=[groundH(xx,z),groundH(xx+300,z),groundH(xx-300,z),groundH(xx,z+400)],h=hs.reduce((q,v)=>q+v+(v<4?700:0),0)+Math.abs(dx)*.08;/* land, not lakes */if(h<bh){bh=h;bx=xx}}x=bx;pts.push(new V3(x,0,z))}
+  for(let k=0;k<2;k++)for(let i=1;i<pts.length-1;i++)pts[i].x=(pts[i-1].x+pts[i].x*2+pts[i+1].x)/4;
+  for(const p of pts)p.y=Math.max(groundH(p.x,p.z),0);return pts}
+function setupValley(){valleyClear();
+  const route=valleyRoute(4500,rand(28000,32000)),end=route[route.length-1],tx=end.x,tz=end.z+2600;
+  route.forEach((p,i)=>{if(i%2)return;const n=route[Math.min(i+1,route.length-1)],m=new THREE.Mesh(VAL_RING,VAL_MAT[0]);
+    m.position.set(p.x,p.y+105,p.z);m.rotation.y=Math.atan2(n.x-p.x,n.z-p.z);scene.add(m);valRings.push(m)});
+  // two hardened bunkers in the bowl with guns round them; SAMs on the rim stay quiet until something wakes them; an early-warning radar on the highest ground nearby
+  spawnGround('bunker',tx-260,tz,true);spawnGround('bunker',tx+280,tz+240,true);
+  spawnGround('aaa',tx-900,tz-600);spawnGround('aaa',tx+850,tz-450);spawnGround('aaa',tx+80,tz+950);
+  const sams=[spawnGround('sam',tx-4200,tz-1600),spawnGround('sam',tx+4400,tz-2600),spawnGround('sam',tx+700,tz-9500)];for(const g of sams)g.dormant=true;
+  let rx=tx,rz=tz+3000,rh=-1e9;for(let a=0;a<16;a++){const x=tx+Math.cos(a/16*6.283)*3600,z=tz+Math.sin(a/16*6.283)*3600,h=groundH(x,z);if(h>rh){rh=h;rx=x;rz=z}}
+  const ewr=spawnGround('radar',rx,rz);
+  const s0=route[0],s1=route[1];P.pos.set(s0.x,Math.max(groundH(s0.x,s0.z-2200),0)+130,s0.z-2200);P.vel.set(s1.x-s0.x,0,s1.z-s0.z+2200).setLength(230);
+  playerJet.quaternion.setFromUnitVectors(ZF,_s1.copy(P.vel).normalize());axes(P);
+  sortie={kind:'VALLEY',route,ring:0,missed:0,det:0,comp:false,t:0,phase:'in',ewr,sams,tx,tz,warnT:0};
+  message('VALLEY STRIKE · FLY THE GATES BELOW '+VAL_CEIL+' M · '+fmtT(VAL_TOT)+' TO TARGET · TWO BUNKERS'+(AC.strike?'':' · NO STRIKE FIT, USE GUNS'),3.4);
+  radio(myCall()+', you are cleared low level up the valley. Stay under the radar, time on target '+fmtT(VAL_TOT)+'.')}
+// something gave you away (or the bombs went off): the SAMs come up and a pair of fighters scrambles from the north
+function valleyAlert(why){const S=sortie;if(!S||S.comp)return;S.comp=true;
+  for(const g of S.sams){g.dormant=false;g.lockT=0;g.mslCd=rand(2,5)}
+  spawnPair(pickBanditType(),new V3(S.tx+rand(-3000,3000),6500,S.tz+24000),new V3(S.tx,1500,S.tz-6000));
+  if(why){message(why+' · SAMS ARE UP · BANDITS SCRAMBLING',2.6);radio(myCall()+', you are '+why.toLowerCase()+'. Expect SAMs and fighters.')}}
+function valleyCheck(dt){const S=sortie;S.t+=dt;S.warnT=Math.max(0,S.warnT-dt);
+  const r=valRings[S.ring];
+  if(r){if(P.pos.distanceTo(r.position)<240){r.material=VAL_MAT[1];S.ring++;if(S.ring<valRings.length)message('GATE '+S.ring+' / '+valRings.length,.7)}
+    else if(P.pos.z>r.position.z+500){r.material=VAL_MAT[1];S.ring++;S.missed++}}
+  const agl=P.pos.y-Math.max(groundH(P.pos.x,P.pos.z),0);
+  if(!S.comp&&S.ewr.alive){const d=P.pos.distanceTo(S.ewr.pos),see=d<26000&&agl>VAL_CEIL&&losClear(S.ewr.pos.clone().setY(S.ewr.pos.y+14),P.pos);
+    S.det=clamp(S.det+(see?dt/3.5:-dt/8),0,1);if(see&&S.warnT<=0){message('RADAR CEILING · GET LOW',1.1);S.warnT=2}
+    if(S.det>=1)valleyAlert('DETECTED')}
+  if(S.phase==='in'&&S.t>VAL_TOT)valleyAlert('LATE ON TARGET');
+  if(S.phase==='in'&&!ground.some(g=>g.objective&&g.alive)){S.phase='out';const was=S.comp;valleyAlert(null);
+    message('BOTH BUNKERS DESTROYED · EGRESS SOUTH'+(was?'':' · SAMS ARE UP'),3);radio(myCall()+', good hits. Get out low and fast, bandits scrambling from the north.')}
+  if(S.phase==='out'&&Math.hypot(P.pos.x,P.pos.z)<9000)endMission(true,'Bunkers destroyed and home safe'+(S.missed?'':' · every gate flown'))}
+function valleyStatus(){const S=sortie,left=ground.filter(g=>g.objective&&g.alive).length;
+  if(S.phase==='out')return'EGRESS · BASE '+Math.max(0,(Math.hypot(P.pos.x,P.pos.z)-9000)/1000).toFixed(1)+' KM';
+  return(S.ring<valRings.length?'GATE '+(S.ring+1)+'/'+valRings.length+' · ':'')+'BUNKERS '+left+' · '+(S.comp?'COMPROMISED':'TOT '+fmtT(VAL_TOT-S.t)+' · RADAR '+Math.round(S.det*100)+'%')}
 function setupCAP(cz,n){for(let i=0;i<n;i+=2)spawnPair(pickBanditType(),new V3(rand(-6000,6000),rand(5000,8000),cz+rand(-3000,3000)),new V3(0,5000,0));sortie={kind:'CAP'}}
 function sortieStatus(){if(!sortie)return'';const left=ground.filter(g=>g.objective&&g.alive).length;
-  return sortie.kind==='GROUNDWAR'?warStatus():sortie.kind==='CONVOY'?'TRUCKS LEFT '+ground.filter(g=>g.kind==='truck'&&g.alive).length:sortie.kind==='SHIP'?'FRIGATE '+(left?'AFLOAT':'SUNK'):sortie.kind==='CRUISE'?'CRUISE MISSILES '+(enemies.filter(e=>e.kind==='cruise').length+(sortie.second?0:3)):sortie.kind==='STRIKE'?'TARGETS LEFT '+left:'BANDITS '+enemies.length}
+  return sortie.kind==='VALLEY'?valleyStatus():sortie.kind==='GROUNDWAR'?warStatus():sortie.kind==='CONVOY'?'TRUCKS LEFT '+ground.filter(g=>g.kind==='truck'&&g.alive).length:sortie.kind==='SHIP'?'FRIGATE '+(left?'AFLOAT':'SUNK'):sortie.kind==='CRUISE'?'CRUISE MISSILES '+(enemies.filter(e=>e.kind==='cruise').length+(sortie.second?0:3)):sortie.kind==='STRIKE'?'TARGETS LEFT '+left:'BANDITS '+enemies.length}
 function sortieCheck(dt){if(!sortie)return;const k=sortie.kind;
+  if(k==='VALLEY'){valleyCheck(dt);return}
   if(k==='GROUNDWAR'){warCheck(dt);return}
   if(k==='CONVOY'){const tr=ground.filter(g=>g.kind==='truck');const dead=tr.filter(g=>!g.alive).length;if(dead>=sortie.need)endMission(true,'Convoy stopped');else if(tr.some(g=>g.alive&&g.s>=g.path.len))endMission(false,'The convoy got through')}
   else if(k==='SHIP'||k==='STRIKE'){if(!ground.some(g=>g.objective&&g.alive))endMission(true,k==='SHIP'?'Frigate sunk':'Target area destroyed')}
