@@ -16,6 +16,7 @@ const path = require('path'), assert = require('assert');
   await p.waitForTimeout(800);   // let localStorage flush before the reload
   await p.reload(); await p.waitForTimeout(1500);
   await p.waitForFunction(() => /blue/.test((document.getElementById('bPal') || {}).textContent || ''), null, { timeout: 10000 }).catch(() => {});
+  await p.waitForSelector('#firstRun', { state: 'hidden', timeout: 8000 }).catch(() => {});
   assert(!(await p.isVisible('#firstRun')), 'hint stays dismissed'); assert.match(await p.textContent('#bPal'), /blue/, 'palette persists');
   assert.deepEqual(errs, []); console.log('ui ok'); await b.close();
 })().catch(e => { console.error(e); process.exit(1); });
