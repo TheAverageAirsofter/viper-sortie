@@ -23,6 +23,15 @@ const assert = require('assert'), path = require('path');
   // a kill by the player's tank is credited
   const k = await p.evaluate(() => { const T = __vs.TNK, r = __vs.WAR.units.find(u => u.team === 'red' && u.alive); r.lastBy = T.u; r.hp = 0; r.hpSeen = 0; __vs.warDie(r, null, 'test'); return T.kills; });
   assert(k === 1, 'kill credited: ' + k);
+  // ammo, view, repair, hit result
+  await p.keyboard.press('KeyQ'); await p.keyboard.press('KeyV');
+  const av = await p.evaluate(() => ({ ammo: __vs.TNK.ammo, view: __vs.TNK.view, he: __vs.TNK.heN }));
+  assert(av.ammo === 'HE' && av.view === 1 && av.he > 0, 'Q switches to HE, V to the commander view: ' + JSON.stringify(av));
+  await p.evaluate(() => { const T = __vs.TNK; T.u.mod.trk = true; T.u.mod.gun = 1; T.v = 0; T.u.moving = false; });
+  await p.keyboard.press('KeyF'); await p.evaluate(() => { __vs.TNK.repT = .05; });
+  await p.waitForFunction(() => !__vs.TNK.u.mod.trk && !__vs.TNK.u.mod.gun, null, { timeout: 10000 });
+  const hr = await p.evaluate(() => { const r = __vs.WAR.units.find(u => u.team === 'red' && u.alive); __vs.tkResult('PENETRATION', r); return __vs.TNK.res.txt; });
+  assert(/PENETRATION/.test(hr), 'hit result banner: ' + hr);
   // knocked out: the next of three tanks rolls out at the start line
   await p.evaluate(() => { const u = __vs.TNK.u; u.hp = 0; __vs.warDie(u, null, 'test'); });
   await p.waitForSelector('#tkPick button', { state: 'visible', timeout: 30000 });

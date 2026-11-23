@@ -143,7 +143,7 @@ function warFire(u,t){
   u.rec=1;const cd=camera.position.distanceTo(from);if(big&&cd<7000&&typeof sndBoom==='function')sndBoom(clamp(1-cd/7000,0,.45)*.8)}
 /* ---- damage modules (War Thunder style): a hit can break the tracks, engine, gun, turret drive, kill crew, hit the ammunition rack or start a fire ---- */
 const WAR_NOTE={trk:'tracks damaged',eng:'engine damaged',fire:'engine on fire',gun:'gun barrel damaged',gun2:'gun destroyed',tur:'turret drive damaged',crew:'crewman killed',rack:'ammunition rack hit'};
-function warNote(u,k,txt){if(u.note[k])return;u.note[k]=1;if(u.team==='red'||u.def.cls==='mbt')feed((u.team==='blue'?'Blue ':'Red ')+u.def.n+': '+(txt||WAR_NOTE[k]),u.team==='red'?'hit':'loss')}
+function warNote(u,k,txt){if(u.note[k])return;u.note[k]=1;if(u.lastBy&&u.lastBy.player&&TNK.res&&TNK.res.t>0)TNK.res.notes.push((txt||WAR_NOTE[k]).toUpperCase());if(u.team==='red'||u.def.cls==='mbt')feed((u.team==='blue'?'Blue ':'Red ')+u.def.n+': '+(txt||WAR_NOTE[k]),u.team==='red'?'hit':'loss')}
 function warModules(u,dmg,by){
   const d=u.def,m=u.mod,heavy=dmg>=2;
   for(let k=0;k<(heavy?2:1)&&u.alive;k++){const r=Math.random();
@@ -215,9 +215,11 @@ function updateWar(dt){
     let hit=null;for(const o of WAR.units){if(!o.alive||o.team===s.team)continue;if(distSeg(_s2.set(o.pos.x,o.pos.y+1.4,o.pos.z),s.prev,s.m.position)<5){hit=o;break}}
     if(hit&&warBounce(s,hit)){s.on=false;s.m.visible=false;continue}
     if(hit){s.on=false;s.m.visible=false;if(hit.player){TNK.hitFrom=s.owner?s.owner.pos.clone():null;TNK.hitT=1.6}const p=s.m.position;puff(p.x,p.y,p.z,0,3,0,1,.8,.4,1,10,22,.2);
-      hit.hp-=s.dmg;hit.lastBy=s.owner;puff(hit.pos.x,hit.pos.y+2,hit.pos.z,0,5,0,.2,.2,.2,.7,9,10,3);if(hit.player){hurtT=.5;shake=Math.max(shake,.35);message(warFlags(hit)||'HIT',1)}else if(s.owner&&s.owner.player)message('HIT',.6);
+      const dm=s.ammo==='HE'?s.dmg*(hit.def.cls==='mbt'?.4:1.5):s.dmg;   // HE: wrecks light vehicles, barely scratches a main battle tank
+      if(s.ammo==='HE')for(const o of WAR.units)if(o!==hit&&o.alive&&o.team!==s.team&&o.pos.distanceTo(hit.pos)<8){o.hp-=dm*.35;o.lastBy=s.owner}
+      hit.hp-=dm;hit.lastBy=s.owner;puff(hit.pos.x,hit.pos.y+2,hit.pos.z,0,5,0,.2,.2,.2,.7,9,10,3);if(hit.player){hurtT=.5;shake=Math.max(shake,.35);message(warFlags(hit)||'HIT',1)}else if(s.owner&&s.owner.player)tkResult(s.ammo==='HE'&&hit.def.cls==='mbt'?'NON-PENETRATION':'PENETRATION',hit);
       if(hit.hp<=0&&hit.alive){hit.alive=false;tkKill(hit,s.owner);explode(new V3(hit.pos.x,hit.pos.y+2,hit.pos.z),false);warWreck(hit);if(s.owner&&s.owner.def)feed((s.owner.team==='blue'?'Blue ':'Red ')+s.owner.def.n+' destroyed '+hit.def.n,hit.team==='red'?'kill':'loss')}
-      else if(hit.alive){hit.hpSeen=hit.hp+s.dmg;}   // the module roll runs next frame
+      else if(hit.alive){hit.hpSeen=hit.hp+dm;}   // the module roll runs next frame
       continue}
     const gh=Math.max(groundH(s.m.position.x,s.m.position.z),0);
     if(s.m.position.y<gh+.3||s.life<=0){s.on=false;s.m.visible=false;if(s.life>0){const p=s.m.position;puff(p.x,gh+1,p.z,0,4,0,.5,.42,.32,.8,9,16,2,-.2)}}}
@@ -232,9 +234,9 @@ function setupGroundWar(){
   sortie={kind:'GROUNDWAR',center:new V3(cx,0,cz),need:red.length};
   P.pos.set(0,5500,0);P.vel.set(0,0,240)}
 // frontal armour: a main battle tank's front shrugs off some hits, more at long range; sides and rear always go through
-function warBounce(s,hit){if(hit.def.cls!=='mbt')return false;const dir=s.vel.clone().normalize(),fx=Math.sin(hit.heading),fz=Math.cos(hit.heading);
+function warBounce(s,hit){if(hit.def.cls!=='mbt'||s.ammo==='HE')return false;const dir=s.vel.clone().normalize(),fx=Math.sin(hit.heading),fz=Math.cos(hit.heading);
   if(-(dir.x*fx+dir.z*fz)<.72)return false;const dist=s.owner?s.owner.pos.distanceTo(hit.pos):1000,pen=dist<800?.8:dist<1600?.55:.35;if(Math.random()<pen)return false;
-  const p=s.m.position;puff(p.x,p.y,p.z,rand(-20,20),rand(5,25),rand(-20,20),1,.9,.6,1,2,4,.25);if(s.owner&&s.owner.player)message('RICOCHET',.9);else if(hit.player)message('BOUNCED OFF YOUR FRONT ARMOUR',1);return true}
+  const p=s.m.position;puff(p.x,p.y,p.z,rand(-20,20),rand(5,25),rand(-20,20),1,.9,.6,1,2,4,.25);if(s.owner&&s.owner.player)tkResult('RICOCHET',hit);else if(hit.player)message('BOUNCED OFF YOUR FRONT ARMOUR',1);return true}
 const warAlive=team=>WAR.units.filter(u=>u.team===team&&u.alive).length;
 function warStatus(){return 'RED '+warAlive('red')+' · BLUE '+warAlive('blue')}
 function warCheck(dt){

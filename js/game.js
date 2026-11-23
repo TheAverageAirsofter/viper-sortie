@@ -6002,7 +6002,7 @@ function warFire(u,t){
   u.rec=1;const cd=camera.position.distanceTo(from);if(big&&cd<7000&&typeof sndBoom==='function')sndBoom(clamp(1-cd/7000,0,.45)*.8)}
 /* ---- damage modules (War Thunder style): a hit can break the tracks, engine, gun, turret drive, kill crew, hit the ammunition rack or start a fire ---- */
 const WAR_NOTE={trk:'tracks damaged',eng:'engine damaged',fire:'engine on fire',gun:'gun barrel damaged',gun2:'gun destroyed',tur:'turret drive damaged',crew:'crewman killed',rack:'ammunition rack hit'};
-function warNote(u,k,txt){if(u.note[k])return;u.note[k]=1;if(u.team==='red'||u.def.cls==='mbt')feed((u.team==='blue'?'Blue ':'Red ')+u.def.n+': '+(txt||WAR_NOTE[k]),u.team==='red'?'hit':'loss')}
+function warNote(u,k,txt){if(u.note[k])return;u.note[k]=1;if(u.lastBy&&u.lastBy.player&&TNK.res&&TNK.res.t>0)TNK.res.notes.push((txt||WAR_NOTE[k]).toUpperCase());if(u.team==='red'||u.def.cls==='mbt')feed((u.team==='blue'?'Blue ':'Red ')+u.def.n+': '+(txt||WAR_NOTE[k]),u.team==='red'?'hit':'loss')}
 function warModules(u,dmg,by){
   const d=u.def,m=u.mod,heavy=dmg>=2;
   for(let k=0;k<(heavy?2:1)&&u.alive;k++){const r=Math.random();
@@ -6074,9 +6074,11 @@ function updateWar(dt){
     let hit=null;for(const o of WAR.units){if(!o.alive||o.team===s.team)continue;if(distSeg(_s2.set(o.pos.x,o.pos.y+1.4,o.pos.z),s.prev,s.m.position)<5){hit=o;break}}
     if(hit&&warBounce(s,hit)){s.on=false;s.m.visible=false;continue}
     if(hit){s.on=false;s.m.visible=false;if(hit.player){TNK.hitFrom=s.owner?s.owner.pos.clone():null;TNK.hitT=1.6}const p=s.m.position;puff(p.x,p.y,p.z,0,3,0,1,.8,.4,1,10,22,.2);
-      hit.hp-=s.dmg;hit.lastBy=s.owner;puff(hit.pos.x,hit.pos.y+2,hit.pos.z,0,5,0,.2,.2,.2,.7,9,10,3);if(hit.player){hurtT=.5;shake=Math.max(shake,.35);message(warFlags(hit)||'HIT',1)}else if(s.owner&&s.owner.player)message('HIT',.6);
+      const dm=s.ammo==='HE'?s.dmg*(hit.def.cls==='mbt'?.4:1.5):s.dmg;   // HE: wrecks light vehicles, barely scratches a main battle tank
+      if(s.ammo==='HE')for(const o of WAR.units)if(o!==hit&&o.alive&&o.team!==s.team&&o.pos.distanceTo(hit.pos)<8){o.hp-=dm*.35;o.lastBy=s.owner}
+      hit.hp-=dm;hit.lastBy=s.owner;puff(hit.pos.x,hit.pos.y+2,hit.pos.z,0,5,0,.2,.2,.2,.7,9,10,3);if(hit.player){hurtT=.5;shake=Math.max(shake,.35);message(warFlags(hit)||'HIT',1)}else if(s.owner&&s.owner.player)tkResult(s.ammo==='HE'&&hit.def.cls==='mbt'?'NON-PENETRATION':'PENETRATION',hit);
       if(hit.hp<=0&&hit.alive){hit.alive=false;tkKill(hit,s.owner);explode(new V3(hit.pos.x,hit.pos.y+2,hit.pos.z),false);warWreck(hit);if(s.owner&&s.owner.def)feed((s.owner.team==='blue'?'Blue ':'Red ')+s.owner.def.n+' destroyed '+hit.def.n,hit.team==='red'?'kill':'loss')}
-      else if(hit.alive){hit.hpSeen=hit.hp+s.dmg;}   // the module roll runs next frame
+      else if(hit.alive){hit.hpSeen=hit.hp+dm;}   // the module roll runs next frame
       continue}
     const gh=Math.max(groundH(s.m.position.x,s.m.position.z),0);
     if(s.m.position.y<gh+.3||s.life<=0){s.on=false;s.m.visible=false;if(s.life>0){const p=s.m.position;puff(p.x,gh+1,p.z,0,4,0,.5,.42,.32,.8,9,16,2,-.2)}}}
@@ -6091,9 +6093,9 @@ function setupGroundWar(){
   sortie={kind:'GROUNDWAR',center:new V3(cx,0,cz),need:red.length};
   P.pos.set(0,5500,0);P.vel.set(0,0,240)}
 // frontal armour: a main battle tank's front shrugs off some hits, more at long range; sides and rear always go through
-function warBounce(s,hit){if(hit.def.cls!=='mbt')return false;const dir=s.vel.clone().normalize(),fx=Math.sin(hit.heading),fz=Math.cos(hit.heading);
+function warBounce(s,hit){if(hit.def.cls!=='mbt'||s.ammo==='HE')return false;const dir=s.vel.clone().normalize(),fx=Math.sin(hit.heading),fz=Math.cos(hit.heading);
   if(-(dir.x*fx+dir.z*fz)<.72)return false;const dist=s.owner?s.owner.pos.distanceTo(hit.pos):1000,pen=dist<800?.8:dist<1600?.55:.35;if(Math.random()<pen)return false;
-  const p=s.m.position;puff(p.x,p.y,p.z,rand(-20,20),rand(5,25),rand(-20,20),1,.9,.6,1,2,4,.25);if(s.owner&&s.owner.player)message('RICOCHET',.9);else if(hit.player)message('BOUNCED OFF YOUR FRONT ARMOUR',1);return true}
+  const p=s.m.position;puff(p.x,p.y,p.z,rand(-20,20),rand(5,25),rand(-20,20),1,.9,.6,1,2,4,.25);if(s.owner&&s.owner.player)tkResult('RICOCHET',hit);else if(hit.player)message('BOUNCED OFF YOUR FRONT ARMOUR',1);return true}
 const warAlive=team=>WAR.units.filter(u=>u.team===team&&u.alive).length;
 function warStatus(){return 'RED '+warAlive('red')+' · BLUE '+warAlive('blue')}
 function warCheck(dt){
@@ -6318,10 +6320,11 @@ function setupTank(){
   playerJet.visible=false;tkUI(true);
   message('TANK BATTLE · '+WAR_V[tkType].n.toUpperCase()+' · HOLD POINT A FOR '+TK_HOLD+' S OR DESTROY THE ENEMY',3.2);
 }
-function tkSpawn(x,z,type){const u=warSpawn(type||tkType,x,z,0);u.obj.traverse(o=>{if(o.name==='mk')o.visible=false});u.player=true;u.cd=0;u.obj.rotation.order='YXZ';return u}
+function tkSpawn(x,z,type){const u=warSpawn(type||tkType,x,z,0),mbt=u.def.cls==='mbt';TNK.apN=mbt?30:180;TNK.heN=mbt?14:120;TNK.ammo='AP';TNK.ext=2;TNK.repT=0;u.obj.traverse(o=>{if(o.name==='mk')o.visible=false});u.player=true;u.cd=0;u.obj.rotation.order='YXZ';return u}
 function tkClear(){if(!TNK||!TNK.on)return;TNK.on=false;for(const o of TNK.town||[])scene.remove(o);TNK.town=[];TNK.bld=null;TNK.u=null;tkUI(false);tkPicker(false);for(const a of TNK.air||[])scene.remove(a.obj);for(const b of TNK.bombs||[])scene.remove(b.m);TNK.air=[];TNK.bombs=[];playerJet.visible=true;projKey=''}
 // keyboard: W/S drive, A/D steer, arrows aim, Space fire, Z or Shift zoom
 function tkKey(code,down){if(!down)return;
+  if(code==='KeyQ')tkAmmo();if(code==='KeyV')tkView();if(code==='KeyF')tkRepair();if(code==='KeyX')tkExt();
   if(TNK.pickOpen&&/^Digit[1-9]$/.test(code)){const k=TANK_LIST.filter(x=>TNK.used.indexOf(x)<0)[+code.slice(5)-1];if(k)tkRespawn(k);return}
   if(code==='Space')TNK.fire=true;
   if(code==='KeyZ'||code==='ShiftLeft'||code==='ShiftRight')tkZoom(1);
@@ -6354,8 +6357,9 @@ function tkDrive(u,dt){const d=u.def,m=u.mod;
   const ud=u.obj.userData,tur=ud.tur;
   const T=TNK.aimPt;
   if(tur&&tur.parent===u.obj){const want2=warAng((T?Math.atan2(T.x-u.pos.x,T.z-u.pos.z):TNK.camYaw)-u.heading),cur=tur.rotation.y,dd=warAng(want2-cur),rate=(d.cls==='mbt'?.75:1.3)*(m.tur?.25:1);tur.rotation.y=cur+clamp(dd,-dt*rate,dt*rate);TNK.aimed=Math.abs(dd)<.02;
-    if(ud.gun){const hd=T?Math.max(30,Math.hypot(T.x-u.pos.x,T.z-u.pos.z)):800,el=(T?Math.atan2(T.y-(u.pos.y+2.4),hd):TNK.camPitch)+9.81*hd/(2*d.gun[2]*d.gun[2])+u.obj.rotation.x;TNK.elWant=-clamp(el,-.15,.35)+(m.gun===1?.04:0);ud.gun.rotation.x+=(TNK.elWant-ud.gun.rotation.x)*Math.min(1,dt*6)}}
+    if(ud.gun){const hd=T?Math.max(30,Math.hypot(T.x-u.pos.x,T.z-u.pos.z)):800,el=(T?Math.atan2(T.y-(u.pos.y+2.4),hd):TNK.camPitch)+9.81*hd/(2*Math.pow(d.gun[2]*(TNK.ammo==='HE'?.62:1),2))+u.obj.rotation.x;TNK.elWant=-clamp(el,-.15,.35)+(m.gun===1?.04:0);ud.gun.rotation.x+=(TNK.elWant-ud.gun.rotation.x)*Math.min(1,dt*6)}}
   if(ud.gun){u.rec=Math.max(0,u.rec-dt*2.5);ud.gun.position.z=d.gz-u.rec*.4}
+  if(TNK.repT>0){if(u.moving){TNK.repT=0;message('REPAIR CANCELLED · STAY STILL',1.2)}else{TNK.repT-=dt;if(TNK.repT<=0){m.trk=false;m.eng=false;m.gun=0;m.tur=false;u.note={};message('REPAIRED',1.4)}}}
   if(TNK.fire){TNK.fire=false;if(m.gun>=2)message('GUN DESTROYED',1);else if(u.cd>0)message('RELOADING',.6);else{TNK.lased=Math.round(tkRange());TNK.laseT=.6;TNK.fireQ=1.5}}
   if(TNK.fireQ>0){TNK.fireQ-=dt;const g=u.obj.userData.gun,laid=TNK.aimed&&(!g||Math.abs(g.rotation.x-(TNK.elWant||0))<.0015);if(laid||TNK.fireQ<=0){TNK.fireQ=0;if(u.cd<=0&&m.gun<2)tkFire(u)}}
   // gentle aim assist when zoomed: an enemy just off the crosshair pulls the aim onto it
@@ -6367,7 +6371,8 @@ function tkDrive(u,dt){const d=u.def,m=u.mod;
 function tkFire(u){const d=u.def,m=u.mod,gun=u.obj.userData.gun;if(!gun)return;u.obj.updateMatrixWorld(true);
   const from=gun.localToWorld(new V3(0,0,d.barrel)),dir=new V3(0,0,1).transformDirection(gun.matrixWorld);
   const sp=d.gun[4]*(u.moving?1.8:.4)*(m.gun===1?2.6:1);dir.x+=rand(-sp,sp);dir.y+=rand(-sp,sp);dir.z+=rand(-sp,sp);dir.normalize();
-  const s=WAR.sh.find(q=>!q.on)||WAR.sh[0];s.on=true;s.team=u.team;s.dmg=d.gun[3];s.owner=u;s.life=8;s.m.material=warShellMat.blue;s.m.visible=true;s.m.position.copy(from);s.prev.copy(from);s.vel.copy(dir).multiplyScalar(d.gun[2]);s.m.quaternion.setFromUnitVectors(ZF,dir);
+  const he=TNK.ammo==='HE';if(he){if(TNK.heN<=0){message('NO HE LEFT',1);return}TNK.heN--}else{if(TNK.apN<=0){message('NO AP LEFT',1);return}TNK.apN--}
+  const s=WAR.sh.find(q=>!q.on)||WAR.sh[0];s.on=true;s.team=u.team;s.dmg=d.gun[3];s.owner=u;s.ammo=he?'HE':'AP';s.life=8;s.m.material=warShellMat.blue;s.m.visible=true;s.m.position.copy(from);s.prev.copy(from);s.vel.copy(dir).multiplyScalar(d.gun[2]*(he?.62:1));s.m.quaternion.setFromUnitVectors(ZF,dir);
   const big=d.cls==='mbt';puff(from.x+dir.x*2,from.y+dir.y*2,from.z+dir.z*2,dir.x*30,dir.y*30+2,dir.z*30,1,.85,.5,1,big?9:3,big?30:10,.14);if(big)puff(from.x,from.y,from.z,dir.x*8,3,dir.z*8,.5,.48,.44,.6,7,12,2.2);
   TNK.shots=(TNK.shots||0)+1;u.rec=1;u.cd=d.gun[1]*(m.gun===1?1.6:1)*(m.crew>0?d.crew/m.crew:9);shake=Math.max(shake,big?.25:.06);if(big)sndBoom(.5);else sndGun();buzz(big?40:10)}
 // what's under the reticle: terrain or a vehicle, out to 4 km
@@ -6380,6 +6385,7 @@ function tkCamera(dt){const u=TNK.u;if(!u)return;applyProj();
   const tur=u.obj.userData.tur,cy=Math.cos(TNK.camPitch);
   const dir=new V3(Math.sin(TNK.camYaw)*cy,Math.sin(TNK.camPitch),Math.cos(TNK.camYaw)*cy);
   if(TNK.zoom){u.obj.updateMatrixWorld(true);const p=tur?tur.localToWorld(new V3(0,u.def.gy+.95,u.def.gz+1.0)):u.pos.clone().setY(u.pos.y+2.8);/* the gunner sight sits above the gun, on its axis */camera.position.copy(p);camera.fov=TNK.zl===2?7.5:15}
+  else if(TNK.view===1&&tur){u.obj.updateMatrixWorld(true);camera.position.copy(tur.localToWorld(new V3(.55,u.def.gy+1.15,-.6)))}   // commander's cupola
   else{camera.position.set(u.pos.x,u.pos.y+3.6,u.pos.z).addScaledVector(dir,-12).setY(Math.max(u.pos.y+3.6-dir.y*12,Math.max(groundH(camera.position.x,camera.position.z),0)+1.8))}
   camera.lookAt(camera.position.clone().addScaledVector(dir,100));camera.updateProjectionMatrix();projKey='';
   TNK.range=TNK.lased||800;TNK.aimPt=camera.position.clone().addScaledVector(camera.getWorldDirection(new V3()),TNK.range)}   // the gun is laid on the last lased range
@@ -6412,7 +6418,13 @@ function tkHUD(c){const u=TNK.u;if(!u)return;const d=u.def,col=HUD,pj=v=>{const 
   if(TNK.zoom)txt(c,TNK.zl===2?'×8':'×4',cx-150,cy+4,'right',col,13,800);
   txt(c,Math.round(Math.abs(TNK.v)*3.6)+' KM/H'+(TNK.v<-.5?' R':''),20,H-120,'left',col,16,700);
   txt(c,d.n.toUpperCase(),20,H-140,'left',col,12,600);
-  const fl=warFlags(u);if(fl)txt(c,fl,20,H-100,'left','#ff6b5c',12,700);
+  // module panel: green fine, amber damaged, red destroyed
+  {const m=u.mod,cells=[['TRK',m.trk?2:0],['ENG',m.fire?2:m.eng?1:0],['GUN',m.gun],['TUR',m.tur?1:0],['CREW '+m.crew+'/'+d.crew,m.crew<d.crew?(m.crew<=1?2:1):0]];let x=20;
+    for(const [k,v] of cells){const w=k.length*7+12;c.fillStyle=v===2?'rgba(255,80,60,.85)':v===1?'rgba(255,180,60,.85)':'rgba(92,255,138,.18)';c.fillRect(x,H-108,w,18);txt(c,k,x+w/2,H-95,'center',v?'#111':col,11,700);x+=w+4}
+    if(m.fire)txt(c,'FIRE · X TO EXTINGUISH ('+TNK.ext+')',20,H-74,'left','#ff6b5c',12,800);if(TNK.repT>0)txt(c,'REPAIRING '+Math.ceil(TNK.repT)+' S',20,H-58,'left','#ffe066',12,800)}
+  txt(c,(TNK.ammo==='HE'?'HE ':'AP ')+(TNK.ammo==='HE'?TNK.heN:TNK.apN)+'  ·  '+(TNK.ammo==='HE'?'AP '+TNK.apN:'HE '+TNK.heN),cx,(TNK.zoom?cy+170:cy+66),'center',col,11,700);
+  if(TNK.hm>0){TNK.hm-=1/60;c.strokeStyle=TNK.res&&TNK.res.col||col;c.lineWidth=2.5;c.beginPath();for(const [a,b] of [[-1,-1],[1,-1],[-1,1],[1,1]]){c.moveTo(cx+a*10,cy+b*10);c.lineTo(cx+a*20,cy+b*20)}c.stroke();c.lineWidth=1.5}
+  if(TNK.res&&TNK.res.t>0){TNK.res.t-=1/60;const R=TNK.res,y=TNK.zoom?cy-140:cy-90;txt(c,R.txt,cx,y,'center',R.col,20,800);R.notes.slice(0,4).forEach((n,i)=>txt(c,n,cx,y+18+i*14,'center','#ffe066',11,700))}
   // point A
   {const Z=TNK.zone,p=pj(new V3(Z.x,Math.max(groundH(Z.x,Z.z),0)+25,Z.z)),dz=Math.hypot(Z.x-u.pos.x,Z.z-u.pos.z);
     if(p){c.strokeStyle=TNK.hold>0?'#5cb8ff':TNK.hold<0?'#ff6b5c':col;c.beginPath();c.arc(p.x,p.y,12,0,6.3);c.stroke();txt(c,'A',p.x,p.y+4,'center',c.strokeStyle,12,800);txt(c,(dz/1000).toFixed(1)+' KM',p.x,p.y+26,'center',col,10,600)}
@@ -6441,6 +6453,10 @@ function tkUI(on){
       '<button id="tkFire" style="position:absolute;right:22px;bottom:30px;width:92px;height:92px;border-radius:50%;border:2px solid var(--hud,#5cff8a);background:rgba(10,20,12,.55);color:var(--hud,#5cff8a);font:700 16px inherit">FIRE</button>'+
       '<button id="tkZoom" style="position:absolute;right:130px;bottom:44px;width:64px;height:64px;border-radius:50%;border:2px solid var(--hud,#5cff8a);background:rgba(10,20,12,.45);color:var(--hud,#5cff8a);font:700 12px inherit">ZOOM</button>'+
       '<button id="tkRange" style="position:absolute;right:130px;bottom:118px;width:64px;height:44px;border-radius:10px;border:2px solid var(--hud,#5cff8a);background:rgba(10,20,12,.45);color:var(--hud,#5cff8a);font:700 11px inherit">RANGE</button>'+
+'<button id="tkAmmo" style="position:absolute;right:210px;bottom:44px;width:64px;height:44px;border-radius:10px;border:2px solid var(--hud,#5cff8a);background:rgba(10,20,12,.45);color:var(--hud,#5cff8a);font:700 11px inherit">AMMO</button>'+
+      '<button id="tkView" style="position:absolute;right:210px;bottom:118px;width:64px;height:44px;border-radius:10px;border:2px solid var(--hud,#5cff8a);background:rgba(10,20,12,.45);color:var(--hud,#5cff8a);font:700 11px inherit">VIEW</button>'+
+      '<button id="tkRep" style="position:absolute;right:22px;bottom:140px;width:92px;height:38px;border-radius:10px;border:2px solid var(--hud,#5cff8a);background:rgba(10,20,12,.45);color:var(--hud,#5cff8a);font:700 11px inherit">REPAIR</button>'+
+      '<button id="tkExt" style="position:absolute;right:22px;bottom:184px;width:92px;height:34px;border-radius:10px;border:2px solid var(--hud,#5cff8a);background:rgba(10,20,12,.45);color:var(--hud,#5cff8a);font:700 11px inherit">EXT</button>'+
       '<button id="tkPause" style="position:absolute;right:14px;top:12px;width:46px;height:40px;border:1px solid var(--hud,#5cff8a);background:rgba(10,20,12,.45);color:var(--hud,#5cff8a);font:700 14px inherit">II</button>'+
       '<div id="tkKnob" style="position:absolute;width:54px;height:54px;margin:-27px 0 0 -27px;border-radius:50%;border:2px solid rgba(92,255,138,.7);display:none;pointer-events:none"></div>';
     host.appendChild(el);TNK.ui=el;
@@ -6452,13 +6468,13 @@ function tkUI(on){
     lk.addEventListener('pointermove',e=>{if(e.pointerId!==lId)return;const k=TNK.zl===2?.0006:TNK.zoom?.0012:.005;TNK.camYaw-=(e.clientX-lx)*k;TNK.camPitch=clamp(TNK.camPitch-(e.clientY-ly)*k,-.25,.45);lx=e.clientX;ly=e.clientY});
     const lEnd=e=>{if(e.pointerId===lId)lId=null};lk.addEventListener('pointerup',lEnd);lk.addEventListener('pointercancel',lEnd);
     el.querySelector('#tkFire').addEventListener('pointerdown',e=>{e.stopPropagation();TNK.fire=true});
-    el.querySelector('#tkZoom').addEventListener('pointerdown',e=>{e.stopPropagation();tkZoom(1)});el.querySelector('#tkRange').addEventListener('pointerdown',e=>{e.stopPropagation();tkLase()});
+    el.querySelector('#tkZoom').addEventListener('pointerdown',e=>{e.stopPropagation();tkZoom(1)});for(const [id,f] of [['#tkAmmo',tkAmmo],['#tkView',tkView],['#tkRep',tkRepair],['#tkExt',tkExt]])el.querySelector(id).addEventListener('pointerdown',e=>{e.stopPropagation();f()});el.querySelector('#tkRange').addEventListener('pointerdown',e=>{e.stopPropagation();tkLase()});
     el.querySelector('#tkPause').addEventListener('click',()=>pause())}
   if(TNK.ui)TNK.ui.hidden=!on;if(on)$('ctrls').hidden=true;document.body.classList.toggle('tankmode',!!on)}
 // per frame: keep the overlay in step with the game state
 function tkFrame(){if(!TNK.on)return;const show=state==='play';if(TNK.ui&&TNK.ui.hidden===show)TNK.ui.hidden=!show;if(show)$('ctrls').hidden=true;playerJet.visible=false}
 // a kill by the player's tank
-function tkKill(u,by){if(!by||!by.player||u.team!=='red')return;TNK.kills++;kills++;score+=u.def.cls==='mbt'?300:200;message(u.def.n.toUpperCase()+' DESTROYED',1.6);sndKill()}
+function tkKill(u,by){if(!by||!by.player||u.team!=='red')return;tkResult('DESTROYED',u);TNK.kills++;kills++;score+=u.def.cls==='mbt'?300:200;message(u.def.n.toUpperCase()+' DESTROYED',1.6);sndKill()}
 
 // the lineup: each of the six blue vehicles can be used once, three per battle
 function tkPicker(show){let el=document.getElementById('tkPick');
@@ -6538,6 +6554,15 @@ function tkReticle(c,cx,cy,sight){const col=HUD,g=sight?7:5,L=sight?150:22;c.str
   c.fillStyle=col;c.beginPath();c.arc(cx,cy,1.4,0,6.3);c.fill();
   if(sight)for(let i=1;i<=4;i++){const y=cy+10+i*20;c.beginPath();c.moveTo(cx-8,y);c.lineTo(cx+8,y);c.stroke();txt(c,(i*4)+'',cx+14,y+4,'left',col,9,700)}
   c.lineWidth=1.5}
+
+// what your shot did: banner under the sight, hit marker on the crosshair, a clang
+function tkResult(kind,target){const col=kind==='DESTROYED'?'#ff5c4d':kind==='PENETRATION'?'#ffb347':kind==='RICOCHET'||kind==='NON-PENETRATION'?'#cfd8dc':HUD;
+  const keep=TNK.res&&TNK.res.t>0&&TNK.res.tgt===target?TNK.res.notes:[];TNK.res={txt:kind+(target?' · '+target.def.n.toUpperCase():''),col,t:2.4,notes:keep,tgt:target};TNK.hm=.45;sndHit()}
+function tkAmmo(){if(!TNK.u||!TNK.u.alive)return;TNK.ammo=TNK.ammo==='AP'?'HE':'AP';message(TNK.ammo==='AP'?'AP · ARMOUR-PIERCING':'HE · HIGH-EXPLOSIVE',1)}
+function tkView(){TNK.view=TNK.view===1?0:1;if(TNK.zoom){TNK.zl=0;TNK.zoom=false}message(TNK.view?'COMMANDER VIEW':'THIRD PERSON',.8)}
+function tkRepair(){const u=TNK.u;if(!u||!u.alive)return;const m=u.mod;if(!(m.trk||m.eng||m.gun||m.tur)){message('NOTHING TO REPAIR',.8);return}if(u.moving){message('STOP TO REPAIR',.8);return}
+  TNK.repT=10+(u.def.crew-m.crew)*4;message('REPAIRING · STAY STILL',1.2)}
+function tkExt(){const u=TNK.u;if(!u||!u.alive||!u.mod.fire)return;if(TNK.ext<=0){message('NO EXTINGUISHERS LEFT',1);return}TNK.ext--;u.mod.fire=false;message('FIRE OUT',1)}
 
 /* ---------------- progression (War Thunder style): research points, silver lions, tech trees, modules, crew ----------------
    Career mode only. RP earned in a sortie go to the aircraft you flew (and 10 % to Free RP); an aircraft is researched with RP from the
@@ -7596,7 +7621,7 @@ const _careerAward=careerAward;
 careerAward=function(){lbAdd();return _careerAward.apply(this,arguments)};
 
 /* ---------- test hook (only with ?test in the URL) ---------- */
-if(/[?&]test\b/.test(location.search))window.__vs={get sortie(){return sortie},get camera(){return camera},tkAirDown,get TNK(){return TNK},get WAR(){return WAR},warDie,warBuild,WAR_V,get playerJet(){return playerJet},get CANYON(){return CANYON},groundH,valRings:()=>valRings,buildSAM,buildAAA,buildRadar,buildBunker,buildTruck,buildShip,get ground(){return ground},deathCause:()=>deathCause,spawnFighter,clockNow:()=>clock,cycleRadarSub,radarBlind,radarSub,clutter,R,AA,killEnemy,aaSpawnWave,AG,agRelease,agSight,agWpn,ccip,agReset,btConditions,NET,netScoreCheck,netTeamScore,sbHtml,killGround,get pass(){return pass},passAdd,passClaim,weeklyAdd,scene,rinfoReset:()=>{renderer.info.autoReset=false;renderer.info.reset()},rinfo:()=>({c:renderer.info.render.calls,t:renderer.info.render.triangles,g:renderer.info.memory.geometries,tx:renderer.info.memory.textures}),KB,kbRebuild,playerGunHit,wingHit,BT,die,btRespawn,TMAP,mapStep,KBM,SC,damageSystem,hitAI,killEnemy,setThr,HEAT,explode,puff,camera,LT,townLights,flashLt,P,fly,dlz,flyout,AC_DEFS,feed,WAR,WAR_V,warBuild,warSpawn,warModules,warDie,warFlags,updateWar,warAlive,buildJet,PLAYER_COLORS,M2,V3,atm,clamp,lbAdd,showOverlay:k=>showOverlay(k),setScore:(n,k)=>{score=n;kills=k},get state(){return state},get enemies(){return enemies},missiles:()=>missiles.filter(m=>m.on),setAC:id=>{AC=AC_DEFS[id];applyAC()},wt:{   // weapon-test hooks: a clean sky, one drone, scripted launches
+if(/[?&]test\b/.test(location.search))window.__vs={get sortie(){return sortie},tkResult,get camera(){return camera},tkAirDown,get TNK(){return TNK},get WAR(){return WAR},warDie,warBuild,WAR_V,get playerJet(){return playerJet},get CANYON(){return CANYON},groundH,valRings:()=>valRings,buildSAM,buildAAA,buildRadar,buildBunker,buildTruck,buildShip,get ground(){return ground},deathCause:()=>deathCause,spawnFighter,clockNow:()=>clock,cycleRadarSub,radarBlind,radarSub,clutter,R,AA,killEnemy,aaSpawnWave,AG,agRelease,agSight,agWpn,ccip,agReset,btConditions,NET,netScoreCheck,netTeamScore,sbHtml,killGround,get pass(){return pass},passAdd,passClaim,weeklyAdd,scene,rinfoReset:()=>{renderer.info.autoReset=false;renderer.info.reset()},rinfo:()=>({c:renderer.info.render.calls,t:renderer.info.render.triangles,g:renderer.info.memory.geometries,tx:renderer.info.memory.textures}),KB,kbRebuild,playerGunHit,wingHit,BT,die,btRespawn,TMAP,mapStep,KBM,SC,damageSystem,hitAI,killEnemy,setThr,HEAT,explode,puff,camera,LT,townLights,flashLt,P,fly,dlz,flyout,AC_DEFS,feed,WAR,WAR_V,warBuild,warSpawn,warModules,warDie,warFlags,updateWar,warAlive,buildJet,PLAYER_COLORS,M2,V3,atm,clamp,lbAdd,showOverlay:k=>showOverlay(k),setScore:(n,k)=>{score=n;kills=k},get state(){return state},get enemies(){return enemies},missiles:()=>missiles.filter(m=>m.on),setAC:id=>{AC=AC_DEFS[id];applyAC()},wt:{   // weapon-test hooks: a clean sky, one drone, scripted launches
   begin:id=>{AC=AC_DEFS[id];applyAC();startGame();return AC.id},
   clear:()=>{waveClearT=1e9;for(const e of enemies){e.alive=false;scene.remove(e.obj)}enemies.length=0;P.pos.set(0,6000,0);P.vel.set(0,0,250);throttle=.7;return state},
   target:(type,dz,away,speed)=>{const e=spawnFighter('red',type,new V3(0,P.pos.y,dz),new V3(0,P.pos.y,dz+(away?9999:-9999)),{ir:0,rdr:0,speed:speed||220});e.drone=true;return e.id},
