@@ -15,7 +15,7 @@ const assert = require('assert'), path = require('path');
   const moved = await p.evaluate(z0 => ({ d: __vs.TNK.u.pos.z - z0, v: __vs.TNK.v, clock: __vs.clockNow() }), a.z);
   assert(moved.d > 3, 'W drives the tank forward: ' + JSON.stringify(moved));
   // fire: a shell leaves, then the gun reloads
-  await p.keyboard.press('Space'); await p.waitForTimeout(200);
+  await p.keyboard.press('Space'); await p.waitForFunction(() => (__vs.TNK.shots || 0) >= 1, null, { timeout: 8000 }).catch(() => {});   // FIRE ranges and waits for the gun to be laid (up to 1.5 s)
   const f = await p.evaluate(() => ({ sh: __vs.TNK.shots || 0, cd: __vs.TNK.u.cd }));
   assert(f.sh >= 1 && f.cd > 1, 'Space fires a shell and starts the reload: ' + JSON.stringify(f));
   await p.keyboard.press('KeyZ'); await p.waitForTimeout(300);
