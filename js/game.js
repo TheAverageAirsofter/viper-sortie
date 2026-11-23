@@ -6532,13 +6532,12 @@ function tkWallMat(col,roof){const m=new THREE.MeshLambertMaterial({color:col});
       '{vec3 n=normalize(vWN2);if(abs(n.y)<.5){float hx=abs(n.x)>.5?vWP.z:vWP.x,fy=fract(vWP.y/3.1),fx=fract(hx/3.3);float win=step(.36,fy)*step(fy,.8)*step(.3,fx)*step(fx,.7),gl=step(.4,fy)*step(fy,.76)*step(.34,fx)*step(fx,.66);float pl=texture2D(nTex,vec2(hx,vWP.y)*.35).r,pl2=texture2D(nTex,vec2(hx,vWP.y)*2.1).g;diffuseColor.rgb*=.84+.2*pl+.1*pl2;float stk=step(.3,fx)*step(fx,.7)*step(fy,.36)*smoothstep(.0,.36,fy);diffuseColor.rgb*=1.-.12*stk*pl;diffuseColor.rgb=mix(diffuseColor.rgb,vec3(.86,.85,.8),win);diffuseColor.rgb=mix(diffuseColor.rgb,vec3(.1,.13,.16)+.06*step(.58,fy),gl);}}'))};
   return m}
 
-// crosshair: a bold cross with a gap and a centre dot (the aim point), range marks below in the sight, drawn black-outlined so it reads on any background
-function tkReticle(c,cx,cy,sight){const col=HUD,seg=f=>{c.lineCap='round';c.strokeStyle='rgba(0,0,0,.85)';c.lineWidth=sight?5:4.5;f();c.stroke();c.strokeStyle=col;c.lineWidth=sight?2.2:2;f();c.stroke()};
-  const g=sight?7:5,L=sight?150:22;
-  seg(()=>{c.beginPath();c.moveTo(cx-L,cy);c.lineTo(cx-g,cy);c.moveTo(cx+g,cy);c.lineTo(cx+L,cy);c.moveTo(cx,cy-(sight?90:L));c.lineTo(cx,cy-g);c.moveTo(cx,cy+g);c.lineTo(cx,cy+(sight?110:L))});
-  c.fillStyle='rgba(0,0,0,.85)';c.beginPath();c.arc(cx,cy,2.6,0,6.3);c.fill();c.fillStyle=col;c.beginPath();c.arc(cx,cy,1.6,0,6.3);c.fill();
-  if(sight)for(let i=1;i<=4;i++){const y=cy+10+i*20;seg(()=>{c.beginPath();c.moveTo(cx-9,y);c.lineTo(cx+9,y)});txt(c,(i*4)+'',cx+15,y+4,'left',col,9,700)}
-  c.lineWidth=1.5;c.lineCap='butt'}
+// crosshair: a clean cross with a gap and a centre dot (the aim point), range marks below in the sight; plain HUD-coloured lines, no outline
+function tkReticle(c,cx,cy,sight){const col=HUD,g=sight?7:5,L=sight?150:22;c.strokeStyle=col;c.lineWidth=sight?1.6:1.8;c.lineCap='butt';
+  c.beginPath();c.moveTo(cx-L,cy);c.lineTo(cx-g,cy);c.moveTo(cx+g,cy);c.lineTo(cx+L,cy);c.moveTo(cx,cy-(sight?90:L));c.lineTo(cx,cy-g);c.moveTo(cx,cy+g);c.lineTo(cx,cy+(sight?110:L));c.stroke();
+  c.fillStyle=col;c.beginPath();c.arc(cx,cy,1.4,0,6.3);c.fill();
+  if(sight)for(let i=1;i<=4;i++){const y=cy+10+i*20;c.beginPath();c.moveTo(cx-8,y);c.lineTo(cx+8,y);c.stroke();txt(c,(i*4)+'',cx+14,y+4,'left',col,9,700)}
+  c.lineWidth=1.5}
 
 /* ---------------- progression (War Thunder style): research points, silver lions, tech trees, modules, crew ----------------
    Career mode only. RP earned in a sortie go to the aircraft you flew (and 10 % to Free RP); an aircraft is researched with RP from the
