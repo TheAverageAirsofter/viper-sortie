@@ -23,6 +23,20 @@ const WAR_X={M1A1:{crew:4,rack:.3,gy:.62,gz:2.25},LEO2A4:{crew:4,rack:.45,gy:.6,
 for(const k in WAR_X)Object.assign(WAR_V[k],WAR_X[k]);
 const WAR={on:false,units:[],sh:[],t:0,debris:[]};
 const warMat=c=>new THREE.MeshLambertMaterial({color:c});
+// armour paint: NATO three-tone (green, brown, black) on blue vehicles, darker blotches on the Soviet base colour, dust and mud low down,
+// weathering and a semi-matte finish that takes the sky reflections; the pattern follows the vehicle (object space), not the world
+function warSkin(col,team){const m=new THREE.MeshStandardMaterial({color:col,roughness:.78,metalness:.18,envMapIntensity:.6});
+  m.onBeforeCompile=sh=>{sh.uniforms.nTex={value:NOISE};
+    sh.vertexShader=sh.vertexShader.replace('#include <common>','#include <common>\nvarying vec3 vLP;').replace('#include <begin_vertex>','#include <begin_vertex>\nvLP=position;');
+    sh.fragmentShader=sh.fragmentShader.replace('#include <common>','#include <common>\nuniform sampler2D nTex;varying vec3 vLP;').replace('#include <color_fragment>','#include <color_fragment>\n'+
+      '{vec3 c=diffuseColor.rgb;float t=texture2D(nTex,vLP.xz*.16+vLP.y*.11).r,t2=texture2D(nTex,vLP.zy*.21+vLP.x*.07).g,n=texture2D(nTex,vLP.xz*1.3+vLP.y*.9).b;'+
+      (team==='blue'?'c=t+t2*.35<.72?c:(t+t2*.35<.98?vec3(.33,.27,.19):vec3(.11,.11,.1));':'c=mix(c,c*.66,smoothstep(.58,.64,t*.7+t2*.5));')+
+      'c*=.86+.26*n;float low=1.-smoothstep(.35,1.25,vLP.y);c=mix(c,vec3(.42,.36,.27),low*(.45+.35*t2));'+   // dust and mud on the running gear and lower hull
+      'c*=1.-.12*smoothstep(.6,.9,texture2D(nTex,vec2(vLP.x*.9+vLP.z*.4,vLP.y*.15)).r);'+                        // grime streaks running down
+      'diffuseColor.rgb=c;}')
+      .replace('#include <roughnessmap_fragment>','#include <roughnessmap_fragment>\nroughnessFactor=clamp(roughnessFactor+(texture2D(nTex,vLP.xz*.7).r-.5)*.25,.45,.95);')};
+  return m}
+function warMetal(col){return new THREE.MeshStandardMaterial({color:col,roughness:.55,metalness:.55,envMapIntensity:.7})}
 const WAR_TRK=(()=>{const cv=document.createElement('canvas');cv.width=64;cv.height=8;const x=cv.getContext('2d');x.fillStyle='#2a2c2e';x.fillRect(0,0,64,8);
   for(let i=0;i<64;i+=4){x.fillStyle='#4a4c4c';x.fillRect(i,0,2,8);x.fillStyle='#17181a';x.fillRect(i+2,0,1,8)}const t=new THREE.CanvasTexture(cv);t.wrapS=t.wrapT=THREE.RepeatWrapping;t.repeat.set(9,1);return t})();   // grousers, link by link
 const warShellMat={blue:new THREE.MeshBasicMaterial({color:0xfff4c0}),red:new THREE.MeshBasicMaterial({color:0xffb27a})};
@@ -39,7 +53,7 @@ function wPrism(pts,w){const sh=new THREE.Shape();pts.forEach((p,i)=>i?sh.lineTo
 const wBox=(w,h,l)=>new THREE.BoxGeometry(w,h,l), wCyl=(r1,r2,h,n)=>new THREE.CylinderGeometry(r1,r2,h,n||10), wSph=()=>new THREE.SphereGeometry(1,14,9);
 const wBarrel=(r,len)=>new THREE.CylinderGeometry(r,r,len,8).rotateX(Math.PI/2).translate(0,0,len/2);
 function warBuild(d){
-  const g=new THREE.Group(),W=d.hull[0],H1=d.hull[1],L=d.hull[2],body=warMat(d.col),tmat=warMat(new THREE.Color(d.col).multiplyScalar(.9).getHex()),dk=warMat(0x24272a),dk2=warMat(0x3a3d3a);
+  const g=new THREE.Group(),W=d.hull[0],H1=d.hull[1],L=d.hull[2],body=warSkin(d.col,d.team),tmat=warSkin(new THREE.Color(d.col).multiplyScalar(.92).getHex(),d.team),dk=warMetal(0x24272a),dk2=warMetal(0x3a3d3a);
   const hullG=[],sideL=[],sideR=[],turB=[],turD=[],gunG=[];
   const tier=d.look==='ifv'||d.look==='m163';
   // hull: sloped glacis and rear deck
@@ -103,7 +117,7 @@ function warBuild(d){
     if(d.n.indexOf('Leopard')>=0||d.n.indexOf('Abrams')>=0||d.n.indexOf('Chall')>=0)wPart(gunG,wCyl(r*1.3,r*1.3,1.4,10).rotateX(Math.PI/2),0,0,.9)}
   else wPart(gunG,wBarrel(.06,d.barrel),0,0,0);
   if(d.look==='gepard')gg.position.set(0,.8,d.gz);
-  const trk=new THREE.MeshLambertMaterial({color:0xffffff,map:WAR_TRK});
+  const trk=new THREE.MeshStandardMaterial({color:0xffffff,map:WAR_TRK,roughness:.6,metalness:.5,envMapIntensity:.6});
   const hull=wMerge(hullG,body),sl=wMerge(sideL,trk),sr=wMerge(sideR,trk),tb=wMerge(turB,tmat),td=wMerge(turD,dk2),gn=wMerge(gunG,dk);
   const tur=new THREE.Group();tur.position.y=yT;
   g.add(hull);g.add(sl);g.add(sr);g.add(tur);tur.add(tb);if(td)tur.add(td);tur.add(gg);if(gn)gg.add(gn);

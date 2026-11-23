@@ -896,7 +896,7 @@ function paintCompile(sh){const u=this.userData.pu; if(u)for(const k in u)sh.uni
   sh.vertexShader=sh.vertexShader.replace('#include <common>','#include <common>\nattribute vec3 jp;attribute vec3 jn;varying vec3 vJP;varying vec3 vJN;')
     .replace('#include <begin_vertex>','#include <begin_vertex>\nvJP=jp;vJN=jn;');
   sh.fragmentShader=sh.fragmentShader.replace('#include <common>',`#include <common>
-uniform vec3 pc0,pc1,pc2,pBel;uniform float pPat,pBelK,pTail,pSc;uniform sampler2D nTex;varying vec3 vJP;varying vec3 vJN;
+uniform vec3 pc0,pc1,pc2,pBel;uniform float pPat,pBelK,pTail,pSc;uniform sampler2D nTex;varying vec3 vJP;varying vec3 vJN;float gBump=0.;
 float ph(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
 float splinter(vec2 p){vec2 i=floor(p),f=fract(p);float md=9.,id=0.;
  for(int y=-1;y<=1;y++)for(int x=-1;x<=1;x++){vec2 g=vec2(float(x),float(y));vec2 o=vec2(ph(i+g),ph(i+g+17.3));vec2 r=g+o-f;float d=max(abs(r.x),abs(r.y))*.55+length(r)*.45;if(d<md){md=d;id=ph(i+g+5.1);}}
@@ -921,7 +921,8 @@ vec3 paint(){vec3 n=normalize(vJN);bool side=abs(n.x)>.62;vec2 p=side?vec2(vJP.z
    ln=max(ln,edge*.65*(1.-smoothstep(.015,.05,wz)));}}
  // rivet rows a hand's width either side of the frame lines, only up close
  {float rv=abs(fract(vJP.z/1.27+.5)-.5)*1.27;float row=1.-smoothstep(.02,.035,abs(rv-.06));float t=side?vJP.y:vJP.x;float dot2=1.-smoothstep(.15,.3,abs(fract(t/.09)-.5)*2.);
-  c*=1.-.12*row*dot2*(1.-smoothstep(.004,.012,wz));}
+  c*=1.-.12*row*dot2*(1.-smoothstep(.004,.012,wz));gBump+=row*dot2*.35*(1.-smoothstep(.004,.012,wz));}
+ gBump=ln*.9;
  c*=(1.-.24*ln)*(.975+.05*pid);
  // walkways: dark outlines on top of the wing roots
  if(n.y>.6&&abs(vJP.x)>1.1&&abs(vJP.x)<2.3){float wx2=fwidth(vJP.x)+1e-4;float ed=min(abs(abs(vJP.x)-1.15),abs(abs(vJP.x)-2.25))/wx2;c*=1.-.35*(1.-smoothstep(.6,1.8,ed))*(1.-smoothstep(.02,.06,wz))*step(pTail+5.,vJP.z);}
@@ -931,6 +932,7 @@ vec3 paint(){vec3 n=normalize(vJN);bool side=abs(n.x)>.62;vec2 p=side?vec2(vJP.z
  c=mix(c,c*1.07+.02,smoothstep(.55,.95,n.y)*smoothstep(.4,.7,texture2D(nTex,vJP.zx/16.).r)*.6);
  c=mix(c,c*.42,smoothstep(pTail+3.2,pTail+.2,vJP.z)*(.55+.35*gr));
  return c;}`).replace('#include <color_fragment>','#include <color_fragment>\ndiffuseColor.rgb=paint();')
+   .replace('#include <normal_fragment_maps>','#include <normal_fragment_maps>\n {vec3 sp=-vViewPosition,dpx=dFdx(sp),dpy=dFdy(sp),r1=cross(dpy,normal),r2=cross(normal,dpx);float det=dot(dpx,r1),hb=-gBump*.012,hx=dFdx(hb),hy=dFdy(hb);if(abs(det)>1e-9)normal=normalize(abs(det)*normal-sign(det)*(hx*r1+hy*r2));}')
    .replace('#include <roughnessmap_fragment>','#include <roughnessmap_fragment>\n roughnessFactor=clamp(roughnessFactor*(.82+.3*texture2D(nTex,vJP.zx/5.).r)+.06*(ph(floor(vec2(vJP.z/1.27,vJP.x/1.05+vJP.y)))-.5),.25,.9);')}
 // bake jet-space position and normal into each painted mesh so paint stays put when a surface moves
 function bakePaint(g,mat){g.updateMatrixWorld(true);const iv=new THREE.Matrix4().copy(g.matrixWorld).invert(),M=new THREE.Matrix4(),N=new THREE.Matrix3(),v=new THREE.Vector3();
@@ -5880,6 +5882,20 @@ const WAR_X={M1A1:{crew:4,rack:.3,gy:.62,gz:2.25},LEO2A4:{crew:4,rack:.45,gy:.6,
 for(const k in WAR_X)Object.assign(WAR_V[k],WAR_X[k]);
 const WAR={on:false,units:[],sh:[],t:0,debris:[]};
 const warMat=c=>new THREE.MeshLambertMaterial({color:c});
+// armour paint: NATO three-tone (green, brown, black) on blue vehicles, darker blotches on the Soviet base colour, dust and mud low down,
+// weathering and a semi-matte finish that takes the sky reflections; the pattern follows the vehicle (object space), not the world
+function warSkin(col,team){const m=new THREE.MeshStandardMaterial({color:col,roughness:.78,metalness:.18,envMapIntensity:.6});
+  m.onBeforeCompile=sh=>{sh.uniforms.nTex={value:NOISE};
+    sh.vertexShader=sh.vertexShader.replace('#include <common>','#include <common>\nvarying vec3 vLP;').replace('#include <begin_vertex>','#include <begin_vertex>\nvLP=position;');
+    sh.fragmentShader=sh.fragmentShader.replace('#include <common>','#include <common>\nuniform sampler2D nTex;varying vec3 vLP;').replace('#include <color_fragment>','#include <color_fragment>\n'+
+      '{vec3 c=diffuseColor.rgb;float t=texture2D(nTex,vLP.xz*.16+vLP.y*.11).r,t2=texture2D(nTex,vLP.zy*.21+vLP.x*.07).g,n=texture2D(nTex,vLP.xz*1.3+vLP.y*.9).b;'+
+      (team==='blue'?'c=t+t2*.35<.72?c:(t+t2*.35<.98?vec3(.33,.27,.19):vec3(.11,.11,.1));':'c=mix(c,c*.66,smoothstep(.58,.64,t*.7+t2*.5));')+
+      'c*=.86+.26*n;float low=1.-smoothstep(.35,1.25,vLP.y);c=mix(c,vec3(.42,.36,.27),low*(.45+.35*t2));'+   // dust and mud on the running gear and lower hull
+      'c*=1.-.12*smoothstep(.6,.9,texture2D(nTex,vec2(vLP.x*.9+vLP.z*.4,vLP.y*.15)).r);'+                        // grime streaks running down
+      'diffuseColor.rgb=c;}')
+      .replace('#include <roughnessmap_fragment>','#include <roughnessmap_fragment>\nroughnessFactor=clamp(roughnessFactor+(texture2D(nTex,vLP.xz*.7).r-.5)*.25,.45,.95);')};
+  return m}
+function warMetal(col){return new THREE.MeshStandardMaterial({color:col,roughness:.55,metalness:.55,envMapIntensity:.7})}
 const WAR_TRK=(()=>{const cv=document.createElement('canvas');cv.width=64;cv.height=8;const x=cv.getContext('2d');x.fillStyle='#2a2c2e';x.fillRect(0,0,64,8);
   for(let i=0;i<64;i+=4){x.fillStyle='#4a4c4c';x.fillRect(i,0,2,8);x.fillStyle='#17181a';x.fillRect(i+2,0,1,8)}const t=new THREE.CanvasTexture(cv);t.wrapS=t.wrapT=THREE.RepeatWrapping;t.repeat.set(9,1);return t})();   // grousers, link by link
 const warShellMat={blue:new THREE.MeshBasicMaterial({color:0xfff4c0}),red:new THREE.MeshBasicMaterial({color:0xffb27a})};
@@ -5896,7 +5912,7 @@ function wPrism(pts,w){const sh=new THREE.Shape();pts.forEach((p,i)=>i?sh.lineTo
 const wBox=(w,h,l)=>new THREE.BoxGeometry(w,h,l), wCyl=(r1,r2,h,n)=>new THREE.CylinderGeometry(r1,r2,h,n||10), wSph=()=>new THREE.SphereGeometry(1,14,9);
 const wBarrel=(r,len)=>new THREE.CylinderGeometry(r,r,len,8).rotateX(Math.PI/2).translate(0,0,len/2);
 function warBuild(d){
-  const g=new THREE.Group(),W=d.hull[0],H1=d.hull[1],L=d.hull[2],body=warMat(d.col),tmat=warMat(new THREE.Color(d.col).multiplyScalar(.9).getHex()),dk=warMat(0x24272a),dk2=warMat(0x3a3d3a);
+  const g=new THREE.Group(),W=d.hull[0],H1=d.hull[1],L=d.hull[2],body=warSkin(d.col,d.team),tmat=warSkin(new THREE.Color(d.col).multiplyScalar(.92).getHex(),d.team),dk=warMetal(0x24272a),dk2=warMetal(0x3a3d3a);
   const hullG=[],sideL=[],sideR=[],turB=[],turD=[],gunG=[];
   const tier=d.look==='ifv'||d.look==='m163';
   // hull: sloped glacis and rear deck
@@ -5960,7 +5976,7 @@ function warBuild(d){
     if(d.n.indexOf('Leopard')>=0||d.n.indexOf('Abrams')>=0||d.n.indexOf('Chall')>=0)wPart(gunG,wCyl(r*1.3,r*1.3,1.4,10).rotateX(Math.PI/2),0,0,.9)}
   else wPart(gunG,wBarrel(.06,d.barrel),0,0,0);
   if(d.look==='gepard')gg.position.set(0,.8,d.gz);
-  const trk=new THREE.MeshLambertMaterial({color:0xffffff,map:WAR_TRK});
+  const trk=new THREE.MeshStandardMaterial({color:0xffffff,map:WAR_TRK,roughness:.6,metalness:.5,envMapIntensity:.6});
   const hull=wMerge(hullG,body),sl=wMerge(sideL,trk),sr=wMerge(sideR,trk),tb=wMerge(turB,tmat),td=wMerge(turD,dk2),gn=wMerge(gunG,dk);
   const tur=new THREE.Group();tur.position.y=yT;
   g.add(hull);g.add(sl);g.add(sr);g.add(tur);tur.add(tb);if(td)tur.add(td);tur.add(gg);if(gn)gg.add(gn);
@@ -6505,10 +6521,10 @@ function tkSegHit(a,b){let best=-1;if(!TNK.bld)return best;const d=[b.x-a.x,b.y-
 
 // house walls and roofs: windows with white frames on every floor, roof tile courses, all from world position (no textures, no extra draw calls)
 function tkWallMat(col,roof){const m=new THREE.MeshLambertMaterial({color:col});
-  m.onBeforeCompile=sh=>{sh.vertexShader=sh.vertexShader.replace('#include <common>','#include <common>\nvarying vec3 vWP;varying vec3 vWN2;').replace('#include <project_vertex>','#include <project_vertex>\nvWP=(modelMatrix*vec4(transformed,1.)).xyz;vWN2=normalize(mat3(modelMatrix)*objectNormal);');
-    sh.fragmentShader=sh.fragmentShader.replace('#include <common>','#include <common>\nvarying vec3 vWP;varying vec3 vWN2;').replace('#include <color_fragment>','#include <color_fragment>\n'+(roof?
-      '{float t=fract(vWP.y*2.4+sin(vWP.x*1.7+vWP.z*1.3)*.08);diffuseColor.rgb*=.8+.2*smoothstep(0.,.25,t);}':
-      '{vec3 n=normalize(vWN2);if(abs(n.y)<.5){float hx=abs(n.x)>.5?vWP.z:vWP.x,fy=fract(vWP.y/3.1),fx=fract(hx/3.3);float win=step(.36,fy)*step(fy,.8)*step(.3,fx)*step(fx,.7),gl=step(.4,fy)*step(fy,.76)*step(.34,fx)*step(fx,.66);diffuseColor.rgb=mix(diffuseColor.rgb,vec3(.86,.85,.8),win);diffuseColor.rgb=mix(diffuseColor.rgb,vec3(.1,.13,.16)+.06*step(.58,fy),gl);}}'))};
+  m.onBeforeCompile=sh=>{sh.vertexShader=sh.vertexShader.replace('#include <common>','#include <common>\nvarying vec3 vWP;varying vec3 vWN2;').replace('#include <project_vertex>','#include <project_vertex>\nvWP=(modelMatrix*vec4(transformed,1.)).xyz;vWN2=normalize(mat3(modelMatrix)*objectNormal);');sh.uniforms.nTex={value:NOISE};
+    sh.fragmentShader=sh.fragmentShader.replace('#include <common>','#include <common>\nuniform sampler2D nTex;varying vec3 vWP;varying vec3 vWN2;').replace('#include <color_fragment>','#include <color_fragment>\n'+(roof?
+      '{float t=fract(vWP.y*2.4+sin(vWP.x*1.7+vWP.z*1.3)*.08);vec2 tc=floor(vec2(vWP.x+vWP.z,vWP.y*2.4)*vec2(2.6,1.));float tv=fract(sin(dot(tc,vec2(12.9,78.2)))*43758.5);diffuseColor.rgb*=(.78+.22*smoothstep(0.,.25,t))*(.88+.22*tv);}':
+      '{vec3 n=normalize(vWN2);if(abs(n.y)<.5){float hx=abs(n.x)>.5?vWP.z:vWP.x,fy=fract(vWP.y/3.1),fx=fract(hx/3.3);float win=step(.36,fy)*step(fy,.8)*step(.3,fx)*step(fx,.7),gl=step(.4,fy)*step(fy,.76)*step(.34,fx)*step(fx,.66);float pl=texture2D(nTex,vec2(hx,vWP.y)*.35).r,pl2=texture2D(nTex,vec2(hx,vWP.y)*2.1).g;diffuseColor.rgb*=.84+.2*pl+.1*pl2;float stk=step(.3,fx)*step(fx,.7)*step(fy,.36)*smoothstep(.0,.36,fy);diffuseColor.rgb*=1.-.12*stk*pl;diffuseColor.rgb=mix(diffuseColor.rgb,vec3(.86,.85,.8),win);diffuseColor.rgb=mix(diffuseColor.rgb,vec3(.1,.13,.16)+.06*step(.58,fy),gl);}}'))};
   return m}
 
 /* ---------------- progression (War Thunder style): research points, silver lions, tech trees, modules, crew ----------------
