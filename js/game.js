@@ -1097,11 +1097,22 @@ function buildLoftJet(c,S,type){
   const fm=new THREE.MeshBasicMaterial({color:c.flame,transparent:true,opacity:.85,blending:THREE.AdditiveBlending,depthWrite:false});
   const fl=new THREE.Group(); fl.name='flame'; fl.position.set(0,S.noz[0][1],S.noz[0][2]-S.noz[0][4]*.5-.1); g.add(fl);
   for(const [x,y,z,r,len] of S.noz){const ng=new THREE.Group();ng.name='nozG';ng.userData={s:Math.sign(x)};ng.position.set(x,y,z+len*.5);g.add(ng);
-    const rect=S.nozRect, n=add(rect?new THREE.CylinderGeometry(r*.94,r,len,4,1,true).rotateY(Math.PI/4).rotateX(Math.PI/2).scale(1.3,.72,1):new THREE.CylinderGeometry(r*.94,r,len,18,1,true).rotateX(Math.PI/2),metal,'noz',ng);n.position.z=-len*.5;
-    if(!rect){const lip=add(new THREE.TorusGeometry(r*.98,.03,4,18),dark,null,n);lip.position.z=-len*.5}
-    const th=add(rect?new THREE.PlaneGeometry(r*1.25,r*.68):new THREE.CircleGeometry(r*.85,16),black,null,ng);th.position.z=-len*.2;th.rotation.y=Math.PI;
+    const rect=S.nozRect;let n;
+    if(rect){n=add(new THREE.CylinderGeometry(r*.94,r,len,4,1,true).rotateY(Math.PI/4).rotateX(Math.PI/2).scale(1.3,.72,1),metal,'noz',ng);n.position.z=-len*.5;
+      const th=add(new THREE.PlaneGeometry(r*1.25,r*.68),black,null,ng);th.position.z=-len*.2;th.rotation.y=Math.PI}
+    else{// a petal nozzle: converging, with scalloped "turkey feather" petals at the exit; a dark liner, flame-holder rings and a tail cone inside
+      const ng2=new THREE.CylinderGeometry(r*.86,r,len,48,4,true);ng2.rotateX(Math.PI/2);const P=ng2.attributes.position;
+      for(let i=0;i<P.count;i++){const x0=P.getX(i),y0=P.getY(i),z0=P.getZ(i),u=(len/2-z0)/len,a0=Math.atan2(y0,x0),k=1+u*u*.035*Math.cos(a0*16);P.setX(i,x0*k);P.setY(i,y0*k)}
+      ng2.computeVertexNormals();n=add(ng2,metal,'noz',ng);n.position.z=-len*.5;
+      const lip=add(new THREE.TorusGeometry(r*.87,.025,4,32),dark,null,n);lip.position.z=-len*.5;
+      const lin=add(new THREE.CylinderGeometry(r*.8,r*.8,len*.95,24,1,true).rotateX(Math.PI/2),black,null,ng);lin.position.z=-len*.48;
+      const fhm=new THREE.MeshStandardMaterial({color:0x2a2622,roughness:.6,metalness:.7});
+      for(const [rr,zz] of [[.55,.3],[.32,.3]]){const t=add(new THREE.TorusGeometry(r*rr,r*.035,4,20),fhm,null,ng);t.position.z=-len*zz}
+      const tc=add(new THREE.ConeGeometry(r*.22,r*.6,12).rotateX(-Math.PI/2),fhm,null,ng);tc.position.z=-len*.22;
+      const th=add(new THREE.CircleGeometry(r*.8,24),black,null,ng);th.position.z=-len*.12;th.rotation.y=Math.PI}
     const hz=add(HAZE_GEO,HAZE_MAT,'haze',ng);hz.position.z=-len;hz.scale.set(r/.5,r/.5,1);
-    const cgm=new THREE.ConeGeometry(r*.82,3.6,12,1,true);cgm.rotateX(-Math.PI/2);cgm.translate(0,0,-1.8);const m=new THREE.Mesh(cgm,fm);m.position.x=x;fl.add(m)}
+    const cgm=new THREE.ConeGeometry(r*.82,3.6,12,1,true);cgm.rotateX(-Math.PI/2);cgm.translate(0,0,-1.8);const m=new THREE.Mesh(cgm,fm);m.position.x=x;fl.add(m);
+    for(let k=0;k<4;k++){const dm=new THREE.Mesh(SHOCK_GEO,SHOCK_MAT);dm.position.set(x,0,-.5-k*r*1.5);const q=1-k*.17;dm.scale.set(r*.42*q,r*.42*q,r*.75*q);fl.add(dm)}}   // shock diamonds in the afterburner plume
   // stores: rails carry the real missile sizes for this jet's weapons; pylons go away with their missile
   const ac=AC_DEFS[type], d9=MSL_DIM[ac.srFull]||[3,.09], dM=MSL_DIM[ac.mrFull]||[3.7,.1];
   const lr=type==='SU35'&&c===PLAYER_COLORS&&suLR, d120=lr?MSL_DIM['R-37M']:dM;
@@ -1113,6 +1124,7 @@ function buildLoftJet(c,S,type){
   bakePaint(g,body);
   root.userData.spec=S;
   return root}
+const SHOCK_GEO=new THREE.SphereGeometry(1,10,8),SHOCK_MAT=new THREE.MeshBasicMaterial({color:0xfff2d0,transparent:true,opacity:.55,blending:THREE.AdditiveBlending,depthWrite:false});
 // heat haze: a faint, rippling plume behind each nozzle
 const HAZE_GEO=(()=>{const g=new THREE.CylinderGeometry(1.15,.5,7,14,6,true);g.rotateX(Math.PI/2);g.translate(0,0,-3.5);return g})();
 const HAZE_MAT=new THREE.ShaderMaterial({transparent:true,depthWrite:false,side:THREE.DoubleSide,uniforms:{t:{value:0},k:{value:0}},
@@ -5868,6 +5880,8 @@ const WAR_X={M1A1:{crew:4,rack:.3,gy:.62,gz:2.25},LEO2A4:{crew:4,rack:.45,gy:.6,
 for(const k in WAR_X)Object.assign(WAR_V[k],WAR_X[k]);
 const WAR={on:false,units:[],sh:[],t:0,debris:[]};
 const warMat=c=>new THREE.MeshLambertMaterial({color:c});
+const WAR_TRK=(()=>{const cv=document.createElement('canvas');cv.width=64;cv.height=8;const x=cv.getContext('2d');x.fillStyle='#2a2c2e';x.fillRect(0,0,64,8);
+  for(let i=0;i<64;i+=4){x.fillStyle='#4a4c4c';x.fillRect(i,0,2,8);x.fillStyle='#17181a';x.fillRect(i+2,0,1,8)}const t=new THREE.CanvasTexture(cv);t.wrapS=t.wrapT=THREE.RepeatWrapping;t.repeat.set(9,1);return t})();   // grousers, link by link
 const warShellMat={blue:new THREE.MeshBasicMaterial({color:0xfff4c0}),red:new THREE.MeshBasicMaterial({color:0xffb27a})};
 const warShellGeo=new THREE.BoxGeometry(.28,.28,7);
 for(let i=0;i<48;i++){const m=new THREE.Mesh(warShellGeo,warShellMat.blue);m.visible=false;m.frustumCulled=false;scene.add(m);WAR.sh.push({m,on:false,vel:new V3(),prev:new V3(),life:0,team:'blue',dmg:0,owner:null})}
@@ -5933,6 +5947,9 @@ function warBuild(d){
     default:{   // ZSU-57-2: open-topped turret with thin walls
       for(const s of [-1,1])wPart(T,wBox(.12,.9,3.0),s*1.4,.45,-.2);wPart(T,wBox(2.9,.9,.12),0,.45,-1.7);wPart(T,wBox(2.9,.5,.12),0,.3,1.3);wPart(TD,wBox(2.6,.1,2.6),0,.05,-.2);top.v=.9}}
   if(d.team==='blue'&&d.cls==='mbt')for(const sd of [-1,1])wPart(TD,wBox(.35,.45,1.6),sd*1.85,.4,-1.2);   // stowage bins on the turret sides
+  if(d.cls==='mbt'){wPart(TD,wBox(.95,.62,.4),0,d.gy,d.gz-.05);   // gun mantlet
+    wPart(TD,wBarrel(.025,1.1),.7,top.v+.18,-.2);wPart(TD,wBox(.12,.14,.4),.7,top.v+.14,-.25);   // commander's machine gun on its mount
+    if(d.look==='box')for(const sd of [-1,1])for(let i=0;i<4;i++)wPart(TD,wCyl(.06,.06,.32,6),sd*(1.0+i*.13),.62,1.75,-1.1,0,0);}   // smoke grenade launchers
   // gun: barrel(s) in their own group so they can elevate and recoil
   const gg=new THREE.Group();gg.position.set(0,d.gy,d.gz);
   if(d.look==='gepard')for(const s of [-1,1]){wPart(gunG,wBarrel(.075,d.barrel),s*1.35,d.gy*0-.15,-d.gz+1.2);wPart(gunG,wCyl(.1,.1,.35,8).rotateX(Math.PI/2),s*1.35,-.15,-d.gz+1.2+d.barrel,0,0,0)}
@@ -5943,7 +5960,8 @@ function warBuild(d){
     if(d.n.indexOf('Leopard')>=0||d.n.indexOf('Abrams')>=0||d.n.indexOf('Chall')>=0)wPart(gunG,wCyl(r*1.3,r*1.3,1.4,10).rotateX(Math.PI/2),0,0,.9)}
   else wPart(gunG,wBarrel(.06,d.barrel),0,0,0);
   if(d.look==='gepard')gg.position.set(0,.8,d.gz);
-  const hull=wMerge(hullG,body),sl=wMerge(sideL,dk),sr=wMerge(sideR,dk),tb=wMerge(turB,tmat),td=wMerge(turD,dk2),gn=wMerge(gunG,dk);
+  const trk=new THREE.MeshLambertMaterial({color:0xffffff,map:WAR_TRK});
+  const hull=wMerge(hullG,body),sl=wMerge(sideL,trk),sr=wMerge(sideR,trk),tb=wMerge(turB,tmat),td=wMerge(turD,dk2),gn=wMerge(gunG,dk);
   const tur=new THREE.Group();tur.position.y=yT;
   g.add(hull);g.add(sl);g.add(sr);g.add(tur);tur.add(tb);if(td)tur.add(td);tur.add(gg);if(gn)gg.add(gn);
   const mk=new THREE.Mesh(new THREE.PlaneGeometry(1.6,1.6).rotateX(-Math.PI/2),new THREE.MeshBasicMaterial({color:d.team==='blue'?0x2b8cff:0xff3b30,side:THREE.DoubleSide}));mk.name='mk';mk.position.set(0,top.v+.05,-.3);tur.add(mk);   // roof panel: readable from the air
@@ -6469,11 +6487,11 @@ function tkTown(cx,cz){const walls=[[],[]],roofs=[],bld=[],sq=34,step=32;
   const put=(x,z,w,d,h,rh,tower)=>{let base=1e9;for(const [dx,dz] of [[-w/2,-d/2],[w/2,-d/2],[-w/2,d/2],[w/2,d/2],[0,0]])base=Math.min(base,Math.max(groundH(x+dx,z+dz),0));
     wPart(walls[bld.length%2],wBox(w,h+4,d),x,base+(h+4)/2-4,z);
     if(rh)wPart(roofs,wPrism([[-d/2-.4,0],[0,rh],[d/2+.4,0]],w+.6),x,base+h,z);
-    bld.push({x,z,hx:w/2,hz:d/2,y0:base-4,y1:base+h+rh*.7});if(tower){wPart(walls[0],wBox(5,tower+4,5),x+w/2-2.5,base+(tower+4)/2-4,z-d/2+2.5);wPart(roofs,wCyl(0,3.8,6,4).rotateY(Math.PI/4),x+w/2-2.5,base+tower+3,z-d/2+2.5);bld.push({x:x+w/2-2.5,z:z-d/2+2.5,hx:2.5,hz:2.5,y0:base-4,y1:base+tower+4})}};
+    bld.push({x,z,hx:w/2,hz:d/2,y0:base-4,y1:base+h+rh*.7});if(rh&&!tower&&Math.random()<.65)wPart(walls[0],wBox(.7,1.8,.7),x+w*.22,base+h+rh*.55,z+d*.18);/* chimney */if(tower){wPart(walls[0],wBox(5,tower+4,5),x+w/2-2.5,base+(tower+4)/2-4,z-d/2+2.5);wPart(roofs,wCyl(0,3.8,6,4).rotateY(Math.PI/4),x+w/2-2.5,base+tower+3,z-d/2+2.5);bld.push({x:x+w/2-2.5,z:z-d/2+2.5,hx:2.5,hz:2.5,y0:base-4,y1:base+tower+4})}};
   for(let gx=-3;gx<=3;gx++)for(let gz=-3;gz<=3;gz++){if(gx===0||gz===0)continue;const x=cx+gx*step+Math.sign(gx)*(sq-step/2),z=cz+gz*step+Math.sign(gz)*(sq-step/2);
     if(gx===2&&gz===-2){put(x,z,14,20,9,5,22);continue}   // the church and its tower
     if(Math.random()<.22)continue;put(x+rand(-3,3),z+rand(-3,3),rand(8,12.5),rand(8,11.5),rand(4.5,8),rand(2.5,3.5))}
-  const objs=[wMerge(walls[0],warMat(0xcdbfa4)),wMerge(walls[1],warMat(0xb9ad97)),wMerge(roofs,warMat(0x8c4a33))].filter(Boolean);for(const o of objs)scene.add(o);
+  const objs=[wMerge(walls[0],tkWallMat(0xcdbfa4,0)),wMerge(walls[1],tkWallMat(0xb9ad97,0)),wMerge(roofs,tkWallMat(0x8c4a33,1))].filter(Boolean);for(const o of objs)scene.add(o);
   TNK.town=objs;TNK.bld=bld}
 function tkBld(x,z,pad){for(const b of TNK.bld||[])if(Math.abs(x-b.x)<b.hx+pad&&Math.abs(z-b.z)<b.hz+pad)return b;return null}
 function tkPush(u){if(!TNK.on||!TNK.bld)return false;const b=tkBld(u.pos.x,u.pos.z,2.6);if(!b)return false;
@@ -6484,6 +6502,14 @@ function tkSegHit(a,b){let best=-1;if(!TNK.bld)return best;const d=[b.x-a.x,b.y-
     for(let i=0;i<3&&ok;i++){if(Math.abs(d[i])<1e-9){if(o[i]<mn[i]||o[i]>mx[i])ok=false}else{let ta=(mn[i]-o[i])/d[i],tb=(mx[i]-o[i])/d[i];if(ta>tb){const q=ta;ta=tb;tb=q}t0=Math.max(t0,ta);t1=Math.min(t1,tb);if(t0>t1)ok=false}}
     if(ok&&(best<0||t0<best))best=t0}
   return best}
+
+// house walls and roofs: windows with white frames on every floor, roof tile courses, all from world position (no textures, no extra draw calls)
+function tkWallMat(col,roof){const m=new THREE.MeshLambertMaterial({color:col});
+  m.onBeforeCompile=sh=>{sh.vertexShader=sh.vertexShader.replace('#include <common>','#include <common>\nvarying vec3 vWP;varying vec3 vWN2;').replace('#include <project_vertex>','#include <project_vertex>\nvWP=(modelMatrix*vec4(transformed,1.)).xyz;vWN2=normalize(mat3(modelMatrix)*objectNormal);');
+    sh.fragmentShader=sh.fragmentShader.replace('#include <common>','#include <common>\nvarying vec3 vWP;varying vec3 vWN2;').replace('#include <color_fragment>','#include <color_fragment>\n'+(roof?
+      '{float t=fract(vWP.y*2.4+sin(vWP.x*1.7+vWP.z*1.3)*.08);diffuseColor.rgb*=.8+.2*smoothstep(0.,.25,t);}':
+      '{vec3 n=normalize(vWN2);if(abs(n.y)<.5){float hx=abs(n.x)>.5?vWP.z:vWP.x,fy=fract(vWP.y/3.1),fx=fract(hx/3.3);float win=step(.36,fy)*step(fy,.8)*step(.3,fx)*step(fx,.7),gl=step(.4,fy)*step(fy,.76)*step(.34,fx)*step(fx,.66);diffuseColor.rgb=mix(diffuseColor.rgb,vec3(.86,.85,.8),win);diffuseColor.rgb=mix(diffuseColor.rgb,vec3(.1,.13,.16)+.06*step(.58,fy),gl);}}'))};
+  return m}
 
 /* ---------------- progression (War Thunder style): research points, silver lions, tech trees, modules, crew ----------------
    Career mode only. RP earned in a sortie go to the aircraft you flew (and 10 % to Free RP); an aircraft is researched with RP from the

@@ -853,11 +853,22 @@ function buildLoftJet(c,S,type){
   const fm=new THREE.MeshBasicMaterial({color:c.flame,transparent:true,opacity:.85,blending:THREE.AdditiveBlending,depthWrite:false});
   const fl=new THREE.Group(); fl.name='flame'; fl.position.set(0,S.noz[0][1],S.noz[0][2]-S.noz[0][4]*.5-.1); g.add(fl);
   for(const [x,y,z,r,len] of S.noz){const ng=new THREE.Group();ng.name='nozG';ng.userData={s:Math.sign(x)};ng.position.set(x,y,z+len*.5);g.add(ng);
-    const rect=S.nozRect, n=add(rect?new THREE.CylinderGeometry(r*.94,r,len,4,1,true).rotateY(Math.PI/4).rotateX(Math.PI/2).scale(1.3,.72,1):new THREE.CylinderGeometry(r*.94,r,len,18,1,true).rotateX(Math.PI/2),metal,'noz',ng);n.position.z=-len*.5;
-    if(!rect){const lip=add(new THREE.TorusGeometry(r*.98,.03,4,18),dark,null,n);lip.position.z=-len*.5}
-    const th=add(rect?new THREE.PlaneGeometry(r*1.25,r*.68):new THREE.CircleGeometry(r*.85,16),black,null,ng);th.position.z=-len*.2;th.rotation.y=Math.PI;
+    const rect=S.nozRect;let n;
+    if(rect){n=add(new THREE.CylinderGeometry(r*.94,r,len,4,1,true).rotateY(Math.PI/4).rotateX(Math.PI/2).scale(1.3,.72,1),metal,'noz',ng);n.position.z=-len*.5;
+      const th=add(new THREE.PlaneGeometry(r*1.25,r*.68),black,null,ng);th.position.z=-len*.2;th.rotation.y=Math.PI}
+    else{// a petal nozzle: converging, with scalloped "turkey feather" petals at the exit; a dark liner, flame-holder rings and a tail cone inside
+      const ng2=new THREE.CylinderGeometry(r*.86,r,len,48,4,true);ng2.rotateX(Math.PI/2);const P=ng2.attributes.position;
+      for(let i=0;i<P.count;i++){const x0=P.getX(i),y0=P.getY(i),z0=P.getZ(i),u=(len/2-z0)/len,a0=Math.atan2(y0,x0),k=1+u*u*.035*Math.cos(a0*16);P.setX(i,x0*k);P.setY(i,y0*k)}
+      ng2.computeVertexNormals();n=add(ng2,metal,'noz',ng);n.position.z=-len*.5;
+      const lip=add(new THREE.TorusGeometry(r*.87,.025,4,32),dark,null,n);lip.position.z=-len*.5;
+      const lin=add(new THREE.CylinderGeometry(r*.8,r*.8,len*.95,24,1,true).rotateX(Math.PI/2),black,null,ng);lin.position.z=-len*.48;
+      const fhm=new THREE.MeshStandardMaterial({color:0x2a2622,roughness:.6,metalness:.7});
+      for(const [rr,zz] of [[.55,.3],[.32,.3]]){const t=add(new THREE.TorusGeometry(r*rr,r*.035,4,20),fhm,null,ng);t.position.z=-len*zz}
+      const tc=add(new THREE.ConeGeometry(r*.22,r*.6,12).rotateX(-Math.PI/2),fhm,null,ng);tc.position.z=-len*.22;
+      const th=add(new THREE.CircleGeometry(r*.8,24),black,null,ng);th.position.z=-len*.12;th.rotation.y=Math.PI}
     const hz=add(HAZE_GEO,HAZE_MAT,'haze',ng);hz.position.z=-len;hz.scale.set(r/.5,r/.5,1);
-    const cgm=new THREE.ConeGeometry(r*.82,3.6,12,1,true);cgm.rotateX(-Math.PI/2);cgm.translate(0,0,-1.8);const m=new THREE.Mesh(cgm,fm);m.position.x=x;fl.add(m)}
+    const cgm=new THREE.ConeGeometry(r*.82,3.6,12,1,true);cgm.rotateX(-Math.PI/2);cgm.translate(0,0,-1.8);const m=new THREE.Mesh(cgm,fm);m.position.x=x;fl.add(m);
+    for(let k=0;k<4;k++){const dm=new THREE.Mesh(SHOCK_GEO,SHOCK_MAT);dm.position.set(x,0,-.5-k*r*1.5);const q=1-k*.17;dm.scale.set(r*.42*q,r*.42*q,r*.75*q);fl.add(dm)}}   // shock diamonds in the afterburner plume
   // stores: rails carry the real missile sizes for this jet's weapons; pylons go away with their missile
   const ac=AC_DEFS[type], d9=MSL_DIM[ac.srFull]||[3,.09], dM=MSL_DIM[ac.mrFull]||[3.7,.1];
   const lr=type==='SU35'&&c===PLAYER_COLORS&&suLR, d120=lr?MSL_DIM['R-37M']:dM;
@@ -869,6 +880,7 @@ function buildLoftJet(c,S,type){
   bakePaint(g,body);
   root.userData.spec=S;
   return root}
+const SHOCK_GEO=new THREE.SphereGeometry(1,10,8),SHOCK_MAT=new THREE.MeshBasicMaterial({color:0xfff2d0,transparent:true,opacity:.55,blending:THREE.AdditiveBlending,depthWrite:false});
 // heat haze: a faint, rippling plume behind each nozzle
 const HAZE_GEO=(()=>{const g=new THREE.CylinderGeometry(1.15,.5,7,14,6,true);g.rotateX(Math.PI/2);g.translate(0,0,-3.5);return g})();
 const HAZE_MAT=new THREE.ShaderMaterial({transparent:true,depthWrite:false,side:THREE.DoubleSide,uniforms:{t:{value:0},k:{value:0}},

@@ -207,11 +207,11 @@ function tkTown(cx,cz){const walls=[[],[]],roofs=[],bld=[],sq=34,step=32;
   const put=(x,z,w,d,h,rh,tower)=>{let base=1e9;for(const [dx,dz] of [[-w/2,-d/2],[w/2,-d/2],[-w/2,d/2],[w/2,d/2],[0,0]])base=Math.min(base,Math.max(groundH(x+dx,z+dz),0));
     wPart(walls[bld.length%2],wBox(w,h+4,d),x,base+(h+4)/2-4,z);
     if(rh)wPart(roofs,wPrism([[-d/2-.4,0],[0,rh],[d/2+.4,0]],w+.6),x,base+h,z);
-    bld.push({x,z,hx:w/2,hz:d/2,y0:base-4,y1:base+h+rh*.7});if(tower){wPart(walls[0],wBox(5,tower+4,5),x+w/2-2.5,base+(tower+4)/2-4,z-d/2+2.5);wPart(roofs,wCyl(0,3.8,6,4).rotateY(Math.PI/4),x+w/2-2.5,base+tower+3,z-d/2+2.5);bld.push({x:x+w/2-2.5,z:z-d/2+2.5,hx:2.5,hz:2.5,y0:base-4,y1:base+tower+4})}};
+    bld.push({x,z,hx:w/2,hz:d/2,y0:base-4,y1:base+h+rh*.7});if(rh&&!tower&&Math.random()<.65)wPart(walls[0],wBox(.7,1.8,.7),x+w*.22,base+h+rh*.55,z+d*.18);/* chimney */if(tower){wPart(walls[0],wBox(5,tower+4,5),x+w/2-2.5,base+(tower+4)/2-4,z-d/2+2.5);wPart(roofs,wCyl(0,3.8,6,4).rotateY(Math.PI/4),x+w/2-2.5,base+tower+3,z-d/2+2.5);bld.push({x:x+w/2-2.5,z:z-d/2+2.5,hx:2.5,hz:2.5,y0:base-4,y1:base+tower+4})}};
   for(let gx=-3;gx<=3;gx++)for(let gz=-3;gz<=3;gz++){if(gx===0||gz===0)continue;const x=cx+gx*step+Math.sign(gx)*(sq-step/2),z=cz+gz*step+Math.sign(gz)*(sq-step/2);
     if(gx===2&&gz===-2){put(x,z,14,20,9,5,22);continue}   // the church and its tower
     if(Math.random()<.22)continue;put(x+rand(-3,3),z+rand(-3,3),rand(8,12.5),rand(8,11.5),rand(4.5,8),rand(2.5,3.5))}
-  const objs=[wMerge(walls[0],warMat(0xcdbfa4)),wMerge(walls[1],warMat(0xb9ad97)),wMerge(roofs,warMat(0x8c4a33))].filter(Boolean);for(const o of objs)scene.add(o);
+  const objs=[wMerge(walls[0],tkWallMat(0xcdbfa4,0)),wMerge(walls[1],tkWallMat(0xb9ad97,0)),wMerge(roofs,tkWallMat(0x8c4a33,1))].filter(Boolean);for(const o of objs)scene.add(o);
   TNK.town=objs;TNK.bld=bld}
 function tkBld(x,z,pad){for(const b of TNK.bld||[])if(Math.abs(x-b.x)<b.hx+pad&&Math.abs(z-b.z)<b.hz+pad)return b;return null}
 function tkPush(u){if(!TNK.on||!TNK.bld)return false;const b=tkBld(u.pos.x,u.pos.z,2.6);if(!b)return false;
@@ -222,3 +222,11 @@ function tkSegHit(a,b){let best=-1;if(!TNK.bld)return best;const d=[b.x-a.x,b.y-
     for(let i=0;i<3&&ok;i++){if(Math.abs(d[i])<1e-9){if(o[i]<mn[i]||o[i]>mx[i])ok=false}else{let ta=(mn[i]-o[i])/d[i],tb=(mx[i]-o[i])/d[i];if(ta>tb){const q=ta;ta=tb;tb=q}t0=Math.max(t0,ta);t1=Math.min(t1,tb);if(t0>t1)ok=false}}
     if(ok&&(best<0||t0<best))best=t0}
   return best}
+
+// house walls and roofs: windows with white frames on every floor, roof tile courses, all from world position (no textures, no extra draw calls)
+function tkWallMat(col,roof){const m=new THREE.MeshLambertMaterial({color:col});
+  m.onBeforeCompile=sh=>{sh.vertexShader=sh.vertexShader.replace('#include <common>','#include <common>\nvarying vec3 vWP;varying vec3 vWN2;').replace('#include <project_vertex>','#include <project_vertex>\nvWP=(modelMatrix*vec4(transformed,1.)).xyz;vWN2=normalize(mat3(modelMatrix)*objectNormal);');
+    sh.fragmentShader=sh.fragmentShader.replace('#include <common>','#include <common>\nvarying vec3 vWP;varying vec3 vWN2;').replace('#include <color_fragment>','#include <color_fragment>\n'+(roof?
+      '{float t=fract(vWP.y*2.4+sin(vWP.x*1.7+vWP.z*1.3)*.08);diffuseColor.rgb*=.8+.2*smoothstep(0.,.25,t);}':
+      '{vec3 n=normalize(vWN2);if(abs(n.y)<.5){float hx=abs(n.x)>.5?vWP.z:vWP.x,fy=fract(vWP.y/3.1),fx=fract(hx/3.3);float win=step(.36,fy)*step(fy,.8)*step(.3,fx)*step(fx,.7),gl=step(.4,fy)*step(fy,.76)*step(.34,fx)*step(fx,.66);diffuseColor.rgb=mix(diffuseColor.rgb,vec3(.86,.85,.8),win);diffuseColor.rgb=mix(diffuseColor.rgb,vec3(.1,.13,.16)+.06*step(.58,fy),gl);}}'))};
+  return m}

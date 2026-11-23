@@ -23,6 +23,8 @@ const WAR_X={M1A1:{crew:4,rack:.3,gy:.62,gz:2.25},LEO2A4:{crew:4,rack:.45,gy:.6,
 for(const k in WAR_X)Object.assign(WAR_V[k],WAR_X[k]);
 const WAR={on:false,units:[],sh:[],t:0,debris:[]};
 const warMat=c=>new THREE.MeshLambertMaterial({color:c});
+const WAR_TRK=(()=>{const cv=document.createElement('canvas');cv.width=64;cv.height=8;const x=cv.getContext('2d');x.fillStyle='#2a2c2e';x.fillRect(0,0,64,8);
+  for(let i=0;i<64;i+=4){x.fillStyle='#4a4c4c';x.fillRect(i,0,2,8);x.fillStyle='#17181a';x.fillRect(i+2,0,1,8)}const t=new THREE.CanvasTexture(cv);t.wrapS=t.wrapT=THREE.RepeatWrapping;t.repeat.set(9,1);return t})();   // grousers, link by link
 const warShellMat={blue:new THREE.MeshBasicMaterial({color:0xfff4c0}),red:new THREE.MeshBasicMaterial({color:0xffb27a})};
 const warShellGeo=new THREE.BoxGeometry(.28,.28,7);
 for(let i=0;i<48;i++){const m=new THREE.Mesh(warShellGeo,warShellMat.blue);m.visible=false;m.frustumCulled=false;scene.add(m);WAR.sh.push({m,on:false,vel:new V3(),prev:new V3(),life:0,team:'blue',dmg:0,owner:null})}
@@ -88,6 +90,9 @@ function warBuild(d){
     default:{   // ZSU-57-2: open-topped turret with thin walls
       for(const s of [-1,1])wPart(T,wBox(.12,.9,3.0),s*1.4,.45,-.2);wPart(T,wBox(2.9,.9,.12),0,.45,-1.7);wPart(T,wBox(2.9,.5,.12),0,.3,1.3);wPart(TD,wBox(2.6,.1,2.6),0,.05,-.2);top.v=.9}}
   if(d.team==='blue'&&d.cls==='mbt')for(const sd of [-1,1])wPart(TD,wBox(.35,.45,1.6),sd*1.85,.4,-1.2);   // stowage bins on the turret sides
+  if(d.cls==='mbt'){wPart(TD,wBox(.95,.62,.4),0,d.gy,d.gz-.05);   // gun mantlet
+    wPart(TD,wBarrel(.025,1.1),.7,top.v+.18,-.2);wPart(TD,wBox(.12,.14,.4),.7,top.v+.14,-.25);   // commander's machine gun on its mount
+    if(d.look==='box')for(const sd of [-1,1])for(let i=0;i<4;i++)wPart(TD,wCyl(.06,.06,.32,6),sd*(1.0+i*.13),.62,1.75,-1.1,0,0);}   // smoke grenade launchers
   // gun: barrel(s) in their own group so they can elevate and recoil
   const gg=new THREE.Group();gg.position.set(0,d.gy,d.gz);
   if(d.look==='gepard')for(const s of [-1,1]){wPart(gunG,wBarrel(.075,d.barrel),s*1.35,d.gy*0-.15,-d.gz+1.2);wPart(gunG,wCyl(.1,.1,.35,8).rotateX(Math.PI/2),s*1.35,-.15,-d.gz+1.2+d.barrel,0,0,0)}
@@ -98,7 +103,8 @@ function warBuild(d){
     if(d.n.indexOf('Leopard')>=0||d.n.indexOf('Abrams')>=0||d.n.indexOf('Chall')>=0)wPart(gunG,wCyl(r*1.3,r*1.3,1.4,10).rotateX(Math.PI/2),0,0,.9)}
   else wPart(gunG,wBarrel(.06,d.barrel),0,0,0);
   if(d.look==='gepard')gg.position.set(0,.8,d.gz);
-  const hull=wMerge(hullG,body),sl=wMerge(sideL,dk),sr=wMerge(sideR,dk),tb=wMerge(turB,tmat),td=wMerge(turD,dk2),gn=wMerge(gunG,dk);
+  const trk=new THREE.MeshLambertMaterial({color:0xffffff,map:WAR_TRK});
+  const hull=wMerge(hullG,body),sl=wMerge(sideL,trk),sr=wMerge(sideR,trk),tb=wMerge(turB,tmat),td=wMerge(turD,dk2),gn=wMerge(gunG,dk);
   const tur=new THREE.Group();tur.position.y=yT;
   g.add(hull);g.add(sl);g.add(sr);g.add(tur);tur.add(tb);if(td)tur.add(td);tur.add(gg);if(gn)gg.add(gn);
   const mk=new THREE.Mesh(new THREE.PlaneGeometry(1.6,1.6).rotateX(-Math.PI/2),new THREE.MeshBasicMaterial({color:d.team==='blue'?0x2b8cff:0xff3b30,side:THREE.DoubleSide}));mk.name='mk';mk.position.set(0,top.v+.05,-.3);tur.add(mk);   // roof panel: readable from the air
