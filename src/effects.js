@@ -134,7 +134,8 @@ function explode(p,big,noRec){
   for(let i=0;i<(big?14:5);i++){const d=rv().multiplyScalar(rand(20,70)*S),s=rand(.32,.46);puff(p.x,p.y+rand(5,25)*S,p.z,d.x,d.y*.4+rand(10,20)*S,d.z,s,s,s*1.03,.32,rand(20,36)*S,rand(10,20)*S,rand(6,10)*(big?1:.7),-.8)}   // lighter smoke cap
   ring(p,big?330:150);
   const dist=p.distanceTo(camera.position), vol=clamp(1-dist/6000,0.05,1)*(big?1:.5), lag=Math.min(dist/340,12);   // you see it first, then hear it
-  if(lag<.15||state==='replay')sndBoom(vol); else setTimeout(()=>{if(state==='play')sndBoom(vol)},lag*1000);
+  const bp=p.clone(),boom=()=>sndAt(bp,o=>sndBoom(vol,o));   // heard from its side
+  if(lag<.15||state==='replay')boom(); else setTimeout(()=>{if(state==='play')boom()},lag*1000);
 }
 
 /* ---------------- pools ---------------- */

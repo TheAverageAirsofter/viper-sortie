@@ -17,11 +17,11 @@ function audioInit(){
   A.wh=c.createOscillator(); A.wh.type='sine'; A.wh.frequency.value=900; A.whG=c.createGain(); A.whG.gain.value=0;
   A.wh.connect(A.whG).connect(A.master); A.wh.start();
 }
-function sndNoise(dur,freq,gain,type){
+function sndNoise(dur,freq,gain,type,out){
   if(!A.ctx||!A.on)return; const c=A.ctx,t=c.currentTime;
   const s=c.createBufferSource(); s.buffer=A.noise; const f=c.createBiquadFilter(); f.type=type||'lowpass'; f.frequency.value=freq;
   const g=c.createGain(); g.gain.setValueAtTime(gain,t); g.gain.exponentialRampToValueAtTime(.001,t+dur);
-  s.connect(f).connect(g).connect(A.master); s.start(t,Math.random()*1.5,dur+.05);
+  s.connect(f).connect(g).connect(out||A.master); s.start(t,Math.random()*1.5,dur+.05);
 }
 function sndBeep(freq,dur,gain,type){
   if(!A.ctx||!A.on)return; const c=A.ctx,t=c.currentTime;
@@ -51,7 +51,7 @@ function voiceWatch(){
   const fires=P.sys?P.sys.eng.filter(v=>v===1).length:0; if(fires>VW.fire)say('fire',5); VW.fire=fires;
   if(P.n>(P.gLim||AC.gmax)+.4)say('overg',4)}
 const sndGun=()=>sndNoise(.07,AC.gunSnd,.3,'bandpass');
-const sndBoom=v=>sndNoise(1.4,520,.9*v);
+const sndBoom=(v,out)=>sndNoise(1.4,520,.9*v,'lowpass',out);
 const sndMsl=()=>sndNoise(1.1,1400,.4,'bandpass');
 const sndHit=()=>sndNoise(.12,900,.5,'highpass');
 const sndSeq=(notes,dur,gain,type)=>notes.forEach((f,i)=>setTimeout(()=>sndBeep(f,dur,gain,type||'sine'),i*(dur*1000+30)));

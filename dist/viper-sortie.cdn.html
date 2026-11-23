@@ -3445,7 +3445,7 @@ const cmat=(c,o)=>new THREE.MeshStandardMaterial(Object.assign({color:c,roughnes
 const mDark=cmat(0x1c2023),mPanel=cmat(0x2c3135),mGrey=cmat(0x5a6168),mBlack=cmat(0x0c0e10);
 const cbox=(w,h,d,m,x,y,z,parent)=>{const b=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),m);b.position.set(x,y,z);(parent||cock).add(b);return b};
 // the real airframe around you: nose, wings, tail, stores
-let outside=null,outFlame=null,outRails=[];
+let outside=null,outFlame=null,outRails=[],fbow=null;
 function buildOutside(){
   if(outside)cock.remove(outside);
   outside=buildJet(PLAYER_COLORS,AC.id); if(typeof applyLivery==='function')applyLivery(outside);
@@ -3459,6 +3459,7 @@ function buildOutside(){
   let m=new THREE.Mesh(geo,fm); m.position.z=(cut.full[0]+cut.full[1])/2; g.add(m);
   geo=new THREE.CylinderGeometry(cut.r*1.05,cut.r,cut.open[1]-cut.open[0],12,1,true,Math.PI+.75,Math.PI*2-1.5); geo.rotateX(Math.PI/2);
   m=new THREE.Mesh(geo,fm); m.position.z=(cut.open[0]+cut.open[1])/2; g.add(m)}
+  if(fbow)fbow.visible=!/^(F16|F22|F35|F2A)/.test(AC.id);
   outFlame=outside.getObjectByName('flame'); outRails=[]; outside.traverse(o=>{if(/^r(9|120)_/.test(o.name))outRails.push(o)});
 }
 buildOutside();
@@ -3474,7 +3475,14 @@ const canopyGlass=new THREE.Mesh(new THREE.SphereGeometry(1,32,14,0,Math.PI*2,0,
   new THREE.MeshBasicMaterial({color:0xe2c98a,transparent:true,opacity:.07,side:THREE.BackSide,depthWrite:false}));
 canopyGlass.scale.set(.5,.44,1.55); canopyGlass.position.set(0,-.17,-.18); cock.add(canopyGlass);
 // glare shield + instrument panel (live canvas: MFDs, DED, standby gauges)
-cbox(1.0,.04,.26,mBlack,0,-.2,-.73);
+cbox(1.0,.035,.24,mBlack,0,-.2,-.74);   // glare shield hood with a rounded, padded front lip
+{const lip=new THREE.Mesh(new THREE.CylinderGeometry(.03,.03,1.0,10).rotateZ(Math.PI/2),cmat(0x121416,{roughness:.95}));lip.position.set(0,-.205,-.62);cock.add(lip)}
+// side-console switchgear: rows of knobs and toggles under the sills
+for(const sd of [-1,1])for(let r=0;r<3;r++)for(let k=0;k<4;k++){const z=-.4+r*.2+k*.045,x=sd*(.25+(k%2)*.1);
+  if((r+k)%2){const kn=new THREE.Mesh(new THREE.CylinderGeometry(.012,.014,.02,8),mGrey);kn.position.set(x,-.405,z);cock.add(kn)}
+  else{const t=cbox(.006,.03,.006,cmat(0xb8bcc0,{metalness:.7,roughness:.3}),x,-.4,z);t.rotation.x=.4}}
+// windscreen frame bow on jets that have one (one-piece bubbles don't)
+fbow=new THREE.Mesh(new THREE.TorusGeometry(.46,.022,6,30,Math.PI),mGrey);fbow.position.set(0,-.17,-.6);fbow.rotation.x=-.5;cock.add(fbow);fbow.visible=!/^(F16|F22|F35|F2A)/.test(AC.id);
 cbox(.92,.46,.05,mPanel,0,-.43,-.88);
 const panelCv=document.createElement('canvas'); panelCv.width=1024; panelCv.height=400;
 const pcx=panelCv.getContext('2d'); const panelTex=new THREE.CanvasTexture(panelCv);
@@ -3785,7 +3793,8 @@ function explode(p,big,noRec){
   for(let i=0;i<(big?14:5);i++){const d=rv().multiplyScalar(rand(20,70)*S),s=rand(.32,.46);puff(p.x,p.y+rand(5,25)*S,p.z,d.x,d.y*.4+rand(10,20)*S,d.z,s,s,s*1.03,.32,rand(20,36)*S,rand(10,20)*S,rand(6,10)*(big?1:.7),-.8)}   // lighter smoke cap
   ring(p,big?330:150);
   const dist=p.distanceTo(camera.position), vol=clamp(1-dist/6000,0.05,1)*(big?1:.5), lag=Math.min(dist/340,12);   // you see it first, then hear it
-  if(lag<.15||state==='replay')sndBoom(vol); else setTimeout(()=>{if(state==='play')sndBoom(vol)},lag*1000);
+  const bp=p.clone(),boom=()=>sndAt(bp,o=>sndBoom(vol,o));   // heard from its side
+  if(lag<.15||state==='replay')boom(); else setTimeout(()=>{if(state==='play')boom()},lag*1000);
 }
 
 /* ---------------- pools ---------------- */
@@ -3872,11 +3881,11 @@ function audioInit(){
   A.wh=c.createOscillator(); A.wh.type='sine'; A.wh.frequency.value=900; A.whG=c.createGain(); A.whG.gain.value=0;
   A.wh.connect(A.whG).connect(A.master); A.wh.start();
 }
-function sndNoise(dur,freq,gain,type){
+function sndNoise(dur,freq,gain,type,out){
   if(!A.ctx||!A.on)return; const c=A.ctx,t=c.currentTime;
   const s=c.createBufferSource(); s.buffer=A.noise; const f=c.createBiquadFilter(); f.type=type||'lowpass'; f.frequency.value=freq;
   const g=c.createGain(); g.gain.setValueAtTime(gain,t); g.gain.exponentialRampToValueAtTime(.001,t+dur);
-  s.connect(f).connect(g).connect(A.master); s.start(t,Math.random()*1.5,dur+.05);
+  s.connect(f).connect(g).connect(out||A.master); s.start(t,Math.random()*1.5,dur+.05);
 }
 function sndBeep(freq,dur,gain,type){
   if(!A.ctx||!A.on)return; const c=A.ctx,t=c.currentTime;
@@ -3906,7 +3915,7 @@ function voiceWatch(){
   const fires=P.sys?P.sys.eng.filter(v=>v===1).length:0; if(fires>VW.fire)say('fire',5); VW.fire=fires;
   if(P.n>(P.gLim||AC.gmax)+.4)say('overg',4)}
 const sndGun=()=>sndNoise(.07,AC.gunSnd,.3,'bandpass');
-const sndBoom=v=>sndNoise(1.4,520,.9*v);
+const sndBoom=(v,out)=>sndNoise(1.4,520,.9*v,'lowpass',out);
 const sndMsl=()=>sndNoise(1.1,1400,.4,'bandpass');
 const sndHit=()=>sndNoise(.12,900,.5,'highpass');
 const sndSeq=(notes,dur,gain,type)=>notes.forEach((f,i)=>setTimeout(()=>sndBeep(f,dur,gain,type||'sine'),i*(dur*1000+30)));
@@ -4302,13 +4311,30 @@ const FLYBY=new Map();
 function sndFlyby(){if(!A.ctx||!A.on||state!=='play')return;const cp=camera.position;
   for(const j of enemies.concat(friends)){if(!j.alive||j.kind!=='fighter')continue;const d=j.pos.distanceTo(cp),st=FLYBY.get(j)||{d,near:0,boom:0};
     const closing=st.d-d;
-    if(d<420&&closing<0&&!st.near&&j.vel.length()>140){st.near=1;whoosh(clamp(1-d/420,.15,1),j.vel.length())}
+    if(d<420&&closing<0&&!st.near&&j.vel.length()>140){st.near=1;whoosh(clamp(1-d/420,.15,1),j.vel.length(),j.pos)}
     if(d>900)st.near=0;
     if(j.mach>1&&d<1800&&closing<0&&!st.boom){st.boom=1;sonicBoom(clamp(1-d/1800,.2,1))}
     if(d>3500)st.boom=0;st.d=d;FLYBY.set(j,st)}}
-function whoosh(v,sp){const c=A.ctx,t=c.currentTime,s=c.createBufferSource();s.buffer=A.noise;const f=c.createBiquadFilter();f.type='bandpass';f.Q.value=1.4;
+function whoosh(v,sp,pos){const c=A.ctx,t=c.currentTime,s=c.createBufferSource();s.buffer=A.noise;const f=c.createBiquadFilter();f.type='bandpass';f.Q.value=1.4;
   f.frequency.setValueAtTime(1500+sp,t);f.frequency.exponentialRampToValueAtTime(220,t+1.6);const g=c.createGain();g.gain.setValueAtTime(.001,t);g.gain.exponentialRampToValueAtTime(.5*v,t+.12);g.gain.exponentialRampToValueAtTime(.001,t+1.9);
-  s.connect(f).connect(g).connect(A.master);s.start(t,Math.random(),2)}
+  s.connect(f).connect(g);sndAt(pos||camera.position,out=>g.connect(out));s.start(t,Math.random(),2)}
+// nearby jets and missiles: two looping voices that follow the closest of each, with distance fall-off, Doppler pitch and stereo pan
+const _nvA=new THREE.Vector3(),_nvB=new THREE.Vector3(),_nvR=new THREE.Vector3();
+function nvPan(pos){_nvR.set(1,0,0).applyQuaternion(camera.quaternion);_nvA.subVectors(pos,camera.position).normalize();return clamp(_nvA.dot(_nvR),-1,1)*.85}
+function sndNear(){if(!A.ctx||!A.on)return;const c=A.ctx,t=c.currentTime;
+  if(!A.nv){const mk=(type,freq,q,wave)=>{const s=c.createBufferSource();s.buffer=A.noise;s.loop=true;const f=c.createBiquadFilter();f.type=type;f.frequency.value=freq;f.Q.value=q;
+      const o=c.createOscillator();o.type=wave;o.frequency.value=80;const og=c.createGain();og.gain.value=.3;const g=c.createGain();g.gain.value=0;const p=c.createStereoPanner?c.createStereoPanner():null;
+      s.connect(f);o.connect(og).connect(f);f.connect(g);(p?g.connect(p):g).connect(A.master);s.start(0,Math.random());o.start();return{f,o,g,p}};
+    A.nv={jet:mk('lowpass',700,.7,'sawtooth'),msl:mk('bandpass',2400,1.1,'square')}}
+  const cp=camera.position,live=state==='play';
+  const pick=(list,maxD,ok)=>{let b=null,bd=maxD;for(const j of list){if(!ok(j))continue;const pos=j.pos||j.m.position,d=pos.distanceTo(cp);if(d<bd){bd=d;b=j}}return b?{j:b,d:bd,pos:b.pos||b.m.position}:null};
+  const dop=(pos,vel)=>{_nvB.subVectors(cp,pos).normalize();const cl=_nvB.dot(_nvA.copy(vel).sub(P.vel));return clamp(340/Math.max(120,340-cl),.6,1.7)};
+  const voice=(v,hit,maxD,base,fbase,gk)=>{if(!live||!hit){v.g.gain.setTargetAtTime(0,t,.15);return}const k=Math.pow(1-hit.d/maxD,2),dp=dop(hit.pos,hit.j.vel);
+    v.g.gain.setTargetAtTime(gk*k,t,.08);v.o.frequency.setTargetAtTime(base*dp,t,.06);v.f.frequency.setTargetAtTime(fbase*(.6+.8*k)*dp,t,.06);if(v.p)v.p.pan.setTargetAtTime(nvPan(hit.pos),t,.05)};
+  voice(A.nv.jet,pick(enemies.concat(friends),2500,j=>j.alive&&j.kind==='fighter'),2500,72,900,.4);
+  const m=pick(missiles.concat(eMissiles),1600,q=>q.on);voice(A.nv.msl,m,1600,180,2600,m&&m.j.t<(SPEC[m.j.type]||{burn:3}).burn?.34:.12)}
+// a one-shot sound placed in stereo
+function sndAt(pos,fn){if(!A.ctx||!A.on||!A.ctx.createStereoPanner)return fn(A.master);const p=A.ctx.createStereoPanner();p.pan.value=nvPan(pos);p.connect(A.master);fn(p)}
 function sonicBoom(v){sndNoise(.35,160,1.1*v);setTimeout(()=>sndNoise(.4,150,1.0*v),110);buzz([60,40,80])}
 
 const GEAR_H=1.95;
@@ -6822,10 +6848,18 @@ function warBuild(d){
   // running gear: road wheels, sprocket, idler, track runs and skirts, one merged mesh per side
   const nW=tier?5:6;
   for(const [sd,list] of [[-1,sideL],[1,sideR]]){const x=sd*(W/2+.12);
-    wPart(list,wBox(.8,.95,L+.2),x,.6,0);wPart(list,wBox(.8,.1,L-.2),x,1.12,0);
-    for(let i=0;i<nW;i++){const z=-L/2+1.2+(L-2.4)*i/(nW-1);wPart(list,wCyl(.46,.46,.55,12),x+sd*-.12,.55,z,0,0,Math.PI/2)}
-    wPart(list,wCyl(.4,.4,.55,12),x-sd*.12,.6,-L/2+.45,0,0,Math.PI/2);wPart(list,wCyl(.36,.36,.55,12),x-sd*.12,.6,L/2-.35,0,0,Math.PI/2);
+    // track loop: ground run, return run, and the slopes up to the sprocket and idler; wheels stay visible between the runs
+    wPart(list,wBox(.78,.1,L-1.5),x,.06,0);wPart(list,wBox(.78,.08,L-.5),x,1.07,0);
+    wPart(list,wBox(.78,.1,1.15),x,.5,L/2-.45,-1.0);wPart(list,wBox(.78,.1,1.15),x,.5,-L/2+.45,1.0);
+    for(let i=0;i<nW;i++){const z=-L/2+1.2+(L-2.4)*i/(nW-1);wPart(hullG,wCyl(.45,.45,.62,14),x,.52,z,0,0,Math.PI/2);wPart(list,wCyl(.47,.47,.56,14),x,.52,z,0,0,Math.PI/2);wPart(hullG,wCyl(.16,.16,.7,8),x,.52,z,0,0,Math.PI/2)}   // road wheels with rubber tyres and hubs
+    for(let i=0;i<3;i++)wPart(list,wCyl(.1,.1,.4,8),x,1.0,-L/2+1.8+i*(L-3.6)/2,0,0,Math.PI/2);   // return rollers
+    wPart(hullG,wCyl(.42,.42,.6,10),x,.65,-L/2+.4,0,0,Math.PI/2);wPart(list,wCyl(.46,.46,.5,10),x,.65,-L/2+.4,0,0,Math.PI/2);   // drive sprocket
+    wPart(hullG,wCyl(.38,.38,.6,12),x,.65,L/2-.35,0,0,Math.PI/2);   // idler
     if(!tier&&d.team==='blue')wPart(list,wBox(.08,.55,L*.8),x+sd*.42,.95,0)}                                              // side skirts on the NATO tanks
+  // hull details: headlights and tow hooks at the front, exhaust grilles at the back, Soviet tanks' external fuel drums
+  for(const sd of [-1,1]){wPart(sideL,wCyl(.12,.12,.15,8),sd*(W/2-.55),.3+H1*.62,L/2-.02,Math.PI/2);wPart(sideL,wBox(.18,.14,.25),sd*.8,.38,L/2+.05);wPart(sideL,wBox(.18,.14,.25),sd*.8,.38,-L/2-.05);
+    if(!tier)wPart(sideL,wBox(.9,.05,.5),sd*.9,.3+H1+.03,-L/2+.6)}
+  if(d.team==='red'&&d.cls==='mbt')for(const sd of [-1,1])wPart(hullG,wCyl(.29,.29,.9,12),sd*.55,.3+H1*.82,-L/2-.3,0,0,Math.PI/2);
   const yT=.3+H1, T=turB, TD=turD;   // turret frame: y = 0 at the ring
   const top={v:1};
   switch(d.look){
@@ -6854,6 +6888,7 @@ function warBuild(d){
       wPart(T,wBox(2.9,1.2,2.9),0,.6,-.2);wPart(T,wBox(2.6,.2,1.0),0,1.25,.9,-.35);wPart(TD,wCyl(.06,.06,.8,6),0,1.6,-1.0);wPart(TD,wCyl(.85,.85,.14,14),0,2.1,-1.1,Math.PI/2.3);top.v=1.4;break}
     default:{   // ZSU-57-2: open-topped turret with thin walls
       for(const s of [-1,1])wPart(T,wBox(.12,.9,3.0),s*1.4,.45,-.2);wPart(T,wBox(2.9,.9,.12),0,.45,-1.7);wPart(T,wBox(2.9,.5,.12),0,.3,1.3);wPart(TD,wBox(2.6,.1,2.6),0,.05,-.2);top.v=.9}}
+  if(d.team==='blue'&&d.cls==='mbt')for(const sd of [-1,1])wPart(TD,wBox(.35,.45,1.6),sd*1.85,.4,-1.2);   // stowage bins on the turret sides
   // gun: barrel(s) in their own group so they can elevate and recoil
   const gg=new THREE.Group();gg.position.set(0,d.gy,d.gz);
   if(d.look==='gepard')for(const s of [-1,1]){wPart(gunG,wBarrel(.075,d.barrel),s*1.35,d.gy*0-.15,-d.gz+1.2);wPart(gunG,wCyl(.1,.1,.35,8).rotateX(Math.PI/2),s*1.35,-.15,-d.gz+1.2+d.barrel,0,0,0)}
@@ -8107,7 +8142,7 @@ function frame(now){
   if(boomLight.intensity>0)boomLight.intensity=Math.max(0,boomLight.intensity-(dt||.016)*7*LK);
   updateShadow(); gust=1+.35*Math.sin(clock*.7)*Math.sin(clock*1.9+1); updateRain(dt||.016); updateLightning(dt||.016);
   for(const cl of clouds){if(!cl.visible)continue;const d=cl.position.distanceTo(camera.position),o=clamp((d-380)/900,0,1)*.95;if(cl.userData.op!==o){cl.userData.op=o;for(const m of cl.userData.mats)m.opacity=o}}
-  sndEngine(); sndExtra(); sndFlyby(); updateGlints(); updateFlareLight(); shadowFollow();
+  sndEngine(); sndExtra(); sndFlyby(); sndNear(); updateGlints(); updateFlareLight(); shadowFollow();
   const scn=(HG.on||HG.bg)&&hgSaved&&hgScene?hgScene:scene, inCock=VIEWS[view]==='COCKPIT'&&!(KC.t>0)&&(state==='play'||state==='menu'||state==='paused');
   if(inCock)updateCockpit(dt||.016);
   if(!postRender(scn,camera,inCock)){
@@ -8230,7 +8265,7 @@ const _careerAward=careerAward;
 careerAward=function(){lbAdd();return _careerAward.apply(this,arguments)};
 
 /* ---------- test hook (only with ?test in the URL) ---------- */
-if(/[?&]test\b/.test(location.search))window.__vs={get sortie(){return sortie},get playerJet(){return playerJet},get CANYON(){return CANYON},groundH,valRings:()=>valRings,buildSAM,buildAAA,buildRadar,buildBunker,buildTruck,buildShip,get ground(){return ground},deathCause:()=>deathCause,spawnFighter,clockNow:()=>clock,cycleRadarSub,radarBlind,radarSub,clutter,R,AA,killEnemy,aaSpawnWave,AG,agRelease,agSight,agWpn,ccip,agReset,btConditions,NET,netScoreCheck,netTeamScore,sbHtml,killGround,get pass(){return pass},passAdd,passClaim,weeklyAdd,scene,rinfoReset:()=>{renderer.info.autoReset=false;renderer.info.reset()},rinfo:()=>({c:renderer.info.render.calls,t:renderer.info.render.triangles,g:renderer.info.memory.geometries,tx:renderer.info.memory.textures}),KB,kbRebuild,playerGunHit,wingHit,BT,die,btRespawn,TMAP,mapStep,KBM,SC,damageSystem,hitAI,killEnemy,setThr,HEAT,explode,puff,camera,LT,townLights,flashLt,P,fly,dlz,flyout,AC_DEFS,feed,WAR,WAR_V,warBuild,warSpawn,warModules,warDie,warFlags,updateWar,warAlive,buildJet,PLAYER_COLORS,M2,V3,atm,clamp,lbAdd,showOverlay:k=>showOverlay(k),setScore:(n,k)=>{score=n;kills=k},get state(){return state},get enemies(){return enemies},missiles:()=>missiles.filter(m=>m.on),setAC:id=>{AC=AC_DEFS[id];applyAC()},wt:{   // weapon-test hooks: a clean sky, one drone, scripted launches
+if(/[?&]test\b/.test(location.search))window.__vs={get sortie(){return sortie},warBuild,WAR_V,get playerJet(){return playerJet},get CANYON(){return CANYON},groundH,valRings:()=>valRings,buildSAM,buildAAA,buildRadar,buildBunker,buildTruck,buildShip,get ground(){return ground},deathCause:()=>deathCause,spawnFighter,clockNow:()=>clock,cycleRadarSub,radarBlind,radarSub,clutter,R,AA,killEnemy,aaSpawnWave,AG,agRelease,agSight,agWpn,ccip,agReset,btConditions,NET,netScoreCheck,netTeamScore,sbHtml,killGround,get pass(){return pass},passAdd,passClaim,weeklyAdd,scene,rinfoReset:()=>{renderer.info.autoReset=false;renderer.info.reset()},rinfo:()=>({c:renderer.info.render.calls,t:renderer.info.render.triangles,g:renderer.info.memory.geometries,tx:renderer.info.memory.textures}),KB,kbRebuild,playerGunHit,wingHit,BT,die,btRespawn,TMAP,mapStep,KBM,SC,damageSystem,hitAI,killEnemy,setThr,HEAT,explode,puff,camera,LT,townLights,flashLt,P,fly,dlz,flyout,AC_DEFS,feed,WAR,WAR_V,warBuild,warSpawn,warModules,warDie,warFlags,updateWar,warAlive,buildJet,PLAYER_COLORS,M2,V3,atm,clamp,lbAdd,showOverlay:k=>showOverlay(k),setScore:(n,k)=>{score=n;kills=k},get state(){return state},get enemies(){return enemies},missiles:()=>missiles.filter(m=>m.on),setAC:id=>{AC=AC_DEFS[id];applyAC()},wt:{   // weapon-test hooks: a clean sky, one drone, scripted launches
   begin:id=>{AC=AC_DEFS[id];applyAC();startGame();return AC.id},
   clear:()=>{waveClearT=1e9;for(const e of enemies){e.alive=false;scene.remove(e.obj)}enemies.length=0;P.pos.set(0,6000,0);P.vel.set(0,0,250);throttle=.7;return state},
   target:(type,dz,away,speed)=>{const e=spawnFighter('red',type,new V3(0,P.pos.y,dz),new V3(0,P.pos.y,dz+(away?9999:-9999)),{ir:0,rdr:0,speed:speed||220});e.drone=true;return e.id},

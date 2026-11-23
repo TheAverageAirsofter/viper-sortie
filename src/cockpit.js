@@ -10,7 +10,7 @@ const cmat=(c,o)=>new THREE.MeshStandardMaterial(Object.assign({color:c,roughnes
 const mDark=cmat(0x1c2023),mPanel=cmat(0x2c3135),mGrey=cmat(0x5a6168),mBlack=cmat(0x0c0e10);
 const cbox=(w,h,d,m,x,y,z,parent)=>{const b=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),m);b.position.set(x,y,z);(parent||cock).add(b);return b};
 // the real airframe around you: nose, wings, tail, stores
-let outside=null,outFlame=null,outRails=[];
+let outside=null,outFlame=null,outRails=[],fbow=null;
 function buildOutside(){
   if(outside)cock.remove(outside);
   outside=buildJet(PLAYER_COLORS,AC.id); if(typeof applyLivery==='function')applyLivery(outside);
@@ -24,6 +24,7 @@ function buildOutside(){
   let m=new THREE.Mesh(geo,fm); m.position.z=(cut.full[0]+cut.full[1])/2; g.add(m);
   geo=new THREE.CylinderGeometry(cut.r*1.05,cut.r,cut.open[1]-cut.open[0],12,1,true,Math.PI+.75,Math.PI*2-1.5); geo.rotateX(Math.PI/2);
   m=new THREE.Mesh(geo,fm); m.position.z=(cut.open[0]+cut.open[1])/2; g.add(m)}
+  if(fbow)fbow.visible=!/^(F16|F22|F35|F2A)/.test(AC.id);
   outFlame=outside.getObjectByName('flame'); outRails=[]; outside.traverse(o=>{if(/^r(9|120)_/.test(o.name))outRails.push(o)});
 }
 buildOutside();
@@ -39,7 +40,14 @@ const canopyGlass=new THREE.Mesh(new THREE.SphereGeometry(1,32,14,0,Math.PI*2,0,
   new THREE.MeshBasicMaterial({color:0xe2c98a,transparent:true,opacity:.07,side:THREE.BackSide,depthWrite:false}));
 canopyGlass.scale.set(.5,.44,1.55); canopyGlass.position.set(0,-.17,-.18); cock.add(canopyGlass);
 // glare shield + instrument panel (live canvas: MFDs, DED, standby gauges)
-cbox(1.0,.04,.26,mBlack,0,-.2,-.73);
+cbox(1.0,.035,.24,mBlack,0,-.2,-.74);   // glare shield hood with a rounded, padded front lip
+{const lip=new THREE.Mesh(new THREE.CylinderGeometry(.03,.03,1.0,10).rotateZ(Math.PI/2),cmat(0x121416,{roughness:.95}));lip.position.set(0,-.205,-.62);cock.add(lip)}
+// side-console switchgear: rows of knobs and toggles under the sills
+for(const sd of [-1,1])for(let r=0;r<3;r++)for(let k=0;k<4;k++){const z=-.4+r*.2+k*.045,x=sd*(.25+(k%2)*.1);
+  if((r+k)%2){const kn=new THREE.Mesh(new THREE.CylinderGeometry(.012,.014,.02,8),mGrey);kn.position.set(x,-.405,z);cock.add(kn)}
+  else{const t=cbox(.006,.03,.006,cmat(0xb8bcc0,{metalness:.7,roughness:.3}),x,-.4,z);t.rotation.x=.4}}
+// windscreen frame bow on jets that have one (one-piece bubbles don't)
+fbow=new THREE.Mesh(new THREE.TorusGeometry(.46,.022,6,30,Math.PI),mGrey);fbow.position.set(0,-.17,-.6);fbow.rotation.x=-.5;cock.add(fbow);fbow.visible=!/^(F16|F22|F35|F2A)/.test(AC.id);
 cbox(.92,.46,.05,mPanel,0,-.43,-.88);
 const panelCv=document.createElement('canvas'); panelCv.width=1024; panelCv.height=400;
 const pcx=panelCv.getContext('2d'); const panelTex=new THREE.CanvasTexture(panelCv);

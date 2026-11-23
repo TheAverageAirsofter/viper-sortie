@@ -370,13 +370,30 @@ const FLYBY=new Map();
 function sndFlyby(){if(!A.ctx||!A.on||state!=='play')return;const cp=camera.position;
   for(const j of enemies.concat(friends)){if(!j.alive||j.kind!=='fighter')continue;const d=j.pos.distanceTo(cp),st=FLYBY.get(j)||{d,near:0,boom:0};
     const closing=st.d-d;
-    if(d<420&&closing<0&&!st.near&&j.vel.length()>140){st.near=1;whoosh(clamp(1-d/420,.15,1),j.vel.length())}
+    if(d<420&&closing<0&&!st.near&&j.vel.length()>140){st.near=1;whoosh(clamp(1-d/420,.15,1),j.vel.length(),j.pos)}
     if(d>900)st.near=0;
     if(j.mach>1&&d<1800&&closing<0&&!st.boom){st.boom=1;sonicBoom(clamp(1-d/1800,.2,1))}
     if(d>3500)st.boom=0;st.d=d;FLYBY.set(j,st)}}
-function whoosh(v,sp){const c=A.ctx,t=c.currentTime,s=c.createBufferSource();s.buffer=A.noise;const f=c.createBiquadFilter();f.type='bandpass';f.Q.value=1.4;
+function whoosh(v,sp,pos){const c=A.ctx,t=c.currentTime,s=c.createBufferSource();s.buffer=A.noise;const f=c.createBiquadFilter();f.type='bandpass';f.Q.value=1.4;
   f.frequency.setValueAtTime(1500+sp,t);f.frequency.exponentialRampToValueAtTime(220,t+1.6);const g=c.createGain();g.gain.setValueAtTime(.001,t);g.gain.exponentialRampToValueAtTime(.5*v,t+.12);g.gain.exponentialRampToValueAtTime(.001,t+1.9);
-  s.connect(f).connect(g).connect(A.master);s.start(t,Math.random(),2)}
+  s.connect(f).connect(g);sndAt(pos||camera.position,out=>g.connect(out));s.start(t,Math.random(),2)}
+// nearby jets and missiles: two looping voices that follow the closest of each, with distance fall-off, Doppler pitch and stereo pan
+const _nvA=new THREE.Vector3(),_nvB=new THREE.Vector3(),_nvR=new THREE.Vector3();
+function nvPan(pos){_nvR.set(1,0,0).applyQuaternion(camera.quaternion);_nvA.subVectors(pos,camera.position).normalize();return clamp(_nvA.dot(_nvR),-1,1)*.85}
+function sndNear(){if(!A.ctx||!A.on)return;const c=A.ctx,t=c.currentTime;
+  if(!A.nv){const mk=(type,freq,q,wave)=>{const s=c.createBufferSource();s.buffer=A.noise;s.loop=true;const f=c.createBiquadFilter();f.type=type;f.frequency.value=freq;f.Q.value=q;
+      const o=c.createOscillator();o.type=wave;o.frequency.value=80;const og=c.createGain();og.gain.value=.3;const g=c.createGain();g.gain.value=0;const p=c.createStereoPanner?c.createStereoPanner():null;
+      s.connect(f);o.connect(og).connect(f);f.connect(g);(p?g.connect(p):g).connect(A.master);s.start(0,Math.random());o.start();return{f,o,g,p}};
+    A.nv={jet:mk('lowpass',700,.7,'sawtooth'),msl:mk('bandpass',2400,1.1,'square')}}
+  const cp=camera.position,live=state==='play';
+  const pick=(list,maxD,ok)=>{let b=null,bd=maxD;for(const j of list){if(!ok(j))continue;const pos=j.pos||j.m.position,d=pos.distanceTo(cp);if(d<bd){bd=d;b=j}}return b?{j:b,d:bd,pos:b.pos||b.m.position}:null};
+  const dop=(pos,vel)=>{_nvB.subVectors(cp,pos).normalize();const cl=_nvB.dot(_nvA.copy(vel).sub(P.vel));return clamp(340/Math.max(120,340-cl),.6,1.7)};
+  const voice=(v,hit,maxD,base,fbase,gk)=>{if(!live||!hit){v.g.gain.setTargetAtTime(0,t,.15);return}const k=Math.pow(1-hit.d/maxD,2),dp=dop(hit.pos,hit.j.vel);
+    v.g.gain.setTargetAtTime(gk*k,t,.08);v.o.frequency.setTargetAtTime(base*dp,t,.06);v.f.frequency.setTargetAtTime(fbase*(.6+.8*k)*dp,t,.06);if(v.p)v.p.pan.setTargetAtTime(nvPan(hit.pos),t,.05)};
+  voice(A.nv.jet,pick(enemies.concat(friends),2500,j=>j.alive&&j.kind==='fighter'),2500,72,900,.4);
+  const m=pick(missiles.concat(eMissiles),1600,q=>q.on);voice(A.nv.msl,m,1600,180,2600,m&&m.j.t<(SPEC[m.j.type]||{burn:3}).burn?.34:.12)}
+// a one-shot sound placed in stereo
+function sndAt(pos,fn){if(!A.ctx||!A.on||!A.ctx.createStereoPanner)return fn(A.master);const p=A.ctx.createStereoPanner();p.pan.value=nvPan(pos);p.connect(A.master);fn(p)}
 function sonicBoom(v){sndNoise(.35,160,1.1*v);setTimeout(()=>sndNoise(.4,150,1.0*v),110);buzz([60,40,80])}
 
 const GEAR_H=1.95;

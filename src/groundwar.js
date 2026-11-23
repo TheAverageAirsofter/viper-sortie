@@ -47,10 +47,18 @@ function warBuild(d){
   // running gear: road wheels, sprocket, idler, track runs and skirts, one merged mesh per side
   const nW=tier?5:6;
   for(const [sd,list] of [[-1,sideL],[1,sideR]]){const x=sd*(W/2+.12);
-    wPart(list,wBox(.8,.95,L+.2),x,.6,0);wPart(list,wBox(.8,.1,L-.2),x,1.12,0);
-    for(let i=0;i<nW;i++){const z=-L/2+1.2+(L-2.4)*i/(nW-1);wPart(list,wCyl(.46,.46,.55,12),x+sd*-.12,.55,z,0,0,Math.PI/2)}
-    wPart(list,wCyl(.4,.4,.55,12),x-sd*.12,.6,-L/2+.45,0,0,Math.PI/2);wPart(list,wCyl(.36,.36,.55,12),x-sd*.12,.6,L/2-.35,0,0,Math.PI/2);
+    // track loop: ground run, return run, and the slopes up to the sprocket and idler; wheels stay visible between the runs
+    wPart(list,wBox(.78,.1,L-1.5),x,.06,0);wPart(list,wBox(.78,.08,L-.5),x,1.07,0);
+    wPart(list,wBox(.78,.1,1.15),x,.5,L/2-.45,-1.0);wPart(list,wBox(.78,.1,1.15),x,.5,-L/2+.45,1.0);
+    for(let i=0;i<nW;i++){const z=-L/2+1.2+(L-2.4)*i/(nW-1);wPart(hullG,wCyl(.45,.45,.62,14),x,.52,z,0,0,Math.PI/2);wPart(list,wCyl(.47,.47,.56,14),x,.52,z,0,0,Math.PI/2);wPart(hullG,wCyl(.16,.16,.7,8),x,.52,z,0,0,Math.PI/2)}   // road wheels with rubber tyres and hubs
+    for(let i=0;i<3;i++)wPart(list,wCyl(.1,.1,.4,8),x,1.0,-L/2+1.8+i*(L-3.6)/2,0,0,Math.PI/2);   // return rollers
+    wPart(hullG,wCyl(.42,.42,.6,10),x,.65,-L/2+.4,0,0,Math.PI/2);wPart(list,wCyl(.46,.46,.5,10),x,.65,-L/2+.4,0,0,Math.PI/2);   // drive sprocket
+    wPart(hullG,wCyl(.38,.38,.6,12),x,.65,L/2-.35,0,0,Math.PI/2);   // idler
     if(!tier&&d.team==='blue')wPart(list,wBox(.08,.55,L*.8),x+sd*.42,.95,0)}                                              // side skirts on the NATO tanks
+  // hull details: headlights and tow hooks at the front, exhaust grilles at the back, Soviet tanks' external fuel drums
+  for(const sd of [-1,1]){wPart(sideL,wCyl(.12,.12,.15,8),sd*(W/2-.55),.3+H1*.62,L/2-.02,Math.PI/2);wPart(sideL,wBox(.18,.14,.25),sd*.8,.38,L/2+.05);wPart(sideL,wBox(.18,.14,.25),sd*.8,.38,-L/2-.05);
+    if(!tier)wPart(sideL,wBox(.9,.05,.5),sd*.9,.3+H1+.03,-L/2+.6)}
+  if(d.team==='red'&&d.cls==='mbt')for(const sd of [-1,1])wPart(hullG,wCyl(.29,.29,.9,12),sd*.55,.3+H1*.82,-L/2-.3,0,0,Math.PI/2);
   const yT=.3+H1, T=turB, TD=turD;   // turret frame: y = 0 at the ring
   const top={v:1};
   switch(d.look){
@@ -79,6 +87,7 @@ function warBuild(d){
       wPart(T,wBox(2.9,1.2,2.9),0,.6,-.2);wPart(T,wBox(2.6,.2,1.0),0,1.25,.9,-.35);wPart(TD,wCyl(.06,.06,.8,6),0,1.6,-1.0);wPart(TD,wCyl(.85,.85,.14,14),0,2.1,-1.1,Math.PI/2.3);top.v=1.4;break}
     default:{   // ZSU-57-2: open-topped turret with thin walls
       for(const s of [-1,1])wPart(T,wBox(.12,.9,3.0),s*1.4,.45,-.2);wPart(T,wBox(2.9,.9,.12),0,.45,-1.7);wPart(T,wBox(2.9,.5,.12),0,.3,1.3);wPart(TD,wBox(2.6,.1,2.6),0,.05,-.2);top.v=.9}}
+  if(d.team==='blue'&&d.cls==='mbt')for(const sd of [-1,1])wPart(TD,wBox(.35,.45,1.6),sd*1.85,.4,-1.2);   // stowage bins on the turret sides
   // gun: barrel(s) in their own group so they can elevate and recoil
   const gg=new THREE.Group();gg.position.set(0,d.gy,d.gz);
   if(d.look==='gepard')for(const s of [-1,1]){wPart(gunG,wBarrel(.075,d.barrel),s*1.35,d.gy*0-.15,-d.gz+1.2);wPart(gunG,wCyl(.1,.1,.35,8).rotateX(Math.PI/2),s*1.35,-.15,-d.gz+1.2+d.barrel,0,0,0)}
