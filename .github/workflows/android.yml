@@ -28,12 +28,12 @@ jobs:
       # the ubuntu runner already ships the Android SDK; just accept its licenses so Gradle can fetch missing platform pieces
       - run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
       - run: npm install --no-save @capacitor/core@6 @capacitor/cli@6 @capacitor/android@6
-      - run: node tools/build.js --check && node tools/make-www.js
-      - run: npx cap add android && bash tools/android-patch.sh
       - name: Version
         run: |
           echo "VS_VERSION_CODE=${{ github.run_number }}" >> "$GITHUB_ENV"
           echo "VS_VERSION_NAME=${{ inputs.version || (startsWith(github.ref, 'refs/tags/v') && github.ref_name || format('1.0.{0}', github.run_number)) }}" >> "$GITHUB_ENV"
+      - run: node tools/build.js --check && node tools/make-www.js
+      - run: npx cap add android && bash tools/android-patch.sh
       - name: Signing (only when the keystore secrets are set)
         if: env.HAS_KEY == 'true'
         env:
@@ -47,6 +47,8 @@ jobs:
       - run: python3 tools/android-sign.py
         if: env.HAS_KEY == 'true'
       - run: npx cap sync android
+      # every build is signed with the same committed debug key, so a new APK installs over the old one (no uninstall)
+      - run: mkdir -p ~/.android && cp assets/viper-sortie-debug.keystore ~/.android/debug.keystore
       - run: cd android && ./gradlew assembleDebug --no-daemon
       - run: cp android/app/build/outputs/apk/debug/app-debug.apk viper-sortie.apk
       - run: cd android && ./gradlew assembleRelease bundleRelease --no-daemon
@@ -74,7 +76,7 @@ jobs:
             viper-sortie.apk
             viper-sortie-release.apk
             viper-sortie-release.aab
-          body: Android build. viper-sortie.apk is debug-signed and installs directly (allow "install unknown apps" for your browser). The release APK and .aab only appear when signing secrets are configured.
+          body: Android build. viper-sortie.apk installs directly and updates over the previous version (allow "install unknown apps" for your browser); from v73 on every build uses the same signing key, so no uninstall is needed. The release APK and .aab only appear when signing secrets are configured.
   exe:
     # Windows portable exe (Electron) built from the same web files; attached to the same release as the APK
     needs: apk

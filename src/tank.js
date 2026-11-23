@@ -13,8 +13,8 @@ function setupTank(){
     for(let dz=-2200;dz<=2200&&good;dz+=200)for(const dx of [-450,0,450])if(!dry(x+dx,z+dz)){good=false;break}
     if(good){cx=x;cz=z;ok=true}}
   if(!ok)[cx,cz]=findLand(rand(-2000,2000),12000);
-  const u=warSpawn(tkType,cx-70,cz-1750,0);u.player=true;u.cd=0;u.obj.rotation.order='YXZ';
-  Object.assign(TNK,{on:true,u,v:0,camYaw:0,camPitch:.05,zoom:false,fire:false,kills:0,hold:0,range:0,zone:{x:cx,z:cz,r:190}});
+  const u=tkSpawn(cx-70,cz-1750);
+  Object.assign(TNK,{on:true,u,lives:3,respT:0,start:{x:cx-70,z:cz-1750},hitT:0,hitFrom:null,v:0,camYaw:0,camPitch:.05,zoom:false,fire:false,kills:0,hold:0,range:0,zone:{x:cx,z:cz,r:190}});
   ['LEO2A4','M1A1','M60A3','M3','GEPARD'].forEach((id,i)=>warSpawn(id,cx+(i-2)*140+rand(-25,25),cz-1800-rand(0,160),0));
   ['T80B','T72A','T72A','T62','BMP2','BMP2','ZSU23'].forEach((id,i)=>warSpawn(id,cx+(i-3)*135+rand(-25,25),cz+1750+rand(0,220),Math.PI));
   sortie={kind:'TANK'};
@@ -22,6 +22,7 @@ function setupTank(){
   playerJet.visible=false;tkUI(true);
   message('TANK BATTLE · '+WAR_V[tkType].n.toUpperCase()+' · HOLD POINT A FOR '+TK_HOLD+' S OR DESTROY THE ENEMY',3.2);
 }
+function tkSpawn(x,z){const u=warSpawn(tkType,x,z,0);u.player=true;u.cd=0;u.obj.rotation.order='YXZ';return u}
 function tkClear(){if(!TNK||!TNK.on)return;TNK.on=false;TNK.u=null;tkUI(false);playerJet.visible=true;projKey=''}
 // keyboard: W/S drive, A/D steer, arrows aim, Space fire, Z or Shift zoom
 function tkKey(code,down){if(!down)return;
@@ -78,7 +79,11 @@ function tkSound(){const t=A.ctx.currentTime,v=Math.abs(TNK.v),live=state==='pla
   A.roarF.frequency.setTargetAtTime(160+v*18,t,.2);A.roarG.gain.setTargetAtTime(live?.05+v*.004:0,t,.2)}
 // point A: hold it alone to win; red holding it alone wins for them
 function tkCheck(dt){const Z=TNK.zone,u=TNK.u;
-  if(!u.alive){endMission(false,'Your tank was knocked out'+(TNK.kills?' · '+TNK.kills+' kill'+(TNK.kills>1?'s':''):''));return}
+  if(!u.alive){   // three vehicles: watch the wreck for a few seconds, then the next one rolls out at the start line
+    if(TNK.lives>1){if(!TNK.respT){TNK.respT=6;message('KNOCKED OUT · NEXT TANK IN 6 S',2.4)}TNK.respT-=dt;
+      if(TNK.respT<=0){TNK.lives--;TNK.respT=0;TNK.u=tkSpawn(TNK.start.x+rand(-30,30),TNK.start.z);TNK.v=0;TNK.camYaw=0;TNK.camPitch=.05;TNK.zoom=false;message('VEHICLE '+(4-TNK.lives)+' / 3 · BACK INTO THE FIGHT',2)}}
+    else endMission(false,'All three tanks knocked out'+(TNK.kills?' · '+TNK.kills+' kill'+(TNK.kills>1?'s':''):''));
+    if(!TNK.u.alive)return}
   let b=0,r=0;for(const o of WAR.units){if(!o.alive)continue;if(Math.hypot(o.pos.x-Z.x,o.pos.z-Z.z)<Z.r){if(o.team==='blue')b++;else r++}}
   if(b&&!r)TNK.hold=Math.min(TK_HOLD,TNK.hold+dt);else if(r&&!b)TNK.hold=Math.max(-TK_HOLD,TNK.hold-dt);
   if(TNK.hold>=TK_HOLD)endMission(true,'Point A captured');else if(TNK.hold<=-TK_HOLD)endMission(false,'The enemy took point A');
@@ -107,7 +112,16 @@ function tkHUD(c){const u=TNK.u;if(!u)return;const d=u.def,col=HUD,pj=v=>{const 
   // enemy markers within 3 km and in sight
   for(const o of WAR.units){if(!o.alive||o.team!=='red')continue;const dd=o.pos.distanceTo(u.pos);if(dd>3000)continue;const p=pj(new V3(o.pos.x,o.pos.y+4.5,o.pos.z));if(!p)continue;
     c.strokeStyle='#ff6b5c';c.beginPath();c.moveTo(p.x,p.y-6);c.lineTo(p.x+6,p.y);c.lineTo(p.x,p.y+6);c.lineTo(p.x-6,p.y);c.closePath();c.stroke();if(dd<1800)txt(c,o.def.n,p.x,p.y-10,'center','#ff6b5c',9,600)}
-  txt(c,'KILLS '+TNK.kills,W-20,H-120,'right',col,13,700)}
+  txt(c,'KILLS '+TNK.kills+' · TANKS '+TNK.lives+'/3',W-20,H-120,'right',col,13,700);
+  if(!u.alive&&TNK.respT>0)txt(c,'NEXT TANK IN '+Math.ceil(TNK.respT)+' S',cx,cy-60,'center','#ffb347',20,800);
+  // where the last hit came from
+  if(TNK.hitT>0&&TNK.hitFrom){TNK.hitT-=1/60;const a=Math.atan2(TNK.hitFrom.x-u.pos.x,TNK.hitFrom.z-u.pos.z)-TNK.camYaw;c.strokeStyle='rgba(255,70,50,'+Math.min(1,TNK.hitT)+')';c.lineWidth=6;c.beginPath();c.arc(cx,cy,Math.min(W,H)*.22,-Math.PI/2-a-.3,-Math.PI/2-a+.3);c.stroke();c.lineWidth=1.5}
+  // minimap: heading up, 2.5 km radius
+  {const mx=95,my=H-260,R=70,k=R/2500,ca=Math.cos(TNK.camYaw),sa=Math.sin(TNK.camYaw),pt=(x,z)=>{const dx=x-u.pos.x,dz=z-u.pos.z,lx=dx*ca-dz*sa,lz=dx*sa+dz*ca;return[mx-lx*k,my-lz*k,Math.hypot(lx,lz)*k<R]};
+    c.fillStyle='rgba(0,0,0,.4)';c.beginPath();c.arc(mx,my,R,0,6.3);c.fill();c.strokeStyle=col;c.beginPath();c.arc(mx,my,R,0,6.3);c.stroke();
+    {const [x,y,inR]=pt(TNK.zone.x,TNK.zone.z);if(inR){c.strokeStyle=TNK.hold>0?'#5cb8ff':TNK.hold<0?'#ff6b5c':col;c.beginPath();c.arc(x,y,TNK.zone.r*k,0,6.3);c.stroke();txt(c,'A',x,y+4,'center',c.strokeStyle,10,800)}}
+    for(const o of WAR.units){if(!o.alive||o===u)continue;const [x,y,inR]=pt(o.pos.x,o.pos.z);if(!inR)continue;c.fillStyle=o.team==='blue'?'#5cb8ff':'#ff6b5c';c.fillRect(x-2.5,y-2.5,5,5)}
+    c.fillStyle=col;c.beginPath();c.moveTo(mx,my-7);c.lineTo(mx+5,my+5);c.lineTo(mx-5,my+5);c.closePath();c.fill()}}
 // touch: left half drives (a floating stick), right half aims; FIRE and ZOOM buttons
 function tkUI(on){
   if(on&&!TNK.ui){const host=$('ctrls').parentNode,el=document.createElement('div');el.id='tkUI';

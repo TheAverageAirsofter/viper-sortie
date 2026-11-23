@@ -23,6 +23,9 @@ const assert = require('assert'), path = require('path');
   // a kill by the player's tank is credited
   const k = await p.evaluate(() => { const T = __vs.TNK, r = __vs.WAR.units.find(u => u.team === 'red' && u.alive); r.lastBy = T.u; r.hp = 0; r.hpSeen = 0; __vs.warDie(r, null, 'test'); return T.kills; });
   assert(k === 1, 'kill credited: ' + k);
+  // knocked out: the next of three tanks rolls out at the start line
+  await p.evaluate(() => { const u = __vs.TNK.u; u.hp = 0; __vs.warDie(u, null, 'test'); });
+  await p.waitForFunction(() => __vs.TNK.u.alive && __vs.TNK.lives === 2, null, { timeout: 30000 });
   // holding point A wins
   await p.evaluate(() => { const T = __vs.TNK; T.hold = 59.9; for (const u of __vs.WAR.units) if (u.team === 'red') u.pos.set(T.zone.x + 5000, u.pos.y, T.zone.z + 5000); T.u.pos.set(T.zone.x, T.u.pos.y, T.zone.z); });
   await p.waitForFunction(() => __vs.deathCause() === 'win', null, { timeout: 8000 });
