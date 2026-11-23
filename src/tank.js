@@ -58,14 +58,19 @@ function tkDrive(u,dt){const d=u.def,m=u.mod;
   const ud=u.obj.userData,tur=ud.tur;
   const T=TNK.aimPt;
   if(tur&&tur.parent===u.obj){const want2=warAng((T?Math.atan2(T.x-u.pos.x,T.z-u.pos.z):TNK.camYaw)-u.heading),cur=tur.rotation.y,dd=warAng(want2-cur),rate=(d.cls==='mbt'?.75:1.3)*(m.tur?.25:1);tur.rotation.y=cur+clamp(dd,-dt*rate,dt*rate);TNK.aimed=Math.abs(dd)<.02;
-    if(ud.gun){const hd=T?Math.max(30,Math.hypot(T.x-u.pos.x,T.z-u.pos.z)):800,el=(T?Math.atan2(T.y-(u.pos.y+2.4),hd):TNK.camPitch)+9.81*hd/(2*d.gun[2]*d.gun[2])+u.obj.rotation.x;ud.gun.rotation.x+=(-clamp(el,-.15,.35)+(m.gun===1?.04:0)-ud.gun.rotation.x)*Math.min(1,dt*6)}}
+    if(ud.gun){const hd=T?Math.max(30,Math.hypot(T.x-u.pos.x,T.z-u.pos.z)):800,el=(T?Math.atan2(T.y-(u.pos.y+2.4),hd):TNK.camPitch)+9.81*hd/(2*d.gun[2]*d.gun[2])+u.obj.rotation.x;TNK.elWant=-clamp(el,-.15,.35)+(m.gun===1?.04:0);ud.gun.rotation.x+=(TNK.elWant-ud.gun.rotation.x)*Math.min(1,dt*6)}}
   if(ud.gun){u.rec=Math.max(0,u.rec-dt*2.5);ud.gun.position.z=d.gz-u.rec*.4}
-  if(TNK.fire){TNK.fire=false;if(m.gun>=2)message('GUN DESTROYED',1);else if(u.cd>0)message('RELOADING',.6);else tkFire(u)}
+  if(TNK.fire){TNK.fire=false;if(m.gun>=2)message('GUN DESTROYED',1);else if(u.cd>0)message('RELOADING',.6);else{TNK.lased=Math.round(tkRange());TNK.laseT=.6;TNK.fireQ=1.5}}
+  if(TNK.fireQ>0){TNK.fireQ-=dt;const g=u.obj.userData.gun,laid=TNK.aimed&&(!g||Math.abs(g.rotation.x-(TNK.elWant||0))<.0015);if(laid||TNK.fireQ<=0){TNK.fireQ=0;if(u.cd<=0&&m.gun<2)tkFire(u)}}
+  // gentle aim assist when zoomed: an enemy just off the crosshair pulls the aim onto it
+  if(TNK.zoom){let best=null,ba=TNK.zl===2?.012:.02;const cyw=Math.cos(TNK.camPitch);
+    for(const o of WAR.units){if(!o.alive||o.team!=='red')continue;const dx=o.pos.x-camera.position.x,dy=o.pos.y+1.4-camera.position.y,dz=o.pos.z-camera.position.z,hd=Math.hypot(dx,dz),ya=warAng(Math.atan2(dx,dz)-TNK.camYaw),pa=Math.atan2(dy,hd)-TNK.camPitch,a=Math.hypot(ya,pa);if(a<ba){ba=a;best=[ya,pa]}}
+    if(best){const k=Math.min(1,dt*1.8);TNK.camYaw+=best[0]*k;TNK.camPitch+=best[1]*k;TNK.assist=1}else TNK.assist=0}
   P.pos.set(u.pos.x,u.pos.y+3,u.pos.z);P.vel.copy(u.vel);P.kcas=0;P.mach=0;P.n=1;
 }
 function tkFire(u){const d=u.def,m=u.mod,gun=u.obj.userData.gun;if(!gun)return;u.obj.updateMatrixWorld(true);
   const from=gun.localToWorld(new V3(0,0,d.barrel)),dir=new V3(0,0,1).transformDirection(gun.matrixWorld);
-  const sp=d.gun[4]*(u.moving?1.8:1)*(m.gun===1?2.6:1);dir.x+=rand(-sp,sp);dir.y+=rand(-sp,sp);dir.z+=rand(-sp,sp);dir.normalize();
+  const sp=d.gun[4]*(u.moving?1.8:.4)*(m.gun===1?2.6:1);dir.x+=rand(-sp,sp);dir.y+=rand(-sp,sp);dir.z+=rand(-sp,sp);dir.normalize();
   const s=WAR.sh.find(q=>!q.on)||WAR.sh[0];s.on=true;s.team=u.team;s.dmg=d.gun[3];s.owner=u;s.life=8;s.m.material=warShellMat.blue;s.m.visible=true;s.m.position.copy(from);s.prev.copy(from);s.vel.copy(dir).multiplyScalar(d.gun[2]);s.m.quaternion.setFromUnitVectors(ZF,dir);
   const big=d.cls==='mbt';puff(from.x+dir.x*2,from.y+dir.y*2,from.z+dir.z*2,dir.x*30,dir.y*30+2,dir.z*30,1,.85,.5,1,big?9:3,big?30:10,.14);if(big)puff(from.x,from.y,from.z,dir.x*8,3,dir.z*8,.5,.48,.44,.6,7,12,2.2);
   TNK.shots=(TNK.shots||0)+1;u.rec=1;u.cd=d.gun[1]*(m.gun===1?1.6:1)*(m.crew>0?d.crew/m.crew:9);shake=Math.max(shake,big?.25:.06);if(big)sndBoom(.5);else sndGun();buzz(big?40:10)}
@@ -100,13 +105,13 @@ function tkStatus(){return 'POINT A '+(TNK.hold>0?'BLUE ':TNK.hold<0?'RED ':'')+
 function tkHUD(c){const u=TNK.u;if(!u)return;const d=u.def,col=HUD,pj=v=>{const q=v.clone().project(camera);return q.z<1&&Math.abs(q.x)<1.2&&Math.abs(q.y)<1.2?{x:(q.x+1)/2*W,y:(1-q.y)/2*H}:null};
   const cx=W/2,cy=H/2;c.strokeStyle=col;c.lineWidth=1.5;
   if(TNK.zoom){c.fillStyle='rgba(0,0,0,.55)';{const R=Math.min(W,H)*.46;c.beginPath();c.rect(0,0,W,H);c.moveTo(cx+R,cy);c.arc(cx,cy,R,0,Math.PI*2,true);c.fill()}   // moveTo first, or the path joins the corner to the circle with a hairline
-    c.beginPath();c.moveTo(cx-120,cy);c.lineTo(cx-12,cy);c.moveTo(cx+12,cy);c.lineTo(cx+120,cy);c.moveTo(cx,cy+12);c.lineTo(cx,cy+90);c.stroke();
-    for(let i=1;i<=4;i++){c.beginPath();c.moveTo(cx-6,cy+i*20);c.lineTo(cx+6,cy+i*20);c.stroke()}}
-  else{c.beginPath();c.moveTo(cx-14,cy);c.lineTo(cx-5,cy);c.moveTo(cx+5,cy);c.lineTo(cx+14,cy);c.moveTo(cx,cy-14);c.lineTo(cx,cy-5);c.moveTo(cx,cy+5);c.lineTo(cx,cy+14);c.stroke()}
+    tkReticle(c,cx,cy,1)}
+  else tkReticle(c,cx,cy,0);
+  if(TNK.assist)txt(c,'TRACKING',cx,cy-34,'center','#ffe066',10,700);
   {const gun=u.obj.userData.gun;if(gun){u.obj.updateMatrixWorld(true);const m0=gun.localToWorld(new V3(0,0,d.barrel)),dr=new V3(0,0,1).transformDirection(gun.matrixWorld),p=pj(m0.addScaledVector(dr,TNK.range||800));
-    if(p){c.strokeStyle=TNK.aimed?col:'rgba(255,200,80,.9)';c.beginPath();c.arc(p.x,p.y,9,0,6.3);c.stroke()}}}
-  const rl=u.cd>0?clamp(1-u.cd/(d.gun[1]*(u.mod.crew>0?d.crew/u.mod.crew:9)),0,1):1;c.fillStyle='rgba(0,0,0,.35)';c.fillRect(cx-40,cy+30,80,5);c.fillStyle=rl>=1?col:'#ffb347';c.fillRect(cx-40,cy+30,80*rl,5);
-  txt(c,rl>=1?'READY':'RELOAD',cx,cy+46,'center',rl>=1?col:'#ffb347',11,700);
+    if(p&&!TNK.aimed){c.strokeStyle='rgba(255,200,80,.9)';c.lineWidth=2;c.beginPath();c.moveTo(p.x-6,p.y-6);c.lineTo(p.x+6,p.y+6);c.moveTo(p.x+6,p.y-6);c.lineTo(p.x-6,p.y+6);c.stroke();c.lineWidth=1.5}}}
+  const rl=u.cd>0?clamp(1-u.cd/(d.gun[1]*(u.mod.crew>0?d.crew/u.mod.crew:9)),0,1):1;c.fillStyle='rgba(0,0,0,.35)';const ry=cy+(TNK.zoom?135:30);c.fillRect(cx-40,ry,80,5);c.fillStyle=rl>=1?col:'#ffb347';c.fillRect(cx-40,ry,80*rl,5);
+  txt(c,rl>=1?'READY':'RELOAD',cx,ry+16,'center',rl>=1?col:'#ffb347',11,700);
   txt(c,'RNG '+(TNK.lased?TNK.lased+' M':'--- (R / RANGE)'),cx+(TNK.zoom?150:60),cy+4,'left',TNK.laseT>0?'#ffe066':col,12,700);if(TNK.laseT>0)TNK.laseT-=1/60;
   if(TNK.zoom)txt(c,TNK.zl===2?'×8':'×4',cx-150,cy+4,'right',col,13,800);
   txt(c,Math.round(Math.abs(TNK.v)*3.6)+' KM/H'+(TNK.v<-.5?' R':''),20,H-120,'left',col,16,700);
@@ -230,3 +235,11 @@ function tkWallMat(col,roof){const m=new THREE.MeshLambertMaterial({color:col});
       '{float t=fract(vWP.y*2.4+sin(vWP.x*1.7+vWP.z*1.3)*.08);vec2 tc=floor(vec2(vWP.x+vWP.z,vWP.y*2.4)*vec2(2.6,1.));float tv=fract(sin(dot(tc,vec2(12.9,78.2)))*43758.5);diffuseColor.rgb*=(.78+.22*smoothstep(0.,.25,t))*(.88+.22*tv);}':
       '{vec3 n=normalize(vWN2);if(abs(n.y)<.5){float hx=abs(n.x)>.5?vWP.z:vWP.x,fy=fract(vWP.y/3.1),fx=fract(hx/3.3);float win=step(.36,fy)*step(fy,.8)*step(.3,fx)*step(fx,.7),gl=step(.4,fy)*step(fy,.76)*step(.34,fx)*step(fx,.66);float pl=texture2D(nTex,vec2(hx,vWP.y)*.35).r,pl2=texture2D(nTex,vec2(hx,vWP.y)*2.1).g;diffuseColor.rgb*=.84+.2*pl+.1*pl2;float stk=step(.3,fx)*step(fx,.7)*step(fy,.36)*smoothstep(.0,.36,fy);diffuseColor.rgb*=1.-.12*stk*pl;diffuseColor.rgb=mix(diffuseColor.rgb,vec3(.86,.85,.8),win);diffuseColor.rgb=mix(diffuseColor.rgb,vec3(.1,.13,.16)+.06*step(.58,fy),gl);}}'))};
   return m}
+
+// crosshair: a bold cross with a gap and a centre dot (the aim point), range marks below in the sight, drawn black-outlined so it reads on any background
+function tkReticle(c,cx,cy,sight){const col=HUD,seg=f=>{c.lineCap='round';c.strokeStyle='rgba(0,0,0,.85)';c.lineWidth=sight?5:4.5;f();c.stroke();c.strokeStyle=col;c.lineWidth=sight?2.2:2;f();c.stroke()};
+  const g=sight?7:5,L=sight?150:22;
+  seg(()=>{c.beginPath();c.moveTo(cx-L,cy);c.lineTo(cx-g,cy);c.moveTo(cx+g,cy);c.lineTo(cx+L,cy);c.moveTo(cx,cy-(sight?90:L));c.lineTo(cx,cy-g);c.moveTo(cx,cy+g);c.lineTo(cx,cy+(sight?110:L))});
+  c.fillStyle='rgba(0,0,0,.85)';c.beginPath();c.arc(cx,cy,2.6,0,6.3);c.fill();c.fillStyle=col;c.beginPath();c.arc(cx,cy,1.6,0,6.3);c.fill();
+  if(sight)for(let i=1;i<=4;i++){const y=cy+10+i*20;seg(()=>{c.beginPath();c.moveTo(cx-9,y);c.lineTo(cx+9,y)});txt(c,(i*4)+'',cx+15,y+4,'left',col,9,700)}
+  c.lineWidth=1.5;c.lineCap='butt'}
