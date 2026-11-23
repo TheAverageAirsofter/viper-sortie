@@ -101,7 +101,7 @@ function warBuild(d){
   const hull=wMerge(hullG,body),sl=wMerge(sideL,dk),sr=wMerge(sideR,dk),tb=wMerge(turB,tmat),td=wMerge(turD,dk2),gn=wMerge(gunG,dk);
   const tur=new THREE.Group();tur.position.y=yT;
   g.add(hull);g.add(sl);g.add(sr);g.add(tur);tur.add(tb);if(td)tur.add(td);tur.add(gg);if(gn)gg.add(gn);
-  const mk=new THREE.Mesh(new THREE.PlaneGeometry(1.6,1.6).rotateX(-Math.PI/2),new THREE.MeshBasicMaterial({color:d.team==='blue'?0x2b8cff:0xff3b30,side:THREE.DoubleSide}));mk.position.set(0,top.v+.05,-.3);tur.add(mk);   // roof panel: readable from the air
+  const mk=new THREE.Mesh(new THREE.PlaneGeometry(1.6,1.6).rotateX(-Math.PI/2),new THREE.MeshBasicMaterial({color:d.team==='blue'?0x2b8cff:0xff3b30,side:THREE.DoubleSide}));mk.name='mk';mk.position.set(0,top.v+.05,-.3);tur.add(mk);   // roof panel: readable from the air
   g.userData={tur,gun:gg,gz:d.gz,sl,sr,yT,L};return g}
 function warSpawn(id,x,z,heading){
   const d=WAR_V[id],obj=warBuild(d);obj.position.set(x,Math.max(groundH(x,z),0)+.2,z);obj.rotation.y=heading;scene.add(obj);
@@ -161,7 +161,7 @@ function updateWar(dt){
       u.fireLeft-=dt;if(u.fireLeft<=0){if(m.crew>0&&Math.random()<.55){m.fire=false;feed(d.n+': fire extinguished','info')}else u.fireLeft=8}
       if(u.hp<=0){warDie(u,null,'burned out');continue}}
     if(u.player){tkDrive(u,dt);continue}
-    if(u.scanT<=0){u.scanT=.8+Math.random()*.5;u.aim=warPick(u);u.los=!u.aim||losClear(new V3(u.pos.x,u.pos.y+2.4,u.pos.z),new V3(u.aim.pos.x,u.aim.pos.y+1.4,u.aim.pos.z))}
+    if(u.scanT<=0){u.scanT=.8+Math.random()*.5;u.aim=warPick(u);if(u.aim){const la=new V3(u.pos.x,u.pos.y+2.4,u.pos.z),lb=new V3(u.aim.pos.x,u.aim.pos.y+1.4,u.aim.pos.z);u.los=losClear(la,lb)&&!(TNK&&TNK.on&&tkSegHit(la,lb)>=0)}else u.los=true}
     const t=u.aim&&u.aim.alive?u.aim:null;let dist=1e9,wantH=u.team==='blue'?0:Math.PI;
     if(t){const dx=t.pos.x-u.pos.x,dz=t.pos.z-u.pos.z;dist=Math.hypot(dx,dz);wantH=Math.atan2(dx,dz)}
     u.moving=!m.trk&&(!t||dist>d.gun[0]*.78||u.los===false);   // no line of sight (a ridge in between): keep advancing
@@ -169,6 +169,7 @@ function updateWar(dt){
     if(u.moving&&Math.abs(dh)<.9){const v=d.spd*.5*(m.eng?.45:1);u.pos.x+=Math.sin(u.heading)*v*dt;u.pos.z+=Math.cos(u.heading)*v*dt;u.vel.set(Math.sin(u.heading)*v,0,Math.cos(u.heading)*v);
       u.dustT-=dt;if(u.dustT<=0){u.dustT=.3;puff(u.pos.x-Math.sin(u.heading)*3,u.pos.y+.4,u.pos.z-Math.cos(u.heading)*3,rand(-1,1),rand(1,2.5),rand(-1,1),.55,.5,.4,.35,rand(4,7),rand(5,9),rand(1.5,2.5),-.2)}}
     else u.vel.set(0,0,0);
+    if(TNK&&TNK.on)tkPush(u);
     u.pos.y=Math.max(groundH(u.pos.x,u.pos.z),0)+.2;
     // turret follows its target (in the hull's frame); the gun elevates and recoils
     const ud=u.obj.userData,tur=ud.tur;let aimed=false;
@@ -190,6 +191,7 @@ function updateWar(dt){
   // shells in flight
   for(const s of WAR.sh){if(!s.on)continue;s.prev.copy(s.m.position);s.vel.y-=9.81*dt;s.m.position.addScaledVector(s.vel,dt);s.life-=dt;
     s.m.quaternion.setFromUnitVectors(ZF,_s1.copy(s.vel).normalize());
+    if(TNK&&TNK.on&&TNK.bld&&tkSegHit(s.prev,s.m.position)>=0){s.on=false;s.m.visible=false;const p=s.m.position;puff(p.x,p.y,p.z,0,3,0,.75,.7,.62,.9,8,14,1.6);continue}   // into a wall
     let hit=null;for(const o of WAR.units){if(!o.alive||o.team===s.team)continue;if(distSeg(_s2.set(o.pos.x,o.pos.y+1.4,o.pos.z),s.prev,s.m.position)<5){hit=o;break}}
     if(hit&&warBounce(s,hit)){s.on=false;s.m.visible=false;continue}
     if(hit){s.on=false;s.m.visible=false;if(hit.player){TNK.hitFrom=s.owner?s.owner.pos.clone():null;TNK.hitT=1.6}const p=s.m.position;puff(p.x,p.y,p.z,0,3,0,1,.8,.4,1,10,22,.2);
