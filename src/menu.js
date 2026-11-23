@@ -22,6 +22,7 @@ const MIS_ART={
   GROUNDWAR:['#5a4e2d','#241f10','<path d="M6 46h84"/><rect x="10" y="34" width="16" height="8"/><path d="M26 36h12"/><rect x="58" y="34" width="16" height="8"/><path d="M58 36h-12"/><path d="M40 22l8 8M48 22l-8 8"/>'],
   CONVOY:['#5c5a2d','#242310','<path d="M8 44h80"/><rect x="12" y="34" width="14" height="9"/><rect x="34" y="34" width="14" height="9"/><rect x="56" y="34" width="14" height="9"/><path d="M76 40l8-4v8z"/>'],
   ANTISHIP:['#1e4a6a','#0b1c2c','<path d="M14 36h68l-8 10H24zM38 36v-8h16v8M46 28v-8"/><path d="M8 52q8-5 16 0t16 0t16 0t16 0" stroke-width="1.6"/>'],
+  TANK:['#4a4a2d','#16160c','<path d="M14 46h62l6-8H22zM30 38v-8h26v8M56 33h22"/><circle cx="24" cy="50" r="3"/><circle cx="36" cy="50" r="3"/><circle cx="48" cy="50" r="3"/><circle cx="60" cy="50" r="3"/><circle cx="72" cy="50" r="3"/>'],
   VALLEY:['#3d4a2a','#141a0c','<path d="M6 50L24 22l14 18 10-12 12 16 10-20 20 26"/><path d="M12 46q20-8 36-4t40-10" stroke="'+RED+'" stroke-dasharray="3 3"/><circle cx="74" cy="30" r="4" stroke="'+RED+'"/>'],
   CRUISE:['#5c2d1e','#241009','<path d="M16 12l24 14M30 8l24 14M44 4l24 14"/><path d="M40 26l-7-1M54 22l-7-1M68 18l-7-1" stroke="'+RED+'"/><path d="M8 52h80"/>'],
   CAMPAIGN:['#2d4a3a','#0e1c15','<path d="M8 22l20 10 18-8 20 14 22-6" stroke-dasharray="3 4"/><path d="M8 40l24-6 20 8 18-10 18 4"/><circle cx="48" cy="24" r="3" fill="'+RED+'" stroke="none"/>'],
@@ -32,7 +33,7 @@ const MAP_ART={
   DESERT:['#c9a566','#8a6a3a','<path d="M0 44q18-14 36-2t36-4 24 4" stroke="#f3dfb0"/><path d="M0 52q22-10 44-2t52-2" stroke="#6b4e24"/><circle cx="74" cy="14" r="6" stroke="#fff3c4"/>'],
   ALPINE:['#9fb4c6','#51647a','<path d="M4 50l20-30 12 16 12-22 16 26 8-10 20 20z" fill="#eef3f7" stroke="#cfd9e3"/>'],
   OCEAN:['#2a6a9a','#0f2f4c','<path d="M0 22q12-6 24 0t24 0t24 0t24 0M0 36q12-6 24 0t24 0t24 0t24 0M0 50q12-6 24 0t24 0t24 0t24 0" stroke="#9fd4ff"/>']};
-const MIS_DESC={VALLEY:'Low-level run up a valley under the radar, pop up on two bunkers, then get home past the SAMs.',ASSAULT:'Defend the base against 15 waves of bombers and attackers; kill the howitzers.',NAVAL:'Sink three enemy frigates before their pressure runs your points out.',COMBINED:'Air and armour fight over the same zones; your tanks hold the front, you win the sky.',BATTLE:'Team battle: capture three zones, drain the enemy points, respawn from a lineup of jets.',WAVES:'Endless bandit groups. Survive and rack up score.',STRIKE:'Take out the SAM and AAA site, then fly home.',INTERCEPT:'Four bombers inbound. Stop them before the release point.',
+const MIS_DESC={TANK:'Drive a tank: take point A or destroy the enemy armour, with AI tanks on both sides.',VALLEY:'Low-level run up a valley under the radar, pop up on two bunkers, then get home past the SAMs.',ASSAULT:'Defend the base against 15 waves of bombers and attackers; kill the howitzers.',NAVAL:'Sink three enemy frigates before their pressure runs your points out.',COMBINED:'Air and armour fight over the same zones; your tanks hold the front, you win the sky.',BATTLE:'Team battle: capture three zones, drain the enemy points, respawn from a lineup of jets.',WAVES:'Endless bandit groups. Survive and rack up score.',STRIKE:'Take out the SAM and AAA site, then fly home.',INTERCEPT:'Four bombers inbound. Stop them before the release point.',
   RUSH:'Bandit rush: 8 kills in 5 minutes.',ESCORT:'Protect a C-130 across the sector.','2V4':'You and your wingman against four bandits.','4SHIP':'Lead a four-ship against six, with a SAM belt.',
   GROUNDWAR:'Blue and red armour fight each other. Back the blue side from the air and destroy the red force.',CONVOY:'Stop at least 4 of 5 trucks before they escape.',ANTISHIP:'Sink the frigate NE of the base. It has SAMs.',CRUISE:'Cruise missiles inbound on the base. Shoot them down.',
   CAMPAIGN:'A moving front line. Losses stay lost.',ONLINE:'Dogfight other pilots in a shared room.',TRAINING:'Guided lessons: dogfighting, missile defence, landing, refuelling.'};
@@ -49,6 +50,7 @@ const MIS_BRIEF={ASSAULT:'Bombers at 3,500 m and attackers at 1,500 m come in wa
   GROUNDWAR:'M1A1 Abrams, Leopard 2A4, Challenger and M60A3 tanks with Bradley and Marder IFVs, a Gepard and an M163 Vulcan hold the south (the Gepard shoots at bandits). T-80B, T-72A and T-62 tanks, BMP-2s and two ZSU anti-aircraft tracks come from the north. The tanks fight on their own: kill the red armour with bombs, rockets and guns before it grinds the blue force down, and keep away from the ZSUs.',
   CONVOY:'Trucks are running for the border. Stop at least four of the five before they escape.',
   ANTISHIP:'A frigate sits north-east of the base with SAM cover. Find it, sink it and avoid the missile envelope.',
+  TANK:'You command a tank with a blue platoon against a red company. Point A sits between the two forces: hold it alone for 60 seconds, or destroy every red vehicle. Hits break tracks, engines, guns and turret drives, kill crew or set the ammunition off, for you as for them. Left side drives, right side aims; the gun is laid on the rangefinder. Keyboard: W A S D drive, arrows aim, Space fire, Z zoom.',
   VALLEY:'Fly a low-level route up a valley through the gates, under a 150 m radar ceiling, and arrive within the time on target. Pop up and destroy the two hardened bunkers in the bowl, then get home past the SAMs and the fighters that scramble. If the early-warning radar sees you too long, or you are late, the SAMs come up early.',
   CRUISE:'Cruise missiles are inbound on the base. They are fast and low. Shoot down as many as you can.'};
 const LES_BRIEF={FLAPS:'Flaps add lift and drag so you can fly slower and turn tighter. Set combat flaps, stay under 200 kt, bank and hold the turn for 12 seconds without stalling.',CCIP:'The ballistic computer shows where your rounds, rockets and bombs will land. Turn it on, dive on the three trucks and destroy them.',BFM:'Learn to turn, use energy and put the gun on target. Kill three drones with the guns.',DEFENSE:'Three missiles are coming for you. Break, chaff and flare your way through them.',
@@ -106,6 +108,7 @@ const qr=$('qRows');
   A1.append(mGrp('Mission'),
     presetRow(),
     mRow('Mission',()=>quickList().map(k=>({v:k,t:MISSIONS[k]})),()=>quickList().indexOf(mission)>=0?mission:lastQuick,v=>{lastQuick=v;drive($('bMission'),()=>mission,v,30)}),
+    mRow('Tank',()=>TANK_LIST.map(k=>({v:k,t:WAR_V[k].n})),()=>tkType,v=>{tkType=v;try{localStorage.setItem('vsTank',v)}catch(e){}},{hidden:()=>mission!=='TANK'}),
     mRow('Map',()=>Object.keys(MAPS).map(k=>({v:k,t:MAP_NAME(k)})),()=>MAP,v=>drive($('bMap'),()=>MAP,v,6)),
     mRow('Start',()=>[{v:'air',t:'In the air'},{v:'rwy',t:'Runway'},...(AC.carrier?[{v:'cv',t:'Carrier'}]:[])],startCur,v=>drive($('bStartPos'),startCur,v,4)),
     mRow('Mode',()=>[{v:'free',t:'Free play'},{v:'career',t:'Career'}],()=>careerOn?'career':'free',v=>drive($('bMode'),()=>careerOn?'career':'free',v,2)));
@@ -249,7 +252,7 @@ function diagram(){const m=MIS_ART[mission]||MIS_ART.WAVES,p=MAP_ART[MAP]||MAP_A
     '<path d="M26 82L150 46" stroke="#fff" stroke-width=".7" stroke-dasharray="3 3" opacity=".7"/><g fill="#fff" stroke="none"><path d="M26 78l5 8h-10z"/></g><text x="34" y="90" fill="#fff" font-size="6" letter-spacing="1" font-family="inherit">BASE</text>'+
     '<text x="170" y="98" fill="#fff" font-size="5.5" letter-spacing="1.2" font-family="inherit" opacity=".8">N &#8593;  50 KM</text></svg>'}
 // the enemy battle-rating range for the selected mission, as the bandit picker will use it
-const NO_FIGHTERS=['CONVOY','ANTISHIP','CRUISE','GROUNDWAR'];
+const NO_FIGHTERS=['CONVOY','ANTISHIP','CRUISE','GROUNDWAR','TANK'];
 function enemyBR(){if(NO_FIGHTERS.indexOf(mission)>=0)return null;
   const v=banditPool().filter(k=>banditType==='MIXED'||k===banditType||banditPool().indexOf(banditType)<0).map(progBR);return{lo:Math.min(...v),hi:Math.max(...v)}}
 const kvs=a=>'<dl class="kvs">'+a.map(x=>'<div><dt>'+x[0]+'</dt><dd>'+x[1]+'</dd></div>').join('')+'</dl>';

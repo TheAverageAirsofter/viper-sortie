@@ -2930,7 +2930,7 @@ function say(key,cd){
   try{const ru=/^(MIG|SU)/.test(AC.id)&&VOICE.ru, u=new SpeechSynthesisUtterance(VTXT[key][ru?1:0]); u.rate=1.15;u.pitch=1.05;u.volume=1;
     if(ru)u.voice=VOICE.ru; else if(VOICE.en)u.voice=VOICE.en; if(key==='pull'||key==='maws'||key==='launch')speechSynthesis.cancel(); speechSynthesis.speak(u)}catch(e){}}
 const VW={bingo:false,fuel:false,fire:0};
-function voiceWatch(){
+function voiceWatch(){if(TNK&&TNK.on)return;
   if(state!=='play'||!P.alive)return;
   const gh=Math.max(groundH(P.pos.x,P.pos.z),0), agl=P.pos.y-gh;
   if(P.gcas||(!P.gear&&agl<400&&P.vel.y<-20))say('pull',2.6);
@@ -2951,7 +2951,7 @@ const sndCrit=()=>sndBeep(1600,.05,.05,'sine');
 const sndZone=up=>sndSeq(up?[660,880,1100]:[880,660,440],.1,.07);
 const sndSpawn=()=>sndSeq([520,780],.1,.06);
 function sndEngine(){
-  if(!A.ctx)return; const t=A.ctx.currentTime;
+  if(!A.ctx)return; if(TNK&&TNK.on){tkSound();return} const t=A.ctx.currentTime;
   const live=(state==='play'||state==='menu')&&(P.thrK??1)>0;
   const k=clamp(P.kcas/700,0,1.2), ab=throttle>.81;
   const snd=ENG_SND[AC.id]||({F16:{f:40,roar:250,wh:0,twin:0},F16B70:{f:39,roar:240,wh:0,twin:0},GRIPEN:{f:52,roar:330,wh:.012,twin:0},GRIPENE:{f:48,roar:300,wh:.01,twin:0},MIG29:{f:30,roar:200,wh:.004,twin:1},MIG29UPG:{f:30,roar:200,wh:.004,twin:1},MIG35:{f:33,roar:215,wh:.005,twin:1},SU27:{f:27,roar:185,wh:.004,twin:1},SU35:{f:26,roar:180,wh:.006,twin:1}})[AC.id]||AC.snd||{f:36,roar:220,wh:.004,twin:1};
@@ -3997,9 +3997,10 @@ function valleyStatus(){const S=sortie,left=ground.filter(g=>g.objective&&g.aliv
   return(S.ring<valRings.length?'GATE '+(S.ring+1)+'/'+valRings.length+' · ':'')+'BUNKERS '+left+' · '+(S.comp?'COMPROMISED':'TOT '+fmtT(VAL_TOT-S.t)+' · RADAR '+Math.round(S.det*100)+'%')}
 function setupCAP(cz,n){for(let i=0;i<n;i+=2)spawnPair(pickBanditType(),new V3(rand(-6000,6000),rand(5000,8000),cz+rand(-3000,3000)),new V3(0,5000,0));sortie={kind:'CAP'}}
 function sortieStatus(){if(!sortie)return'';const left=ground.filter(g=>g.objective&&g.alive).length;
-  return sortie.kind==='VALLEY'?valleyStatus():sortie.kind==='GROUNDWAR'?warStatus():sortie.kind==='CONVOY'?'TRUCKS LEFT '+ground.filter(g=>g.kind==='truck'&&g.alive).length:sortie.kind==='SHIP'?'FRIGATE '+(left?'AFLOAT':'SUNK'):sortie.kind==='CRUISE'?'CRUISE MISSILES '+(enemies.filter(e=>e.kind==='cruise').length+(sortie.second?0:3)):sortie.kind==='STRIKE'?'TARGETS LEFT '+left:'BANDITS '+enemies.length}
+  return sortie.kind==='TANK'?tkStatus():sortie.kind==='VALLEY'?valleyStatus():sortie.kind==='GROUNDWAR'?warStatus():sortie.kind==='CONVOY'?'TRUCKS LEFT '+ground.filter(g=>g.kind==='truck'&&g.alive).length:sortie.kind==='SHIP'?'FRIGATE '+(left?'AFLOAT':'SUNK'):sortie.kind==='CRUISE'?'CRUISE MISSILES '+(enemies.filter(e=>e.kind==='cruise').length+(sortie.second?0:3)):sortie.kind==='STRIKE'?'TARGETS LEFT '+left:'BANDITS '+enemies.length}
 function sortieCheck(dt){if(!sortie)return;const k=sortie.kind;
   if(k==='VALLEY'){valleyCheck(dt);return}
+  if(k==='TANK'){tkCheck(dt);return}
   if(k==='GROUNDWAR'){warCheck(dt);return}
   if(k==='CONVOY'){const tr=ground.filter(g=>g.kind==='truck');const dead=tr.filter(g=>!g.alive).length;if(dead>=sortie.need)endMission(true,'Convoy stopped');else if(tr.some(g=>g.alive&&g.s>=g.path.len))endMission(false,'The convoy got through')}
   else if(k==='SHIP'||k==='STRIKE'){if(!ground.some(g=>g.objective&&g.alive))endMission(true,k==='SHIP'?'Frigate sunk':'Target area destroyed')}
@@ -4258,7 +4259,7 @@ const isBT=()=>mission==='BATTLE'||mission==='COMBINED'||mission==='NAVAL'||miss
 let friends=[], mission='WAVES', banditType='F16', missionT=0, missionDone=false, spawnQ=[];
 try{mission=localStorage.getItem('viperMission')||'WAVES';banditType=localStorage.getItem('viperBandit')||'F16'}catch(e){}
 const RUSH_KILLS=8, RUSH_TIME=300;   // time-attack: bandits keep arriving, four at a time
-const MISSIONS={WAVES:'Waves',STRIKE:'Strike / SEAD',INTERCEPT:'Intercept bombers',RUSH:'Bandit rush (8 in 5 min)',ESCORT:'Escort the C-130','2V4':'2 v 4 with wingman','4SHIP':'4-ship vs 6',CONVOY:'Convoy attack',GROUNDWAR:'Ground war (CAS)',BATTLE:'Air battle (domination)',COMBINED:'Combined arms battle',NAVAL:'Naval battle',ASSAULT:'Air assault (defend the base)',ANTISHIP:'Anti-ship strike',VALLEY:'Valley strike (low level)',CRUISE:'Cruise missile defence',CAMPAIGN:'Campaign',ONLINE:'Online dogfight',TRAINING:'Training'};
+const MISSIONS={WAVES:'Waves',STRIKE:'Strike / SEAD',INTERCEPT:'Intercept bombers',RUSH:'Bandit rush (8 in 5 min)',ESCORT:'Escort the C-130','2V4':'2 v 4 with wingman','4SHIP':'4-ship vs 6',CONVOY:'Convoy attack',GROUNDWAR:'Ground war (CAS)',BATTLE:'Air battle (domination)',COMBINED:'Combined arms battle',NAVAL:'Naval battle',ASSAULT:'Air assault (defend the base)',ANTISHIP:'Anti-ship strike',VALLEY:'Valley strike (low level)',TANK:'Tank battle (drive)',CRUISE:'Cruise missile defence',CAMPAIGN:'Campaign',ONLINE:'Online dogfight',TRAINING:'Training'};
 const LESSONS={BFM:'Dogfighting basics',DEFENSE:'Missile defense',BVR:'Long-range shot',LANDING:'Landing',REFUEL:'Air refueling',FLAPS:'Flaps and slow flight',CCIP:'Ground attack (CCIP)'};
 let lesson='BFM'; try{if(LESSONS[localStorage.getItem('vsLesson')])lesson=localStorage.getItem('vsLesson')}catch(e){}
 let trainDefeated=0, trainConnT=0;
@@ -4350,6 +4351,7 @@ function setupMission(){
   if(mission==='GROUNDWAR'){setupGroundWar();spawnPair(pickBanditType(),new V3(sortie.center.x,7000,sortie.center.z+16000),new V3(0,5000,0));message('GROUND WAR · SUPPORT THE BLUE ARMOUR (GEPARD COVERS IT) · DESTROY THE '+sortie.need+' RED VEHICLES · ZSU-23-4 AND ZSU-57-2 WILL SHOOT AT YOU',3.6);return}
   if(mission==='ANTISHIP'){P.pos.set(0,6000,0);P.vel.set(0,0,240);setupShip();spawnPair(pickBanditType(),new V3(19600,7000,36000),new V3(0,5000,0));message('ANTI-SHIP · SINK THE FRIGATE NE OF THE BASE · IT HAS SAMS',3);return}
   if(mission==='VALLEY'){setupValley();return}
+  if(mission==='TANK'){setupTank();return}
   if(mission==='CRUISE'){P.pos.set(0,5000,6000);P.vel.set(0,0,240);setupCruise();message('CRUISE MISSILES INBOUND FROM THE NORTH · LOW AND FAST · PROTECT THE BASE',3.2);return}
   if(mission==='STRIKE'){
     P.pos.set(0,6500,0); P.vel.set(0,0,240);
@@ -4749,6 +4751,7 @@ const KBE={open:false};   // the bindings editor (menu.js) captures keys while i
 addEventListener('keydown',e=>{
   if(KBE.open)return;
   keys[e.code]=true; audioInit();
+  if(state==='play'&&TNK&&TNK.on){tkKey(e.code,true);if(e.code==='Escape')pause();if(e.code==='Space'||e.code.startsWith('Arrow'))e.preventDefault();return}
   const a=KB.rev[KBM.on?'kbm':'kb'][e.code];
   if(state==='play'){
     if(a&&!e.repeat){if(a==='gun'||a==='map')e.preventDefault();actDown(a)}
@@ -5418,7 +5421,7 @@ function syncRadarUI(){
 }
 function sizeScope(){const r=scope.getBoundingClientRect();if(!r.width)return false;
   const w=Math.round(r.width*DPR),h=Math.round(r.height*DPR);if(scope.width!==w||scope.height!==h){scope.width=w;scope.height=h}return true}
-function drawRadarPanel(){
+function drawRadarPanel(){if(TNK&&TNK.on)return;
   if(rdrEl.hidden||state!=='play')return;
   if(!sizeScope())return;
   const w=scope.width/DPR,h=scope.height/DPR;
@@ -5967,11 +5970,11 @@ function warWreck(u){u.burnT=45;if(u.obj.userData.tur){u.obj.userData.tur.positi
 // the turret flies off when the ammunition goes up
 function warPop(u){const t=u.obj.userData.tur;if(!t||t.parent!==u.obj)return;u.obj.updateMatrixWorld(true);const wp=new V3();t.getWorldPosition(wp);u.obj.remove(t);t.position.copy(wp);t.rotation.set(0,u.heading,0);scene.add(t);
   WAR.debris.push({o:t,vel:new V3(rand(-4,4),rand(16,22),rand(-4,4)),spin:new V3(rand(-1.5,1.5),rand(-1,1),rand(-1.5,1.5)),t:0})}
-function warDie(u,by,why){if(!u.alive)return;u.alive=false;if(BT.on&&BT.ground&&!BT.over)BT.pts[u.team]=Math.max(0,BT.pts[u.team]-6);const big=why==='ammunition detonated';explode(new V3(u.pos.x,u.pos.y+2,u.pos.z),big);
+function warDie(u,by,why){if(!u.alive)return;u.alive=false;by=by||u.lastBy;tkKill(u,by);if(BT.on&&BT.ground&&!BT.over)BT.pts[u.team]=Math.max(0,BT.pts[u.team]-6);const big=why==='ammunition detonated';explode(new V3(u.pos.x,u.pos.y+2,u.pos.z),big);
   if(big)warPop(u);warWreck(u);
   if(by&&by.def)feed((by.team==='blue'?'Blue ':'Red ')+by.def.n+' destroyed '+u.def.n+(why?' ('+why+')':''),u.team==='red'?'kill':'loss');else if(why)feed(u.def.n+': '+why,u.team==='red'?'kill':'loss')}
 const warFlags=u=>{const m=u.mod,a=[];if(m.trk)a.push('TRK');if(m.eng)a.push('ENG');if(m.gun)a.push(m.gun>1?'GUN X':'GUN');if(m.tur)a.push('TUR');if(u.def.crew&&m.crew<u.def.crew)a.push('CREW '+m.crew+'/'+u.def.crew);if(m.fire)a.push('FIRE');return a.join(' ')};
-function warClear(){for(const u of WAR.units)if(u.team==='blue')scene.remove(u.obj);WAR.units=[];for(const s of WAR.sh){s.on=false;s.m.visible=false}for(const x of WAR.debris)scene.remove(x.o);WAR.debris=[];WAR.on=false}
+function warClear(){tkClear();for(const u of WAR.units)if(u.team==='blue')scene.remove(u.obj);WAR.units=[];for(const s of WAR.sh){s.on=false;s.m.visible=false}for(const x of WAR.debris)scene.remove(x.o);WAR.debris=[];WAR.on=false}
 function updateWar(dt){
   if(!WAR.on)return;
   if(state!=='play'){return}
@@ -5986,6 +5989,7 @@ function updateWar(dt){
     if(m.fire){u.fireT-=dt;u.hp-=.1*dt;u.hpSeen=u.hp;if(u.fireT<=0){u.fireT=.12;const rx=Math.sin(u.heading)*-3,rz=Math.cos(u.heading)*-3;puff(u.pos.x+rx+rand(-.4,.4),u.pos.y+2.4,u.pos.z+rz+rand(-.4,.4),rand(-1,1),rand(4,8),rand(-1,1),1,.55,.15,.9,rand(2,4),rand(3,6),rand(.5,.9),-.3);if(Math.random()<.4)puff(u.pos.x+rx,u.pos.y+3,u.pos.z+rz,rand(-1,1),rand(7,11),rand(-1,1),.12,.12,.12,.65,rand(4,8),rand(6,12),rand(2,4),-.3)}
       u.fireLeft-=dt;if(u.fireLeft<=0){if(m.crew>0&&Math.random()<.55){m.fire=false;feed(d.n+': fire extinguished','info')}else u.fireLeft=8}
       if(u.hp<=0){warDie(u,null,'burned out');continue}}
+    if(u.player){tkDrive(u,dt);continue}
     if(u.scanT<=0){u.scanT=.8+Math.random()*.5;u.aim=warPick(u);u.los=!u.aim||losClear(new V3(u.pos.x,u.pos.y+2.4,u.pos.z),new V3(u.aim.pos.x,u.aim.pos.y+1.4,u.aim.pos.z))}
     const t=u.aim&&u.aim.alive?u.aim:null;let dist=1e9,wantH=u.team==='blue'?0:Math.PI;
     if(t){const dx=t.pos.x-u.pos.x,dz=t.pos.z-u.pos.z;dist=Math.hypot(dx,dz);wantH=Math.atan2(dx,dz)}
@@ -6017,8 +6021,8 @@ function updateWar(dt){
     s.m.quaternion.setFromUnitVectors(ZF,_s1.copy(s.vel).normalize());
     let hit=null;for(const o of WAR.units){if(!o.alive||o.team===s.team)continue;if(distSeg(_s2.set(o.pos.x,o.pos.y+1.4,o.pos.z),s.prev,s.m.position)<5){hit=o;break}}
     if(hit){s.on=false;s.m.visible=false;const p=s.m.position;puff(p.x,p.y,p.z,0,3,0,1,.8,.4,1,10,22,.2);
-      hit.hp-=s.dmg;puff(hit.pos.x,hit.pos.y+2,hit.pos.z,0,5,0,.2,.2,.2,.7,9,10,3);
-      if(hit.hp<=0&&hit.alive){hit.alive=false;explode(new V3(hit.pos.x,hit.pos.y+2,hit.pos.z),false);warWreck(hit);if(s.owner&&s.owner.def)feed((s.owner.team==='blue'?'Blue ':'Red ')+s.owner.def.n+' destroyed '+hit.def.n,hit.team==='red'?'kill':'loss')}
+      hit.hp-=s.dmg;hit.lastBy=s.owner;puff(hit.pos.x,hit.pos.y+2,hit.pos.z,0,5,0,.2,.2,.2,.7,9,10,3);if(hit.player){hurtT=.5;shake=Math.max(shake,.35);message(warFlags(hit)||'HIT',1)}else if(s.owner&&s.owner.player)message('HIT',.6);
+      if(hit.hp<=0&&hit.alive){hit.alive=false;tkKill(hit,s.owner);explode(new V3(hit.pos.x,hit.pos.y+2,hit.pos.z),false);warWreck(hit);if(s.owner&&s.owner.def)feed((s.owner.team==='blue'?'Blue ':'Red ')+s.owner.def.n+' destroyed '+hit.def.n,hit.team==='red'?'kill':'loss')}
       else if(hit.alive){hit.hpSeen=hit.hp+s.dmg;}   // the module roll runs next frame
       continue}
     const gh=Math.max(groundH(s.m.position.x,s.m.position.z),0);
@@ -6233,6 +6237,141 @@ function btRespawn(id){
   if(BT.naval&&AC.carrier)placeOnCarrier();else message('RESPAWNED · '+AC.name.toUpperCase(),2.2);
   sndSpawn();
 }
+/* ---------------- Tank battle: you drive one of the ground-war vehicles ----------------
+   The player's tank is an ordinary WAR unit with u.player set: the AI skips it (tkDrive runs instead), red units target it,
+   shells and the damage modules work on it as on any other. The jet is parked out of sight and P only mirrors the tank's position. */
+var TNK={on:false,u:null,v:0,camYaw:0,camPitch:.06,zoom:false,fire:false,kills:0,hold:0,zone:null,range:0,touch:{x:0,y:0},ui:null,baseCd:0};
+const TANK_LIST=['M1A1','LEO2A4','CHAL','M60A3','M3','MARDER'];
+let tkType='M1A1';try{const v=localStorage.getItem('vsTank');if(TANK_LIST.indexOf(v)>=0)tkType=v}catch(e){}
+const TK_HOLD=60;   // seconds holding point A alone to win
+function setupTank(){
+  warClear();WAR.on=true;WAR.t=0;
+  // a dry battlefield: both start lines and everything between them on land
+  let cx=0,cz=12000,ok=false;const dry=(x,z)=>{const h=groundH(x,z);return h>8&&h<320};
+  for(let r=0;r<16000&&!ok;r+=1000)for(let k=0;k<12&&!ok;k++){const x=Math.cos(k*.52)*r,z=12000+Math.sin(k*.52)*r;let good=true;
+    for(let dz=-2200;dz<=2200&&good;dz+=200)for(const dx of [-450,0,450])if(!dry(x+dx,z+dz)){good=false;break}
+    if(good){cx=x;cz=z;ok=true}}
+  if(!ok)[cx,cz]=findLand(rand(-2000,2000),12000);
+  const u=warSpawn(tkType,cx-70,cz-1750,0);u.player=true;u.cd=0;u.obj.rotation.order='YXZ';
+  Object.assign(TNK,{on:true,u,v:0,camYaw:0,camPitch:.05,zoom:false,fire:false,kills:0,hold:0,range:0,zone:{x:cx,z:cz,r:190}});
+  ['LEO2A4','M1A1','M60A3','M3','GEPARD'].forEach((id,i)=>warSpawn(id,cx+(i-2)*140+rand(-25,25),cz-1800-rand(0,160),0));
+  ['T80B','T72A','T72A','T62','BMP2','BMP2','ZSU23'].forEach((id,i)=>warSpawn(id,cx+(i-3)*135+rand(-25,25),cz+1750+rand(0,220),Math.PI));
+  sortie={kind:'TANK'};
+  P.pos.set(u.pos.x,u.pos.y+3,u.pos.z);P.vel.set(0,0,0);P.onGround=true;P.scramble=false;P.kcas=0;P.mach=0;P.n=1;
+  playerJet.visible=false;tkUI(true);
+  message('TANK BATTLE · '+WAR_V[tkType].n.toUpperCase()+' · HOLD POINT A FOR '+TK_HOLD+' S OR DESTROY THE ENEMY',3.2);
+}
+function tkClear(){if(!TNK||!TNK.on)return;TNK.on=false;TNK.u=null;tkUI(false);playerJet.visible=true;projKey=''}
+// keyboard: W/S drive, A/D steer, arrows aim, Space fire, Z or Shift zoom
+function tkKey(code,down){if(!down)return;
+  if(code==='Space')TNK.fire=true;
+  if(code==='KeyZ'||code==='ShiftLeft'||code==='ShiftRight')TNK.zoom=!TNK.zoom}
+// driving, called from updateWar in place of the AI
+function tkDrive(u,dt){const d=u.def,m=u.mod;
+  const thrIn=clamp((keys.KeyW?1:0)-(keys.KeyS?1:0)+TNK.touch.y,-1,1),stIn=clamp((keys.KeyD?1:0)-(keys.KeyA?1:0)+TNK.touch.x,-1,1);
+  if(keys.ArrowLeft)TNK.camYaw+=dt*(TNK.zoom?.25:1.1);if(keys.ArrowRight)TNK.camYaw-=dt*(TNK.zoom?.25:1.1);
+  if(keys.ArrowUp)TNK.camPitch=clamp(TNK.camPitch+dt*(TNK.zoom?.12:.5),-.25,.45);if(keys.ArrowDown)TNK.camPitch=clamp(TNK.camPitch-dt*(TNK.zoom?.12:.5),-.25,.45);
+  const vmax=d.spd*(m.eng?.45:1)*(m.trk?0:1)*(m.crew<d.crew?.85:1),want=thrIn>=0?thrIn*vmax:thrIn*vmax*.4;
+  const h=u.heading,hx=Math.sin(h),hz=Math.cos(h),rx=Math.cos(h),rz=-Math.sin(h);
+  const gH=(x,z)=>Math.max(groundH(x,z),0),fh=gH(u.pos.x+hx*3,u.pos.z+hz*3),bh=gH(u.pos.x-hx*3,u.pos.z-hz*3),slope=(fh-bh)/6;
+  TNK.v+=clamp(want-TNK.v,-7*dt,3.2*dt);TNK.v-=9.81*Math.sin(Math.atan(slope))*.35*dt;   // gravity along the slope
+  if(Math.abs(slope)>.8&&Math.sign(slope)===Math.sign(TNK.v))TNK.v*=.8;   // too steep
+  if(m.trk)TNK.v*=Math.max(0,1-dt*3);
+  if(!m.trk)u.heading+=stIn*(.6-Math.min(.25,Math.abs(TNK.v)/Math.max(1,d.spd)*.25))*(TNK.v<-.5?-1:1)*dt;
+  {const nx=u.pos.x+Math.sin(u.heading)*TNK.v*dt,nz=u.pos.z+Math.cos(u.heading)*TNK.v*dt;if(groundH(nx,nz)>1.5){u.pos.x=nx;u.pos.z=nz}else TNK.v=0}   // tanks don't swim
+  for(const o of WAR.units){if(o===u)continue;const dx=u.pos.x-o.pos.x,dz=u.pos.z-o.pos.z,dd=Math.hypot(dx,dz);if(dd<5.5&&dd>.01){u.pos.x+=dx/dd*(5.5-dd);u.pos.z+=dz/dd*(5.5-dd);TNK.v*=.5}}
+  u.pos.y=Math.max(groundH(u.pos.x,u.pos.z),0)+.2;u.vel.set(Math.sin(u.heading)*TNK.v,0,Math.cos(u.heading)*TNK.v);u.moving=Math.abs(TNK.v)>.6;
+  // the hull sits on the slope
+  const lh=gH(u.pos.x-rx*1.7,u.pos.z-rz*1.7),rh=gH(u.pos.x+rx*1.7,u.pos.z+rz*1.7);
+  u.obj.rotation.set(-Math.atan2(fh-bh,6),u.heading,Math.atan2(rh-lh,3.4));
+  if(u.moving){u.dustT-=dt;if(u.dustT<=0){u.dustT=.25;puff(u.pos.x-hx*3,u.pos.y+.4,u.pos.z-hz*3,rand(-1,1),rand(1,2.5),rand(-1,1),.55,.5,.4,.35,rand(4,7),rand(5,9),rand(1.5,2.5),-.2)}}
+  // turret and gun follow where you look; the gun is laid on the rangefinder distance so the shell drops onto the reticle
+  const ud=u.obj.userData,tur=ud.tur;
+  const T=TNK.aimPt;
+  if(tur&&tur.parent===u.obj){const want2=warAng((T?Math.atan2(T.x-u.pos.x,T.z-u.pos.z):TNK.camYaw)-u.heading),cur=tur.rotation.y,dd=warAng(want2-cur),rate=(d.cls==='mbt'?.75:1.3)*(m.tur?.25:1);tur.rotation.y=cur+clamp(dd,-dt*rate,dt*rate);TNK.aimed=Math.abs(dd)<.02;
+    if(ud.gun){const hd=T?Math.max(30,Math.hypot(T.x-u.pos.x,T.z-u.pos.z)):800,el=(T?Math.atan2(T.y-(u.pos.y+2.4),hd):TNK.camPitch)+9.81*hd/(2*d.gun[2]*d.gun[2])+u.obj.rotation.x;ud.gun.rotation.x+=(-clamp(el,-.15,.35)+(m.gun===1?.04:0)-ud.gun.rotation.x)*Math.min(1,dt*6)}}
+  if(ud.gun){u.rec=Math.max(0,u.rec-dt*2.5);ud.gun.position.z=d.gz-u.rec*.4}
+  if(TNK.fire){TNK.fire=false;if(m.gun>=2)message('GUN DESTROYED',1);else if(u.cd>0)message('RELOADING',.6);else tkFire(u)}
+  P.pos.set(u.pos.x,u.pos.y+3,u.pos.z);P.vel.copy(u.vel);P.kcas=0;P.mach=0;P.n=1;
+}
+function tkFire(u){const d=u.def,m=u.mod,gun=u.obj.userData.gun;if(!gun)return;u.obj.updateMatrixWorld(true);
+  const from=gun.localToWorld(new V3(0,0,d.barrel)),dir=new V3(0,0,1).transformDirection(gun.matrixWorld);
+  const sp=d.gun[4]*(u.moving?1.8:1)*(m.gun===1?2.6:1);dir.x+=rand(-sp,sp);dir.y+=rand(-sp,sp);dir.z+=rand(-sp,sp);dir.normalize();
+  const s=WAR.sh.find(q=>!q.on)||WAR.sh[0];s.on=true;s.team=u.team;s.dmg=d.gun[3];s.owner=u;s.life=8;s.m.material=warShellMat.blue;s.m.visible=true;s.m.position.copy(from);s.prev.copy(from);s.vel.copy(dir).multiplyScalar(d.gun[2]);s.m.quaternion.setFromUnitVectors(ZF,dir);
+  const big=d.cls==='mbt';puff(from.x+dir.x*2,from.y+dir.y*2,from.z+dir.z*2,dir.x*30,dir.y*30+2,dir.z*30,1,.85,.5,1,big?9:3,big?30:10,.14);if(big)puff(from.x,from.y,from.z,dir.x*8,3,dir.z*8,.5,.48,.44,.6,7,12,2.2);
+  TNK.shots=(TNK.shots||0)+1;u.rec=1;u.cd=d.gun[1]*(m.gun===1?1.6:1)*(m.crew>0?d.crew/m.crew:9);shake=Math.max(shake,big?.25:.06);if(big)sndBoom(.5);else sndGun();buzz(big?40:10)}
+// what's under the reticle: terrain or a vehicle, out to 4 km
+function tkRange(){const o=camera.position,dr=new V3();camera.getWorldDirection(dr);let hitD=4000;
+  for(const u of WAR.units){if(u===TNK.u||!u.alive)continue;const w=new V3(u.pos.x,u.pos.y+1.4,u.pos.z).sub(o),t=w.dot(dr);if(t<0||t>hitD)continue;if(w.addScaledVector(dr,-t).length()<3.2)hitD=t}
+  for(let t=20;t<hitD;t+=t<400?10:25){const x=o.x+dr.x*t,y=o.y+dr.y*t,z=o.z+dr.z*t;if(y<Math.max(groundH(x,z),0)){hitD=t;break}}
+  return hitD}
+function tkCamera(dt){const u=TNK.u;if(!u)return;applyProj();
+  const tur=u.obj.userData.tur,cy=Math.cos(TNK.camPitch);
+  const dir=new V3(Math.sin(TNK.camYaw)*cy,Math.sin(TNK.camPitch),Math.cos(TNK.camYaw)*cy);
+  if(TNK.zoom){u.obj.updateMatrixWorld(true);const p=tur?tur.localToWorld(new V3(0,u.def.gy+.95,u.def.gz+1.0)):u.pos.clone().setY(u.pos.y+2.8);/* the gunner sight sits above the gun, on its axis */camera.position.copy(p);camera.fov=14}
+  else{camera.position.set(u.pos.x,u.pos.y+3.6,u.pos.z).addScaledVector(dir,-12).setY(Math.max(u.pos.y+3.6-dir.y*12,Math.max(groundH(camera.position.x,camera.position.z),0)+1.8))}
+  camera.lookAt(camera.position.clone().addScaledVector(dir,100));camera.updateProjectionMatrix();projKey='';
+  TNK.range=tkRange();TNK.aimPt=camera.position.clone().addScaledVector(camera.getWorldDirection(new V3()),TNK.range)}
+function tkSound(){const t=A.ctx.currentTime,v=Math.abs(TNK.v),live=state==='play'&&TNK.u&&TNK.u.alive;
+  A.eng.frequency.setTargetAtTime(24+v*2.2,t,.2);A.engG.gain.setTargetAtTime(live?.05:0,t,.2);if(A.eng2G)A.eng2G.gain.setTargetAtTime(0,t,.2);if(A.whG)A.whG.gain.setTargetAtTime(live?.004+v*.0004:0,t,.2);
+  A.roarF.frequency.setTargetAtTime(160+v*18,t,.2);A.roarG.gain.setTargetAtTime(live?.05+v*.004:0,t,.2)}
+// point A: hold it alone to win; red holding it alone wins for them
+function tkCheck(dt){const Z=TNK.zone,u=TNK.u;
+  if(!u.alive){endMission(false,'Your tank was knocked out'+(TNK.kills?' · '+TNK.kills+' kill'+(TNK.kills>1?'s':''):''));return}
+  let b=0,r=0;for(const o of WAR.units){if(!o.alive)continue;if(Math.hypot(o.pos.x-Z.x,o.pos.z-Z.z)<Z.r){if(o.team==='blue')b++;else r++}}
+  if(b&&!r)TNK.hold=Math.min(TK_HOLD,TNK.hold+dt);else if(r&&!b)TNK.hold=Math.max(-TK_HOLD,TNK.hold-dt);
+  if(TNK.hold>=TK_HOLD)endMission(true,'Point A captured');else if(TNK.hold<=-TK_HOLD)endMission(false,'The enemy took point A');
+  else if(!warAlive('red'))endMission(true,'Enemy armour destroyed');else if(WAR.t>900)endMission(TNK.hold>=0,TNK.hold>=0?'Held the field':'Out of time')}
+function tkStatus(){return 'POINT A '+(TNK.hold>0?'BLUE ':TNK.hold<0?'RED ':'')+Math.round(Math.abs(TNK.hold)/TK_HOLD*100)+'% · BLUE '+warAlive('blue')+' · RED '+warAlive('red')}
+// HUD: reticle where you look, a circle where the gun points, reload, range, speed, damage, point A and enemy markers
+function tkHUD(c){const u=TNK.u;if(!u)return;const d=u.def,col=HUD,pj=v=>{const q=v.clone().project(camera);return q.z<1&&Math.abs(q.x)<1.2&&Math.abs(q.y)<1.2?{x:(q.x+1)/2*W,y:(1-q.y)/2*H}:null};
+  const cx=W/2,cy=H/2;c.strokeStyle=col;c.lineWidth=1.5;
+  if(TNK.zoom){c.fillStyle='rgba(0,0,0,.55)';c.beginPath();c.rect(0,0,W,H);c.arc(cx,cy,Math.min(W,H)*.46,0,6.3,true);c.fill();
+    c.beginPath();c.moveTo(cx-120,cy);c.lineTo(cx-12,cy);c.moveTo(cx+12,cy);c.lineTo(cx+120,cy);c.moveTo(cx,cy+12);c.lineTo(cx,cy+90);c.stroke();
+    for(let i=1;i<=4;i++){c.beginPath();c.moveTo(cx-6,cy+i*20);c.lineTo(cx+6,cy+i*20);c.stroke()}}
+  else{c.beginPath();c.moveTo(cx-14,cy);c.lineTo(cx-5,cy);c.moveTo(cx+5,cy);c.lineTo(cx+14,cy);c.moveTo(cx,cy-14);c.lineTo(cx,cy-5);c.moveTo(cx,cy+5);c.lineTo(cx,cy+14);c.stroke()}
+  {const gun=u.obj.userData.gun;if(gun){u.obj.updateMatrixWorld(true);const m0=gun.localToWorld(new V3(0,0,d.barrel)),dr=new V3(0,0,1).transformDirection(gun.matrixWorld),p=pj(m0.addScaledVector(dr,TNK.range||800));
+    if(p){c.strokeStyle=TNK.aimed?col:'rgba(255,200,80,.9)';c.beginPath();c.arc(p.x,p.y,9,0,6.3);c.stroke()}}}
+  const rl=u.cd>0?clamp(1-u.cd/(d.gun[1]*(u.mod.crew>0?d.crew/u.mod.crew:9)),0,1):1;c.fillStyle='rgba(0,0,0,.35)';c.fillRect(cx-40,cy+30,80,5);c.fillStyle=rl>=1?col:'#ffb347';c.fillRect(cx-40,cy+30,80*rl,5);
+  txt(c,rl>=1?'READY':'RELOAD',cx,cy+46,'center',rl>=1?col:'#ffb347',11,700);
+  txt(c,'RNG '+Math.round(TNK.range)+' M',cx+(TNK.zoom?150:60),cy+4,'left',col,12,700);
+  txt(c,Math.round(Math.abs(TNK.v)*3.6)+' KM/H'+(TNK.v<-.5?' R':''),20,H-120,'left',col,16,700);
+  txt(c,d.n.toUpperCase(),20,H-140,'left',col,12,600);
+  const fl=warFlags(u);if(fl)txt(c,fl,20,H-100,'left','#ff6b5c',12,700);
+  // point A
+  {const Z=TNK.zone,p=pj(new V3(Z.x,Math.max(groundH(Z.x,Z.z),0)+25,Z.z)),dz=Math.hypot(Z.x-u.pos.x,Z.z-u.pos.z);
+    if(p){c.strokeStyle=TNK.hold>0?'#5cb8ff':TNK.hold<0?'#ff6b5c':col;c.beginPath();c.arc(p.x,p.y,12,0,6.3);c.stroke();txt(c,'A',p.x,p.y+4,'center',c.strokeStyle,12,800);txt(c,(dz/1000).toFixed(1)+' KM',p.x,p.y+26,'center',col,10,600)}
+    const w=160,x0=cx-w/2;c.fillStyle='rgba(0,0,0,.35)';c.fillRect(x0,44,w,6);c.fillStyle=TNK.hold>=0?'#5cb8ff':'#ff6b5c';const f=Math.abs(TNK.hold)/TK_HOLD;c.fillRect(TNK.hold>=0?cx:cx-w/2*f,44,w/2*f,6);
+    txt(c,'POINT A',cx,38,'center',col,11,700)}
+  // enemy markers within 3 km and in sight
+  for(const o of WAR.units){if(!o.alive||o.team!=='red')continue;const dd=o.pos.distanceTo(u.pos);if(dd>3000)continue;const p=pj(new V3(o.pos.x,o.pos.y+4.5,o.pos.z));if(!p)continue;
+    c.strokeStyle='#ff6b5c';c.beginPath();c.moveTo(p.x,p.y-6);c.lineTo(p.x+6,p.y);c.lineTo(p.x,p.y+6);c.lineTo(p.x-6,p.y);c.closePath();c.stroke();if(dd<1800)txt(c,o.def.n,p.x,p.y-10,'center','#ff6b5c',9,600)}
+  txt(c,'KILLS '+TNK.kills,W-20,H-120,'right',col,13,700)}
+// touch: left half drives (a floating stick), right half aims; FIRE and ZOOM buttons
+function tkUI(on){
+  if(on&&!TNK.ui){const host=$('ctrls').parentNode,el=document.createElement('div');el.id='tkUI';
+    el.style.cssText='position:absolute;inset:0;z-index:6;touch-action:none;user-select:none';
+    el.innerHTML='<div id="tkDrive" style="position:absolute;left:0;top:0;bottom:0;width:45%"></div><div id="tkLook" style="position:absolute;right:0;top:0;bottom:0;width:55%"></div>'+
+      '<button id="tkFire" style="position:absolute;right:22px;bottom:30px;width:92px;height:92px;border-radius:50%;border:2px solid var(--hud,#5cff8a);background:rgba(10,20,12,.55);color:var(--hud,#5cff8a);font:700 16px inherit">FIRE</button>'+
+      '<button id="tkZoom" style="position:absolute;right:130px;bottom:44px;width:64px;height:64px;border-radius:50%;border:2px solid var(--hud,#5cff8a);background:rgba(10,20,12,.45);color:var(--hud,#5cff8a);font:700 12px inherit">ZOOM</button>'+
+      '<button id="tkPause" style="position:absolute;right:14px;top:12px;width:46px;height:40px;border:1px solid var(--hud,#5cff8a);background:rgba(10,20,12,.45);color:var(--hud,#5cff8a);font:700 14px inherit">II</button>'+
+      '<div id="tkKnob" style="position:absolute;width:54px;height:54px;margin:-27px 0 0 -27px;border-radius:50%;border:2px solid rgba(92,255,138,.7);display:none;pointer-events:none"></div>';
+    host.appendChild(el);TNK.ui=el;
+    const dv=el.querySelector('#tkDrive'),lk=el.querySelector('#tkLook'),kn=el.querySelector('#tkKnob');let dId=null,o=null,lId=null,lx=0,ly=0;
+    dv.addEventListener('pointerdown',e=>{dId=e.pointerId;o={x:e.clientX,y:e.clientY};kn.style.display='block';kn.style.left=e.clientX+'px';kn.style.top=e.clientY+'px';dv.setPointerCapture(e.pointerId);audioInit()});
+    dv.addEventListener('pointermove',e=>{if(e.pointerId!==dId)return;TNK.touch.x=clamp((e.clientX-o.x)/60,-1,1);TNK.touch.y=clamp(-(e.clientY-o.y)/60,-1,1)});
+    const dEnd=e=>{if(e.pointerId!==dId)return;dId=null;TNK.touch.x=TNK.touch.y=0;kn.style.display='none'};dv.addEventListener('pointerup',dEnd);dv.addEventListener('pointercancel',dEnd);
+    lk.addEventListener('pointerdown',e=>{lId=e.pointerId;lx=e.clientX;ly=e.clientY;lk.setPointerCapture(e.pointerId);audioInit()});
+    lk.addEventListener('pointermove',e=>{if(e.pointerId!==lId)return;const k=TNK.zoom?.0012:.005;TNK.camYaw-=(e.clientX-lx)*k;TNK.camPitch=clamp(TNK.camPitch-(e.clientY-ly)*k,-.25,.45);lx=e.clientX;ly=e.clientY});
+    const lEnd=e=>{if(e.pointerId===lId)lId=null};lk.addEventListener('pointerup',lEnd);lk.addEventListener('pointercancel',lEnd);
+    el.querySelector('#tkFire').addEventListener('pointerdown',e=>{e.stopPropagation();TNK.fire=true});
+    el.querySelector('#tkZoom').addEventListener('pointerdown',e=>{e.stopPropagation();TNK.zoom=!TNK.zoom});
+    el.querySelector('#tkPause').addEventListener('click',()=>pause())}
+  if(TNK.ui)TNK.ui.hidden=!on;if(on)$('ctrls').hidden=true;document.body.classList.toggle('tankmode',!!on)}
+// per frame: keep the overlay in step with the game state
+function tkFrame(){if(!TNK.on)return;const show=state==='play';if(TNK.ui&&TNK.ui.hidden===show)TNK.ui.hidden=!show;if(show)$('ctrls').hidden=true;playerJet.visible=false}
+// a kill by the player's tank
+function tkKill(u,by){if(!by||!by.player||u.team!=='red')return;TNK.kills++;kills++;score+=u.def.cls==='mbt'?300:200;message(u.def.n.toUpperCase()+' DESTROYED',1.6);sndKill()}
 
 /* ---------------- progression (War Thunder style): research points, silver lions, tech trees, modules, crew ----------------
    Career mode only. RP earned in a sortie go to the aircraft you flew (and 10 % to Free RP); an aircraft is researched with RP from the
@@ -6786,6 +6925,7 @@ function drawHUD(){
   const c=hctx; c.clearRect(0,0,W,H); drawNVG(c);
   if(hurtT>0){const g=c.createRadialGradient(W/2,H/2,Math.min(W,H)*.3,W/2,H/2,Math.max(W,H)*.7);g.addColorStop(0,'rgba(255,40,30,0)');g.addColorStop(1,`rgba(255,40,30,${hurtT*1.2})`);c.fillStyle=g;c.fillRect(0,0,W,H)}
   if(state!=='play')return;
+  if(TNK&&TNK.on){tkHUD(c);return}
   if(TMAP.z){drawMap(c);return}
   c.lineWidth=1.5;c.strokeStyle=HUD;c.textBaseline='middle';
   if(SC.list.length){let y=H*(W<H?.5:.6);const cols={kill:'#ff8a5c',crit:'#ffd24a',bonus:'#8ee0ff'};c.save();c.textBaseline='middle';
@@ -7137,7 +7277,7 @@ function frame(now){
     const steps=Math.max(1,Math.ceil(dt/.0167)), h=dt/steps; // keeps every step <= ~16.7 ms whatever the frame rate
     for(let s=0;s<steps;s++){
       if(state!=='paused'&&state!=='replay')updateCarrier(h);
-      if(state==='menu'){if(!HG.on&&!HG.bg)updatePlayer(h,true)} else if(state==='play')updatePlayer(h,false);
+      if(state==='menu'){if(!HG.on&&!HG.bg)updatePlayer(h,true)} else if(state==='play'&&!(TNK&&TNK.on))updatePlayer(h,false);
       if(state!=='menu'&&state!=='replay')updateCombat(h);
     }
     rec3(dt); voiceWatch(); updateEject(dt); if(BT.on)btTick(dt); syncEjectBtn();
@@ -7161,7 +7301,7 @@ function frame(now){
       cl.position.set(P.pos.x+Math.sin(a)*d,ovc()?rand(3250,3700):rand(2600,4200),P.pos.z+Math.cos(a)*d)}
   }
   deck.position.x=P.pos.x; deck.position.z=P.pos.z; stars.position.copy(camera.position);
-  updateCamera(dt||.016); if(killCamCamera(rdt||.016))playerJet.visible=P.alive; if(state==='replay')updateReplay(dt||.016); if(PHOTO.on)photoCam(); sky.position.copy(camera.position);
+  (TNK&&TNK.on&&state!=='menu'?tkCamera:updateCamera)(dt||.016); tkFrame(); if(killCamCamera(rdt||.016))playerJet.visible=P.alive; if(state==='replay')updateReplay(dt||.016); if(PHOTO.on)photoCam(); sky.position.copy(camera.position);
   waterMat.uniforms.t.value=now*.001; glare.position.copy(camera.position).addScaledVector(SUN_DIR,26000);
   pMat.uniforms.fogC.value.copy(scene.fog.color); pMat.uniforms.fogN.value=scene.fog.near; pMat.uniforms.fogF.value=scene.fog.far;
   if(boomLight.intensity>0)boomLight.intensity=Math.max(0,boomLight.intensity-(dt||.016)*7*LK);
@@ -7290,7 +7430,7 @@ const _careerAward=careerAward;
 careerAward=function(){lbAdd();return _careerAward.apply(this,arguments)};
 
 /* ---------- test hook (only with ?test in the URL) ---------- */
-if(/[?&]test\b/.test(location.search))window.__vs={get sortie(){return sortie},warBuild,WAR_V,get playerJet(){return playerJet},get CANYON(){return CANYON},groundH,valRings:()=>valRings,buildSAM,buildAAA,buildRadar,buildBunker,buildTruck,buildShip,get ground(){return ground},deathCause:()=>deathCause,spawnFighter,clockNow:()=>clock,cycleRadarSub,radarBlind,radarSub,clutter,R,AA,killEnemy,aaSpawnWave,AG,agRelease,agSight,agWpn,ccip,agReset,btConditions,NET,netScoreCheck,netTeamScore,sbHtml,killGround,get pass(){return pass},passAdd,passClaim,weeklyAdd,scene,rinfoReset:()=>{renderer.info.autoReset=false;renderer.info.reset()},rinfo:()=>({c:renderer.info.render.calls,t:renderer.info.render.triangles,g:renderer.info.memory.geometries,tx:renderer.info.memory.textures}),KB,kbRebuild,playerGunHit,wingHit,BT,die,btRespawn,TMAP,mapStep,KBM,SC,damageSystem,hitAI,killEnemy,setThr,HEAT,explode,puff,camera,LT,townLights,flashLt,P,fly,dlz,flyout,AC_DEFS,feed,WAR,WAR_V,warBuild,warSpawn,warModules,warDie,warFlags,updateWar,warAlive,buildJet,PLAYER_COLORS,M2,V3,atm,clamp,lbAdd,showOverlay:k=>showOverlay(k),setScore:(n,k)=>{score=n;kills=k},get state(){return state},get enemies(){return enemies},missiles:()=>missiles.filter(m=>m.on),setAC:id=>{AC=AC_DEFS[id];applyAC()},wt:{   // weapon-test hooks: a clean sky, one drone, scripted launches
+if(/[?&]test\b/.test(location.search))window.__vs={get sortie(){return sortie},get TNK(){return TNK},get WAR(){return WAR},warDie,warBuild,WAR_V,get playerJet(){return playerJet},get CANYON(){return CANYON},groundH,valRings:()=>valRings,buildSAM,buildAAA,buildRadar,buildBunker,buildTruck,buildShip,get ground(){return ground},deathCause:()=>deathCause,spawnFighter,clockNow:()=>clock,cycleRadarSub,radarBlind,radarSub,clutter,R,AA,killEnemy,aaSpawnWave,AG,agRelease,agSight,agWpn,ccip,agReset,btConditions,NET,netScoreCheck,netTeamScore,sbHtml,killGround,get pass(){return pass},passAdd,passClaim,weeklyAdd,scene,rinfoReset:()=>{renderer.info.autoReset=false;renderer.info.reset()},rinfo:()=>({c:renderer.info.render.calls,t:renderer.info.render.triangles,g:renderer.info.memory.geometries,tx:renderer.info.memory.textures}),KB,kbRebuild,playerGunHit,wingHit,BT,die,btRespawn,TMAP,mapStep,KBM,SC,damageSystem,hitAI,killEnemy,setThr,HEAT,explode,puff,camera,LT,townLights,flashLt,P,fly,dlz,flyout,AC_DEFS,feed,WAR,WAR_V,warBuild,warSpawn,warModules,warDie,warFlags,updateWar,warAlive,buildJet,PLAYER_COLORS,M2,V3,atm,clamp,lbAdd,showOverlay:k=>showOverlay(k),setScore:(n,k)=>{score=n;kills=k},get state(){return state},get enemies(){return enemies},missiles:()=>missiles.filter(m=>m.on),setAC:id=>{AC=AC_DEFS[id];applyAC()},wt:{   // weapon-test hooks: a clean sky, one drone, scripted launches
   begin:id=>{AC=AC_DEFS[id];applyAC();startGame();return AC.id},
   clear:()=>{waveClearT=1e9;for(const e of enemies){e.alive=false;scene.remove(e.obj)}enemies.length=0;P.pos.set(0,6000,0);P.vel.set(0,0,250);throttle=.7;return state},
   target:(type,dz,away,speed)=>{const e=spawnFighter('red',type,new V3(0,P.pos.y,dz),new V3(0,P.pos.y,dz+(away?9999:-9999)),{ir:0,rdr:0,speed:speed||220});e.drone=true;return e.id},
@@ -7575,6 +7715,7 @@ const MIS_ART={
   GROUNDWAR:['#5a4e2d','#241f10','<path d="M6 46h84"/><rect x="10" y="34" width="16" height="8"/><path d="M26 36h12"/><rect x="58" y="34" width="16" height="8"/><path d="M58 36h-12"/><path d="M40 22l8 8M48 22l-8 8"/>'],
   CONVOY:['#5c5a2d','#242310','<path d="M8 44h80"/><rect x="12" y="34" width="14" height="9"/><rect x="34" y="34" width="14" height="9"/><rect x="56" y="34" width="14" height="9"/><path d="M76 40l8-4v8z"/>'],
   ANTISHIP:['#1e4a6a','#0b1c2c','<path d="M14 36h68l-8 10H24zM38 36v-8h16v8M46 28v-8"/><path d="M8 52q8-5 16 0t16 0t16 0t16 0" stroke-width="1.6"/>'],
+  TANK:['#4a4a2d','#16160c','<path d="M14 46h62l6-8H22zM30 38v-8h26v8M56 33h22"/><circle cx="24" cy="50" r="3"/><circle cx="36" cy="50" r="3"/><circle cx="48" cy="50" r="3"/><circle cx="60" cy="50" r="3"/><circle cx="72" cy="50" r="3"/>'],
   VALLEY:['#3d4a2a','#141a0c','<path d="M6 50L24 22l14 18 10-12 12 16 10-20 20 26"/><path d="M12 46q20-8 36-4t40-10" stroke="'+RED+'" stroke-dasharray="3 3"/><circle cx="74" cy="30" r="4" stroke="'+RED+'"/>'],
   CRUISE:['#5c2d1e','#241009','<path d="M16 12l24 14M30 8l24 14M44 4l24 14"/><path d="M40 26l-7-1M54 22l-7-1M68 18l-7-1" stroke="'+RED+'"/><path d="M8 52h80"/>'],
   CAMPAIGN:['#2d4a3a','#0e1c15','<path d="M8 22l20 10 18-8 20 14 22-6" stroke-dasharray="3 4"/><path d="M8 40l24-6 20 8 18-10 18 4"/><circle cx="48" cy="24" r="3" fill="'+RED+'" stroke="none"/>'],
@@ -7585,7 +7726,7 @@ const MAP_ART={
   DESERT:['#c9a566','#8a6a3a','<path d="M0 44q18-14 36-2t36-4 24 4" stroke="#f3dfb0"/><path d="M0 52q22-10 44-2t52-2" stroke="#6b4e24"/><circle cx="74" cy="14" r="6" stroke="#fff3c4"/>'],
   ALPINE:['#9fb4c6','#51647a','<path d="M4 50l20-30 12 16 12-22 16 26 8-10 20 20z" fill="#eef3f7" stroke="#cfd9e3"/>'],
   OCEAN:['#2a6a9a','#0f2f4c','<path d="M0 22q12-6 24 0t24 0t24 0t24 0M0 36q12-6 24 0t24 0t24 0t24 0M0 50q12-6 24 0t24 0t24 0t24 0" stroke="#9fd4ff"/>']};
-const MIS_DESC={VALLEY:'Low-level run up a valley under the radar, pop up on two bunkers, then get home past the SAMs.',ASSAULT:'Defend the base against 15 waves of bombers and attackers; kill the howitzers.',NAVAL:'Sink three enemy frigates before their pressure runs your points out.',COMBINED:'Air and armour fight over the same zones; your tanks hold the front, you win the sky.',BATTLE:'Team battle: capture three zones, drain the enemy points, respawn from a lineup of jets.',WAVES:'Endless bandit groups. Survive and rack up score.',STRIKE:'Take out the SAM and AAA site, then fly home.',INTERCEPT:'Four bombers inbound. Stop them before the release point.',
+const MIS_DESC={TANK:'Drive a tank: take point A or destroy the enemy armour, with AI tanks on both sides.',VALLEY:'Low-level run up a valley under the radar, pop up on two bunkers, then get home past the SAMs.',ASSAULT:'Defend the base against 15 waves of bombers and attackers; kill the howitzers.',NAVAL:'Sink three enemy frigates before their pressure runs your points out.',COMBINED:'Air and armour fight over the same zones; your tanks hold the front, you win the sky.',BATTLE:'Team battle: capture three zones, drain the enemy points, respawn from a lineup of jets.',WAVES:'Endless bandit groups. Survive and rack up score.',STRIKE:'Take out the SAM and AAA site, then fly home.',INTERCEPT:'Four bombers inbound. Stop them before the release point.',
   RUSH:'Bandit rush: 8 kills in 5 minutes.',ESCORT:'Protect a C-130 across the sector.','2V4':'You and your wingman against four bandits.','4SHIP':'Lead a four-ship against six, with a SAM belt.',
   GROUNDWAR:'Blue and red armour fight each other. Back the blue side from the air and destroy the red force.',CONVOY:'Stop at least 4 of 5 trucks before they escape.',ANTISHIP:'Sink the frigate NE of the base. It has SAMs.',CRUISE:'Cruise missiles inbound on the base. Shoot them down.',
   CAMPAIGN:'A moving front line. Losses stay lost.',ONLINE:'Dogfight other pilots in a shared room.',TRAINING:'Guided lessons: dogfighting, missile defence, landing, refuelling.'};
@@ -7602,6 +7743,7 @@ const MIS_BRIEF={ASSAULT:'Bombers at 3,500 m and attackers at 1,500 m come in wa
   GROUNDWAR:'M1A1 Abrams, Leopard 2A4, Challenger and M60A3 tanks with Bradley and Marder IFVs, a Gepard and an M163 Vulcan hold the south (the Gepard shoots at bandits). T-80B, T-72A and T-62 tanks, BMP-2s and two ZSU anti-aircraft tracks come from the north. The tanks fight on their own: kill the red armour with bombs, rockets and guns before it grinds the blue force down, and keep away from the ZSUs.',
   CONVOY:'Trucks are running for the border. Stop at least four of the five before they escape.',
   ANTISHIP:'A frigate sits north-east of the base with SAM cover. Find it, sink it and avoid the missile envelope.',
+  TANK:'You command a tank with a blue platoon against a red company. Point A sits between the two forces: hold it alone for 60 seconds, or destroy every red vehicle. Hits break tracks, engines, guns and turret drives, kill crew or set the ammunition off, for you as for them. Left side drives, right side aims; the gun is laid on the rangefinder. Keyboard: W A S D drive, arrows aim, Space fire, Z zoom.',
   VALLEY:'Fly a low-level route up a valley through the gates, under a 150 m radar ceiling, and arrive within the time on target. Pop up and destroy the two hardened bunkers in the bowl, then get home past the SAMs and the fighters that scramble. If the early-warning radar sees you too long, or you are late, the SAMs come up early.',
   CRUISE:'Cruise missiles are inbound on the base. They are fast and low. Shoot down as many as you can.'};
 const LES_BRIEF={FLAPS:'Flaps add lift and drag so you can fly slower and turn tighter. Set combat flaps, stay under 200 kt, bank and hold the turn for 12 seconds without stalling.',CCIP:'The ballistic computer shows where your rounds, rockets and bombs will land. Turn it on, dive on the three trucks and destroy them.',BFM:'Learn to turn, use energy and put the gun on target. Kill three drones with the guns.',DEFENSE:'Three missiles are coming for you. Break, chaff and flare your way through them.',
@@ -7659,6 +7801,7 @@ const qr=$('qRows');
   A1.append(mGrp('Mission'),
     presetRow(),
     mRow('Mission',()=>quickList().map(k=>({v:k,t:MISSIONS[k]})),()=>quickList().indexOf(mission)>=0?mission:lastQuick,v=>{lastQuick=v;drive($('bMission'),()=>mission,v,30)}),
+    mRow('Tank',()=>TANK_LIST.map(k=>({v:k,t:WAR_V[k].n})),()=>tkType,v=>{tkType=v;try{localStorage.setItem('vsTank',v)}catch(e){}},{hidden:()=>mission!=='TANK'}),
     mRow('Map',()=>Object.keys(MAPS).map(k=>({v:k,t:MAP_NAME(k)})),()=>MAP,v=>drive($('bMap'),()=>MAP,v,6)),
     mRow('Start',()=>[{v:'air',t:'In the air'},{v:'rwy',t:'Runway'},...(AC.carrier?[{v:'cv',t:'Carrier'}]:[])],startCur,v=>drive($('bStartPos'),startCur,v,4)),
     mRow('Mode',()=>[{v:'free',t:'Free play'},{v:'career',t:'Career'}],()=>careerOn?'career':'free',v=>drive($('bMode'),()=>careerOn?'career':'free',v,2)));
@@ -7802,7 +7945,7 @@ function diagram(){const m=MIS_ART[mission]||MIS_ART.WAVES,p=MAP_ART[MAP]||MAP_A
     '<path d="M26 82L150 46" stroke="#fff" stroke-width=".7" stroke-dasharray="3 3" opacity=".7"/><g fill="#fff" stroke="none"><path d="M26 78l5 8h-10z"/></g><text x="34" y="90" fill="#fff" font-size="6" letter-spacing="1" font-family="inherit">BASE</text>'+
     '<text x="170" y="98" fill="#fff" font-size="5.5" letter-spacing="1.2" font-family="inherit" opacity=".8">N &#8593;  50 KM</text></svg>'}
 // the enemy battle-rating range for the selected mission, as the bandit picker will use it
-const NO_FIGHTERS=['CONVOY','ANTISHIP','CRUISE','GROUNDWAR'];
+const NO_FIGHTERS=['CONVOY','ANTISHIP','CRUISE','GROUNDWAR','TANK'];
 function enemyBR(){if(NO_FIGHTERS.indexOf(mission)>=0)return null;
   const v=banditPool().filter(k=>banditType==='MIXED'||k===banditType||banditPool().indexOf(banditType)<0).map(progBR);return{lo:Math.min(...v),hi:Math.max(...v)}}
 const kvs=a=>'<dl class="kvs">'+a.map(x=>'<div><dt>'+x[0]+'</dt><dd>'+x[1]+'</dd></div>').join('')+'</dl>';

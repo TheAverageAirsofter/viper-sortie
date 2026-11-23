@@ -1,0 +1,30 @@
+// Tank battle: the player drives a ground-war unit, aims, fires, the AI targets it, and the battle ends in a win or a loss
+const assert = require('assert'), path = require('path');
+(async () => {
+  const b = await require('./launch')();
+  const p = await b.newPage({ viewport: { width: 900, height: 420 } }); const errs = [];
+  await p.addInitScript(() => { try { localStorage.setItem('vsTips', '1'); localStorage.setItem('viperMode', 'free'); localStorage.setItem('viperMission', 'TANK'); localStorage.setItem('vsTank', 'M1A1'); } catch (e) {} });
+  p.on('pageerror', e => errs.push(e.message));
+  await p.route(/fonts\.(googleapis|gstatic)\.com/, r => r.abort());
+  await p.goto('file://' + path.resolve(__dirname, '../index.html') + '?test'); await p.waitForTimeout(1500);
+  await p.evaluate(() => __vs.wt.begin('F16')); await p.waitForFunction(() => __vs.state === 'play' && __vs.TNK.on && __vs.TNK.u, null, { timeout: 40000 }); await p.waitForTimeout(800);
+  const a = await p.evaluate(() => { const T = __vs.TNK; return { type: T.u.def.n, player: !!T.u.player, ui: !!document.getElementById('tkUI') && !document.getElementById('tkUI').hidden, ctrls: document.getElementById('ctrls').hidden, red: __vs.WAR.units.filter(u => u.team === 'red').length, z: T.u.pos.z }; });
+  assert(a.player && a.type === 'M1A1 Abrams' && a.ui && a.ctrls && a.red === 7, 'tank spawned with its own controls: ' + JSON.stringify(a));
+  // drive forward with W for two seconds
+  await p.keyboard.down('KeyW'); await p.waitForFunction(z0 => Math.hypot(__vs.TNK.u.pos.z - z0) > 3, a.z, { timeout: 20000 }).catch(() => {}); await p.keyboard.up('KeyW');
+  const moved = await p.evaluate(z0 => ({ d: __vs.TNK.u.pos.z - z0, v: __vs.TNK.v, clock: __vs.clockNow() }), a.z);
+  assert(moved.d > 3, 'W drives the tank forward: ' + JSON.stringify(moved));
+  // fire: a shell leaves, then the gun reloads
+  await p.keyboard.press('Space'); await p.waitForTimeout(200);
+  const f = await p.evaluate(() => ({ sh: __vs.TNK.shots || 0, cd: __vs.TNK.u.cd }));
+  assert(f.sh >= 1 && f.cd > 1, 'Space fires a shell and starts the reload: ' + JSON.stringify(f));
+  await p.keyboard.press('KeyZ'); await p.waitForTimeout(300);
+  assert(await p.evaluate(() => __vs.TNK.zoom), 'Z toggles the gunner sight');
+  // a kill by the player's tank is credited
+  const k = await p.evaluate(() => { const T = __vs.TNK, r = __vs.WAR.units.find(u => u.team === 'red' && u.alive); r.lastBy = T.u; r.hp = 0; r.hpSeen = 0; __vs.warDie(r, null, 'test'); return T.kills; });
+  assert(k === 1, 'kill credited: ' + k);
+  // holding point A wins
+  await p.evaluate(() => { const T = __vs.TNK; T.hold = 59.9; for (const u of __vs.WAR.units) if (u.team === 'red') u.pos.set(T.zone.x + 5000, u.pos.y, T.zone.z + 5000); T.u.pos.set(T.zone.x, T.u.pos.y, T.zone.z); });
+  await p.waitForFunction(() => __vs.deathCause() === 'win', null, { timeout: 8000 });
+  assert.deepEqual(errs, []); console.log('tank ok'); await b.close();
+})().catch(e => { console.error(e); process.exit(1); });

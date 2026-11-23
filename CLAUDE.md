@@ -46,6 +46,7 @@ node tools/weapons-test.js    # missile sanity for every type, live shots (rear-
 node tools/dims-test.js       # model length and span against tools/real-dims.json (add a row for every new aircraft)
 node tools/visuals-test.js    # night lights, lightning, explosion, heat shimmer, every aircraft model
 node tools/valley-test.js     # Valley strike: gates, dormant SAMs, radar ceiling detection, egress win
+node tools/tank-test.js       # Tank battle: drive, fire, reload, gunner sight, kill credit, point A win
 ```
 Headless Chromium is at /opt/pw-browsers/chromium in the cloud sandbox (tools/launch.js finds it). Tests that click through gameplay set `vsTips` in localStorage to skip the controls guide.
 
@@ -70,6 +71,9 @@ Paint shader (`paintCompile` in render.js): besides the frame-station panel line
 
 ## Tanks, sound, cockpit (Nov 2026)
 Ground-war vehicles (`warBuild`): a track loop (ground and return runs, sloped ends) with visible road wheels, tyres, hubs, return rollers, sprocket and idler; headlights, tow hooks and exhaust grilles; external fuel drums on red MBTs; turret stowage bins on blue MBTs. Sound (flight.js `sndNear`): two looping voices follow the nearest fighter (2.5 km) and the nearest missile in flight (1.6 km) with distance fall-off, Doppler pitch and stereo pan (`nvPan`); `sndAt(pos, fn)` places one-shots (flyby whoosh, explosions via `sndBoom(v, out)`). Cockpit (cockpit.js): rounded glare-shield lip, console knobs and toggles, and a windscreen frame bow (`fbow`, declared with `let` before `buildOutside` runs) on jets whose canopy has one.
+
+## Tank battle (Nov 2026)
+`TANK` mission, `src/tank.js` (slice after battle; the state object is `TNK` because `TK` is the tanker). Free play only for now. The player's tank is a WAR unit with `u.player`: `updateWar` calls `tkDrive` for it instead of the AI, red units target it, and shells, `warModules`, fires and ammo racks work on it as on the AI (`hit.lastBy` and `tkKill` credit kills). `setupTank` finds a dry battlefield, spawns you (`tkType`, Quick mission > Tank row, `vsTank`), four blue allies and seven red vehicles, and point A between them (`tkCheck`: hold it alone for `TK_HOLD` 60 s, or kill all red; losing your tank or red holding A loses). The frame loop skips `updatePlayer` and uses `tkCamera` (third person, or the gunner sight with Z / ZOOM at 14 degrees); `tkRange` finds what is under the reticle and the gun is laid on that point with ballistic drop. `tkHUD` replaces the flight HUD; `#tkUI` is a separate touch overlay (left half drive stick, right half aim, FIRE, ZOOM, pause) and `#ctrls` stays hidden. Keys: W A S D drive, arrows aim, Space fire, Z or Shift zoom (the keydown handler hands them to `tkKey`). `tkSound` replaces the jet engine. `warClear` calls `tkClear`.
 
 ## Combat balance (Nov 2026)
 AI radar shots are taken inside 72 % of the launch zone's Rmax (`launchAI` in ai.js), so bandits press in rather than lobbing from the edge. AI flares come in spaced bursts (inside 3 km, every 0.7-1.1 s), and `aiDecoyRoll` scales the per-flare decoy chance by 0.75, or 0.4 for a tail chase. Gun hits on AI fighters register inside 8.5 m and `aiGunHit` is deadlier (pilot 4.5 %, wing +0.2 per hit, engine fires fatal 55 %). Firing the last radar missile reminds the player that landing and stopping at base rearms.

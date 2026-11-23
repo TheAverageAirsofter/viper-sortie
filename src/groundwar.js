@@ -141,11 +141,11 @@ function warWreck(u){u.burnT=45;if(u.obj.userData.tur){u.obj.userData.tur.positi
 // the turret flies off when the ammunition goes up
 function warPop(u){const t=u.obj.userData.tur;if(!t||t.parent!==u.obj)return;u.obj.updateMatrixWorld(true);const wp=new V3();t.getWorldPosition(wp);u.obj.remove(t);t.position.copy(wp);t.rotation.set(0,u.heading,0);scene.add(t);
   WAR.debris.push({o:t,vel:new V3(rand(-4,4),rand(16,22),rand(-4,4)),spin:new V3(rand(-1.5,1.5),rand(-1,1),rand(-1.5,1.5)),t:0})}
-function warDie(u,by,why){if(!u.alive)return;u.alive=false;if(BT.on&&BT.ground&&!BT.over)BT.pts[u.team]=Math.max(0,BT.pts[u.team]-6);const big=why==='ammunition detonated';explode(new V3(u.pos.x,u.pos.y+2,u.pos.z),big);
+function warDie(u,by,why){if(!u.alive)return;u.alive=false;by=by||u.lastBy;tkKill(u,by);if(BT.on&&BT.ground&&!BT.over)BT.pts[u.team]=Math.max(0,BT.pts[u.team]-6);const big=why==='ammunition detonated';explode(new V3(u.pos.x,u.pos.y+2,u.pos.z),big);
   if(big)warPop(u);warWreck(u);
   if(by&&by.def)feed((by.team==='blue'?'Blue ':'Red ')+by.def.n+' destroyed '+u.def.n+(why?' ('+why+')':''),u.team==='red'?'kill':'loss');else if(why)feed(u.def.n+': '+why,u.team==='red'?'kill':'loss')}
 const warFlags=u=>{const m=u.mod,a=[];if(m.trk)a.push('TRK');if(m.eng)a.push('ENG');if(m.gun)a.push(m.gun>1?'GUN X':'GUN');if(m.tur)a.push('TUR');if(u.def.crew&&m.crew<u.def.crew)a.push('CREW '+m.crew+'/'+u.def.crew);if(m.fire)a.push('FIRE');return a.join(' ')};
-function warClear(){for(const u of WAR.units)if(u.team==='blue')scene.remove(u.obj);WAR.units=[];for(const s of WAR.sh){s.on=false;s.m.visible=false}for(const x of WAR.debris)scene.remove(x.o);WAR.debris=[];WAR.on=false}
+function warClear(){tkClear();for(const u of WAR.units)if(u.team==='blue')scene.remove(u.obj);WAR.units=[];for(const s of WAR.sh){s.on=false;s.m.visible=false}for(const x of WAR.debris)scene.remove(x.o);WAR.debris=[];WAR.on=false}
 function updateWar(dt){
   if(!WAR.on)return;
   if(state!=='play'){return}
@@ -160,6 +160,7 @@ function updateWar(dt){
     if(m.fire){u.fireT-=dt;u.hp-=.1*dt;u.hpSeen=u.hp;if(u.fireT<=0){u.fireT=.12;const rx=Math.sin(u.heading)*-3,rz=Math.cos(u.heading)*-3;puff(u.pos.x+rx+rand(-.4,.4),u.pos.y+2.4,u.pos.z+rz+rand(-.4,.4),rand(-1,1),rand(4,8),rand(-1,1),1,.55,.15,.9,rand(2,4),rand(3,6),rand(.5,.9),-.3);if(Math.random()<.4)puff(u.pos.x+rx,u.pos.y+3,u.pos.z+rz,rand(-1,1),rand(7,11),rand(-1,1),.12,.12,.12,.65,rand(4,8),rand(6,12),rand(2,4),-.3)}
       u.fireLeft-=dt;if(u.fireLeft<=0){if(m.crew>0&&Math.random()<.55){m.fire=false;feed(d.n+': fire extinguished','info')}else u.fireLeft=8}
       if(u.hp<=0){warDie(u,null,'burned out');continue}}
+    if(u.player){tkDrive(u,dt);continue}
     if(u.scanT<=0){u.scanT=.8+Math.random()*.5;u.aim=warPick(u);u.los=!u.aim||losClear(new V3(u.pos.x,u.pos.y+2.4,u.pos.z),new V3(u.aim.pos.x,u.aim.pos.y+1.4,u.aim.pos.z))}
     const t=u.aim&&u.aim.alive?u.aim:null;let dist=1e9,wantH=u.team==='blue'?0:Math.PI;
     if(t){const dx=t.pos.x-u.pos.x,dz=t.pos.z-u.pos.z;dist=Math.hypot(dx,dz);wantH=Math.atan2(dx,dz)}
@@ -191,8 +192,8 @@ function updateWar(dt){
     s.m.quaternion.setFromUnitVectors(ZF,_s1.copy(s.vel).normalize());
     let hit=null;for(const o of WAR.units){if(!o.alive||o.team===s.team)continue;if(distSeg(_s2.set(o.pos.x,o.pos.y+1.4,o.pos.z),s.prev,s.m.position)<5){hit=o;break}}
     if(hit){s.on=false;s.m.visible=false;const p=s.m.position;puff(p.x,p.y,p.z,0,3,0,1,.8,.4,1,10,22,.2);
-      hit.hp-=s.dmg;puff(hit.pos.x,hit.pos.y+2,hit.pos.z,0,5,0,.2,.2,.2,.7,9,10,3);
-      if(hit.hp<=0&&hit.alive){hit.alive=false;explode(new V3(hit.pos.x,hit.pos.y+2,hit.pos.z),false);warWreck(hit);if(s.owner&&s.owner.def)feed((s.owner.team==='blue'?'Blue ':'Red ')+s.owner.def.n+' destroyed '+hit.def.n,hit.team==='red'?'kill':'loss')}
+      hit.hp-=s.dmg;hit.lastBy=s.owner;puff(hit.pos.x,hit.pos.y+2,hit.pos.z,0,5,0,.2,.2,.2,.7,9,10,3);if(hit.player){hurtT=.5;shake=Math.max(shake,.35);message(warFlags(hit)||'HIT',1)}else if(s.owner&&s.owner.player)message('HIT',.6);
+      if(hit.hp<=0&&hit.alive){hit.alive=false;tkKill(hit,s.owner);explode(new V3(hit.pos.x,hit.pos.y+2,hit.pos.z),false);warWreck(hit);if(s.owner&&s.owner.def)feed((s.owner.team==='blue'?'Blue ':'Red ')+s.owner.def.n+' destroyed '+hit.def.n,hit.team==='red'?'kill':'loss')}
       else if(hit.alive){hit.hpSeen=hit.hp+s.dmg;}   // the module roll runs next frame
       continue}
     const gh=Math.max(groundH(s.m.position.x,s.m.position.z),0);

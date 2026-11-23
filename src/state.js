@@ -48,7 +48,7 @@ const isBT=()=>mission==='BATTLE'||mission==='COMBINED'||mission==='NAVAL'||miss
 let friends=[], mission='WAVES', banditType='F16', missionT=0, missionDone=false, spawnQ=[];
 try{mission=localStorage.getItem('viperMission')||'WAVES';banditType=localStorage.getItem('viperBandit')||'F16'}catch(e){}
 const RUSH_KILLS=8, RUSH_TIME=300;   // time-attack: bandits keep arriving, four at a time
-const MISSIONS={WAVES:'Waves',STRIKE:'Strike / SEAD',INTERCEPT:'Intercept bombers',RUSH:'Bandit rush (8 in 5 min)',ESCORT:'Escort the C-130','2V4':'2 v 4 with wingman','4SHIP':'4-ship vs 6',CONVOY:'Convoy attack',GROUNDWAR:'Ground war (CAS)',BATTLE:'Air battle (domination)',COMBINED:'Combined arms battle',NAVAL:'Naval battle',ASSAULT:'Air assault (defend the base)',ANTISHIP:'Anti-ship strike',VALLEY:'Valley strike (low level)',CRUISE:'Cruise missile defence',CAMPAIGN:'Campaign',ONLINE:'Online dogfight',TRAINING:'Training'};
+const MISSIONS={WAVES:'Waves',STRIKE:'Strike / SEAD',INTERCEPT:'Intercept bombers',RUSH:'Bandit rush (8 in 5 min)',ESCORT:'Escort the C-130','2V4':'2 v 4 with wingman','4SHIP':'4-ship vs 6',CONVOY:'Convoy attack',GROUNDWAR:'Ground war (CAS)',BATTLE:'Air battle (domination)',COMBINED:'Combined arms battle',NAVAL:'Naval battle',ASSAULT:'Air assault (defend the base)',ANTISHIP:'Anti-ship strike',VALLEY:'Valley strike (low level)',TANK:'Tank battle (drive)',CRUISE:'Cruise missile defence',CAMPAIGN:'Campaign',ONLINE:'Online dogfight',TRAINING:'Training'};
 const LESSONS={BFM:'Dogfighting basics',DEFENSE:'Missile defense',BVR:'Long-range shot',LANDING:'Landing',REFUEL:'Air refueling',FLAPS:'Flaps and slow flight',CCIP:'Ground attack (CCIP)'};
 let lesson='BFM'; try{if(LESSONS[localStorage.getItem('vsLesson')])lesson=localStorage.getItem('vsLesson')}catch(e){}
 let trainDefeated=0, trainConnT=0;
@@ -140,6 +140,7 @@ function setupMission(){
   if(mission==='GROUNDWAR'){setupGroundWar();spawnPair(pickBanditType(),new V3(sortie.center.x,7000,sortie.center.z+16000),new V3(0,5000,0));message('GROUND WAR · SUPPORT THE BLUE ARMOUR (GEPARD COVERS IT) · DESTROY THE '+sortie.need+' RED VEHICLES · ZSU-23-4 AND ZSU-57-2 WILL SHOOT AT YOU',3.6);return}
   if(mission==='ANTISHIP'){P.pos.set(0,6000,0);P.vel.set(0,0,240);setupShip();spawnPair(pickBanditType(),new V3(19600,7000,36000),new V3(0,5000,0));message('ANTI-SHIP · SINK THE FRIGATE NE OF THE BASE · IT HAS SAMS',3);return}
   if(mission==='VALLEY'){setupValley();return}
+  if(mission==='TANK'){setupTank();return}
   if(mission==='CRUISE'){P.pos.set(0,5000,6000);P.vel.set(0,0,240);setupCruise();message('CRUISE MISSILES INBOUND FROM THE NORTH · LOW AND FAST · PROTECT THE BASE',3.2);return}
   if(mission==='STRIKE'){
     P.pos.set(0,6500,0); P.vel.set(0,0,240);
@@ -539,6 +540,7 @@ const KBE={open:false};   // the bindings editor (menu.js) captures keys while i
 addEventListener('keydown',e=>{
   if(KBE.open)return;
   keys[e.code]=true; audioInit();
+  if(state==='play'&&TNK&&TNK.on){tkKey(e.code,true);if(e.code==='Escape')pause();if(e.code==='Space'||e.code.startsWith('Arrow'))e.preventDefault();return}
   const a=KB.rev[KBM.on?'kbm':'kb'][e.code];
   if(state==='play'){
     if(a&&!e.repeat){if(a==='gun'||a==='map')e.preventDefault();actDown(a)}

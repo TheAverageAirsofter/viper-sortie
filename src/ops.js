@@ -580,9 +580,10 @@ function valleyStatus(){const S=sortie,left=ground.filter(g=>g.objective&&g.aliv
   return(S.ring<valRings.length?'GATE '+(S.ring+1)+'/'+valRings.length+' · ':'')+'BUNKERS '+left+' · '+(S.comp?'COMPROMISED':'TOT '+fmtT(VAL_TOT-S.t)+' · RADAR '+Math.round(S.det*100)+'%')}
 function setupCAP(cz,n){for(let i=0;i<n;i+=2)spawnPair(pickBanditType(),new V3(rand(-6000,6000),rand(5000,8000),cz+rand(-3000,3000)),new V3(0,5000,0));sortie={kind:'CAP'}}
 function sortieStatus(){if(!sortie)return'';const left=ground.filter(g=>g.objective&&g.alive).length;
-  return sortie.kind==='VALLEY'?valleyStatus():sortie.kind==='GROUNDWAR'?warStatus():sortie.kind==='CONVOY'?'TRUCKS LEFT '+ground.filter(g=>g.kind==='truck'&&g.alive).length:sortie.kind==='SHIP'?'FRIGATE '+(left?'AFLOAT':'SUNK'):sortie.kind==='CRUISE'?'CRUISE MISSILES '+(enemies.filter(e=>e.kind==='cruise').length+(sortie.second?0:3)):sortie.kind==='STRIKE'?'TARGETS LEFT '+left:'BANDITS '+enemies.length}
+  return sortie.kind==='TANK'?tkStatus():sortie.kind==='VALLEY'?valleyStatus():sortie.kind==='GROUNDWAR'?warStatus():sortie.kind==='CONVOY'?'TRUCKS LEFT '+ground.filter(g=>g.kind==='truck'&&g.alive).length:sortie.kind==='SHIP'?'FRIGATE '+(left?'AFLOAT':'SUNK'):sortie.kind==='CRUISE'?'CRUISE MISSILES '+(enemies.filter(e=>e.kind==='cruise').length+(sortie.second?0:3)):sortie.kind==='STRIKE'?'TARGETS LEFT '+left:'BANDITS '+enemies.length}
 function sortieCheck(dt){if(!sortie)return;const k=sortie.kind;
   if(k==='VALLEY'){valleyCheck(dt);return}
+  if(k==='TANK'){tkCheck(dt);return}
   if(k==='GROUNDWAR'){warCheck(dt);return}
   if(k==='CONVOY'){const tr=ground.filter(g=>g.kind==='truck');const dead=tr.filter(g=>!g.alive).length;if(dead>=sortie.need)endMission(true,'Convoy stopped');else if(tr.some(g=>g.alive&&g.s>=g.path.len))endMission(false,'The convoy got through')}
   else if(k==='SHIP'||k==='STRIKE'){if(!ground.some(g=>g.objective&&g.alive))endMission(true,k==='SHIP'?'Frigate sunk':'Target area destroyed')}

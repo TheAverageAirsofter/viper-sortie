@@ -41,7 +41,7 @@ function say(key,cd){
   try{const ru=/^(MIG|SU)/.test(AC.id)&&VOICE.ru, u=new SpeechSynthesisUtterance(VTXT[key][ru?1:0]); u.rate=1.15;u.pitch=1.05;u.volume=1;
     if(ru)u.voice=VOICE.ru; else if(VOICE.en)u.voice=VOICE.en; if(key==='pull'||key==='maws'||key==='launch')speechSynthesis.cancel(); speechSynthesis.speak(u)}catch(e){}}
 const VW={bingo:false,fuel:false,fire:0};
-function voiceWatch(){
+function voiceWatch(){if(TNK&&TNK.on)return;
   if(state!=='play'||!P.alive)return;
   const gh=Math.max(groundH(P.pos.x,P.pos.z),0), agl=P.pos.y-gh;
   if(P.gcas||(!P.gear&&agl<400&&P.vel.y<-20))say('pull',2.6);
@@ -62,7 +62,7 @@ const sndCrit=()=>sndBeep(1600,.05,.05,'sine');
 const sndZone=up=>sndSeq(up?[660,880,1100]:[880,660,440],.1,.07);
 const sndSpawn=()=>sndSeq([520,780],.1,.06);
 function sndEngine(){
-  if(!A.ctx)return; const t=A.ctx.currentTime;
+  if(!A.ctx)return; if(TNK&&TNK.on){tkSound();return} const t=A.ctx.currentTime;
   const live=(state==='play'||state==='menu')&&(P.thrK??1)>0;
   const k=clamp(P.kcas/700,0,1.2), ab=throttle>.81;
   const snd=ENG_SND[AC.id]||({F16:{f:40,roar:250,wh:0,twin:0},F16B70:{f:39,roar:240,wh:0,twin:0},GRIPEN:{f:52,roar:330,wh:.012,twin:0},GRIPENE:{f:48,roar:300,wh:.01,twin:0},MIG29:{f:30,roar:200,wh:.004,twin:1},MIG29UPG:{f:30,roar:200,wh:.004,twin:1},MIG35:{f:33,roar:215,wh:.005,twin:1},SU27:{f:27,roar:185,wh:.004,twin:1},SU35:{f:26,roar:180,wh:.006,twin:1}})[AC.id]||AC.snd||{f:36,roar:220,wh:.004,twin:1};

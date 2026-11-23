@@ -697,3 +697,4 @@ button:disabled{opacity:.4;cursor:not-allowed}
 #ov .pt.open{border-color:var(--hud,#7dff9a);color:var(--hud,#7dff9a)}
 #ov .pt.got{opacity:.5}
 #ov .pt:disabled:not(.got){opacity:.45}
+body.tankmode #rdr,body.tankmode #cm,body.tankmode #thr{display:none}
