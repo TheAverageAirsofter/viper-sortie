@@ -5895,6 +5895,16 @@ function warSkin(col,team){const m=new THREE.MeshStandardMaterial({color:col,rou
       'diffuseColor.rgb=c;}')
       .replace('#include <roughnessmap_fragment>','#include <roughnessmap_fragment>\nroughnessFactor=clamp(roughnessFactor+(texture2D(nTex,vLP.xz*.7).r-.5)*.25,.45,.95);')};
   return m}
+// a track loop: two runs joined round the sprocket and idler, as one extruded band (R outer radius, yc axle height, w width)
+function wTrack(L,R,yc,w){const zr=-L/2+.5,zf=L/2-.5,r2=R-.09,sh=new THREE.Shape();
+  sh.moveTo(zr,yc-R);sh.lineTo(zf,yc-R);sh.absarc(zf,yc,R,-Math.PI/2,Math.PI/2,false);sh.lineTo(zr,yc+R);sh.absarc(zr,yc,R,Math.PI/2,Math.PI*1.5,false);
+  const h=new THREE.Path();h.moveTo(zr,yc-r2);h.absarc(zr,yc,r2,Math.PI*1.5,Math.PI/2,true);h.lineTo(zf,yc+r2);h.absarc(zf,yc,r2,Math.PI/2,-Math.PI/2,true);h.lineTo(zr,yc-r2);sh.holes.push(h);
+  const g=new THREE.ExtrudeGeometry(sh,{depth:w,bevelEnabled:false,curveSegments:12});g.translate(0,0,-w/2);g.rotateY(-Math.PI/2);return g}
+// running gear: dark steel with track links and grousers drawn from object position (the merged meshes carry no UVs)
+function warTrackMat(){const m=new THREE.MeshStandardMaterial({color:0x2c2e30,roughness:.62,metalness:.55,envMapIntensity:.6});
+  m.onBeforeCompile=sh=>{sh.vertexShader=sh.vertexShader.replace('#include <common>','#include <common>\nvarying vec3 vLP;').replace('#include <begin_vertex>','#include <begin_vertex>\nvLP=position;');
+    sh.fragmentShader=sh.fragmentShader.replace('#include <common>','#include <common>\nvarying vec3 vLP;').replace('#include <color_fragment>','#include <color_fragment>\n{float k=fract((vLP.z+vLP.y*.9)*6.);diffuseColor.rgb*=.7+.45*smoothstep(.0,.12,k)*smoothstep(.62,.5,k);float dust=1.-smoothstep(.1,.9,vLP.y);diffuseColor.rgb=mix(diffuseColor.rgb,vec3(.33,.29,.23),dust*.35);}')};
+  return m}
 function warMetal(col){return new THREE.MeshStandardMaterial({color:col,roughness:.55,metalness:.55,envMapIntensity:.7})}
 const WAR_TRK=(()=>{const cv=document.createElement('canvas');cv.width=64;cv.height=8;const x=cv.getContext('2d');x.fillStyle='#2a2c2e';x.fillRect(0,0,64,8);
   for(let i=0;i<64;i+=4){x.fillStyle='#4a4c4c';x.fillRect(i,0,2,8);x.fillStyle='#17181a';x.fillRect(i+2,0,1,8)}const t=new THREE.CanvasTexture(cv);t.wrapS=t.wrapT=THREE.RepeatWrapping;t.repeat.set(9,1);return t})();   // grousers, link by link
@@ -5917,19 +5927,21 @@ function warBuild(d){
   const tier=d.look==='ifv'||d.look==='m163';
   // hull: sloped glacis and rear deck
   const hp=d.look==='m163'?[[-L/2,.3],[-L/2,.3+H1],[L/2-1.0,.3+H1],[L/2,.3+H1*.6],[L/2,.3]]:tier?[[-L/2,.3],[-L/2,.3+H1],[L/2-1.5,.3+H1],[L/2,.3+H1*.55],[L/2,.3]]:[[-L/2,.3],[-L/2,.3+H1*.92],[-L/2+1.8,.3+H1],[L/2-2.0,.3+H1],[L/2,.3+H1*.5],[L/2,.3]];
-  wPart(hullG,wPrism(hp,W-.35),0,0,0);
+  const tW=.78,tX=W/2-.42,yTop=1.16;   // track width, track centre line, top of the track run
+  wPart(hullG,wPrism(hp,W-2*tW+.1),0,0,0);   // lower hull between the tracks
+  {const sp=hp.map(([z,y])=>[z,Math.max(y,yTop+.02)]);for(const sd of [-1,1])wPart(hullG,wPrism(sp,tW+.08),sd*tX,0,0)}   // sponsons over the tracks
+  for(const sd of [-1,1])wPart(hullG,wBox(tW+.12,.04,L+.35),sd*tX,yTop+.03,0);   // fenders
   if(!tier||d.look==='m163'){wPart(sideL,wBox(W*.55,.05,1.7),0,.3+H1+.04,-L/2+1.3);}                                       // engine deck grille (hull frame, dark)
   // running gear: road wheels, sprocket, idler, track runs and skirts, one merged mesh per side
   const nW=tier?5:6;
-  for(const [sd,list] of [[-1,sideL],[1,sideR]]){const x=sd*(W/2+.12);
-    // track loop: ground run, return run, and the slopes up to the sprocket and idler; wheels stay visible between the runs
-    wPart(list,wBox(.78,.1,L-1.5),x,.06,0);wPart(list,wBox(.78,.08,L-.5),x,1.07,0);
-    wPart(list,wBox(.78,.1,1.15),x,.5,L/2-.45,-1.0);wPart(list,wBox(.78,.1,1.15),x,.5,-L/2+.45,1.0);
-    for(let i=0;i<nW;i++){const z=-L/2+1.2+(L-2.4)*i/(nW-1);wPart(hullG,wCyl(.45,.45,.62,14),x,.52,z,0,0,Math.PI/2);wPart(list,wCyl(.47,.47,.56,14),x,.52,z,0,0,Math.PI/2);wPart(hullG,wCyl(.16,.16,.7,8),x,.52,z,0,0,Math.PI/2)}   // road wheels with rubber tyres and hubs
-    for(let i=0;i<3;i++)wPart(list,wCyl(.1,.1,.4,8),x,1.0,-L/2+1.8+i*(L-3.6)/2,0,0,Math.PI/2);   // return rollers
-    wPart(hullG,wCyl(.42,.42,.6,10),x,.65,-L/2+.4,0,0,Math.PI/2);wPart(list,wCyl(.46,.46,.5,10),x,.65,-L/2+.4,0,0,Math.PI/2);   // drive sprocket
-    wPart(hullG,wCyl(.38,.38,.6,12),x,.65,L/2-.35,0,0,Math.PI/2);   // idler
-    if(!tier&&d.team==='blue')wPart(list,wBox(.08,.55,L*.8),x+sd*.42,.95,0)}                                              // side skirts on the NATO tanks
+  for(const [sd,list] of [[-1,sideL],[1,sideR]]){const x=sd*tX;
+    wPart(list,wTrack(L,.56,.6,tW),x,0,0);   // the track: one continuous loop round the sprocket and idler
+    for(let i=0;i<nW;i++){const z=-L/2+1.25+(L-2.5)*i/(nW-1);wPart(hullG,wCyl(.43,.43,.58,16),x,.52,z,0,0,Math.PI/2);wPart(list,wCyl(.46,.46,.5,16),x,.52,z,0,0,Math.PI/2);wPart(list,wCyl(.14,.14,.66,8),x,.52,z,0,0,Math.PI/2)}   // road wheels: painted discs, rubber tyres, hubs
+    for(let i=0;i<3;i++)wPart(list,wCyl(.1,.1,.4,8),x,1.04,-L/2+1.8+i*(L-3.6)/2,0,0,Math.PI/2);   // return rollers
+    wPart(list,wCyl(.42,.42,.62,12),x,.6,-L/2+.5,0,0,Math.PI/2);for(let k=0;k<12;k++){const a=k/12*Math.PI*2;wPart(list,wBox(.5,.1,.1),x,.6+Math.sin(a)*.47,-L/2+.5+Math.cos(a)*.47,a)}   // drive sprocket and its teeth
+    wPart(hullG,wCyl(.4,.4,.6,14),x,.6,L/2-.5,0,0,Math.PI/2);   // idler
+    if(d.look==='box'){wPart(hullG,wBox(.07,.66,L*.86),sd*(W/2+.03),.86,.15);for(let k=1;k<6;k++)wPart(list,wBox(.08,.62,.03),sd*(W/2+.07),.86,.15-L*.43+k*L*.86/6)}   // armoured side skirts with their segment joints
+    else if(d.team==='red'&&d.cls==='mbt')wPart(list,wBox(.03,.32,L*.8),sd*(W/2+.02),1.0,.1)}                                // rubber skirts on the Soviet tanks
   // hull details: headlights and tow hooks at the front, exhaust grilles at the back, Soviet tanks' external fuel drums
   for(const sd of [-1,1]){wPart(sideL,wCyl(.12,.12,.15,8),sd*(W/2-.55),.3+H1*.62,L/2-.02,Math.PI/2);wPart(sideL,wBox(.18,.14,.25),sd*.8,.38,L/2+.05);wPart(sideL,wBox(.18,.14,.25),sd*.8,.38,-L/2-.05);
     if(!tier)wPart(sideL,wBox(.9,.05,.5),sd*.9,.3+H1+.03,-L/2+.6)}
@@ -5938,20 +5950,21 @@ function warBuild(d){
   const top={v:1};
   switch(d.look){
     case 'box':{
-      if(d.n.indexOf('Abrams')>=0){wPart(T,wPrism([[-2.5,0],[-2.5,.92],[-.7,1.06],[1.0,.96],[2.0,.72],[2.3,.35],[2.3,0]],3.3),0,0,0);wPart(T,wBox(3.2,.8,1.1),0,.45,-2.75);wPart(T,wBox(.7,.3,.9),-.75,1.1,-.3);wPart(TD,wCyl(.42,.42,.3,10),.75,1.15,-.2);wPart(TD,wBox(1.0,.7,.4),0,.5,2.35);top.v=1.2}
-      else if(d.n.indexOf('Leopard')>=0){wPart(T,wPrism([[-2.4,0],[-2.4,.95],[1.7,.95],[2.15,.78],[2.15,0]],3.4),0,0,0);for(const s of [-1,1])wPart(T,wBox(.55,.78,1.5),s*1.55,.45,1.55,0,-s*.55);wPart(T,wBox(3.1,.7,1.0),0,.45,-2.75);wPart(TD,wCyl(.4,.4,.3,10),.8,1.1,-.2);wPart(TD,wBox(.9,.6,.4),0,.5,2.2);top.v=1.05}
-      else{wPart(T,wPrism([[-2.6,0],[-2.6,.98],[1.4,1.05],[2.25,.78],[2.25,0]],3.5),0,0,0);wPart(T,wBox(3.3,.85,1.4),0,.5,-2.9);wPart(TD,wCyl(.42,.42,.3,10),.8,1.18,-.4);wPart(TD,wBox(1.1,.7,.4),0,.5,2.3);top.v=1.15}
+      if(d.n.indexOf('Abrams')>=0){wPart(T,wPrism([[-2.5,0],[-2.5,.92],[-.7,1.06],[1.0,.96],[2.0,.72],[2.3,.35],[2.3,0]],3.3),0,0,0);wPart(T,wBox(3.2,.8,1.1),0,.45,-2.75);wPart(T,wBox(.7,.3,.9),-.75,1.1,-.3);wPart(T,wCyl(.42,.46,.3,14),.75,1.15,-.2);wPart(T,wBox(1.0,.7,.4),0,.5,2.35);top.v=1.2}
+      else if(d.n.indexOf('Leopard')>=0){wPart(T,wPrism([[-2.4,0],[-2.4,.95],[1.7,.95],[2.15,.78],[2.15,0]],3.4),0,0,0);for(const s of [-1,1])wPart(T,wBox(.55,.78,1.5),s*1.55,.45,1.55,0,-s*.55);wPart(T,wBox(3.1,.7,1.0),0,.45,-2.75);wPart(T,wCyl(.4,.44,.3,14),.8,1.1,-.2);wPart(T,wBox(.9,.6,.4),0,.5,2.2);top.v=1.05}
+      else{wPart(T,wPrism([[-2.6,0],[-2.6,.98],[1.4,1.05],[2.25,.78],[2.25,0]],3.5),0,0,0);wPart(T,wBox(3.3,.85,1.4),0,.5,-2.9);wPart(T,wCyl(.42,.46,.3,14),.8,1.18,-.4);wPart(T,wBox(1.1,.7,.4),0,.5,2.3);top.v=1.15}
       break}
     case 'round':{
-      const m60=d.n.indexOf('M60')>=0;wPart(T,wSph(),0,m60?.15:.05,.1,0,0,0,m60?1.5:1.6,m60?.85:.55,m60?2.0:1.85);
-      wPart(TD,wCyl(.46,.46,.32,10),m60?.65:.55,m60?1.0:.62,-.3);
+      const m60=d.n.indexOf('M60')>=0,dome=new THREE.LatheGeometry([[0,0],[1.55,0],[1.6,.12],[1.52,.42],[1.3,.66],[.9,.8],[0,.84]].map(([x,y])=>new THREE.Vector2(x,y)),24);
+      wPart(T,dome,0,0,m60?.25:.15,0,0,0,m60?.95:1,m60?1.08:.98,m60?1.38:1.12);   // cast turret: rounded shoulders, flat-ish crown
+      wPart(T,wCyl(.46,.5,.3,14),m60?.65:.55,m60?1.0:.92,-.3);
       if(!m60){wPart(TD,wBox(.5,.3,.6),-.75,.6,1.1);for(const s of [-1,1])for(let i=0;i<3;i++)wPart(TD,wCyl(.07,.07,.3,6),s*(.75+i*.15),.45,1.55,Math.PI/2,0,0);wPart(TD,wCyl(.05,.05,.7,6),.55,.9,-.3)}
       else wPart(TD,wBox(.9,.3,.6),-.9,.55,-.2);
-      top.v=m60?1.1:.82;break}
+      top.v=m60?1.15:1.07;break}
     case 'ifv':{
       const brad=d.n.indexOf('Bradley')>=0,mard=d.n.indexOf('Marder')>=0;
-      wPart(T,wBox(brad?1.9:1.7,.85,2.0),brad?-.4:.35,.42,-.2);if(brad)wPart(TD,wBox(.7,.55,1.2),.95,.8,-.4);else if(mard)wPart(TD,wBox(.5,.4,.8),-.1,.9,-.3);else wPart(TD,wBox(.3,.35,.9),-.5,1.0,.1);
-      wPart(TD,wCyl(.3,.3,.18,8),brad?-.4:.35,.9,-.3);top.v=.9;break}
+      if(!brad&&!mard)wPart(T,wCyl(.78,1.12,.62,10),.3,.31,-.1);else wPart(T,wBox(brad?1.9:1.7,.85,2.0),brad?-.4:.35,.42,-.2);   // BMP-2: a low conical two-man turretif(brad)wPart(TD,wBox(.7,.55,1.2),.95,.8,-.4);else if(mard)wPart(TD,wBox(.5,.4,.8),-.1,.9,-.3);else wPart(TD,wBox(.3,.35,.9),-.5,1.0,.1);
+      wPart(TD,wCyl(.3,.3,.18,8),brad?-.4:.35,brad||mard?.9:.68,-.3);top.v=brad||mard?.9:.72;break}
     case 'gepard':{
       wPart(T,wPrism([[-1.9,0],[-1.9,1.25],[1.1,1.35],[1.9,.95],[1.9,0]],3.3),0,0,0);
       wPart(TD,wCyl(.06,.06,1.0,6),0,1.8,-1.0);wPart(TD,wCyl(.95,.95,.14,16),0,2.4,-1.0,Math.PI/2.4);wPart(TD,wCyl(.42,.42,.14,12),0,1.55,1.4,Math.PI/2.1);
@@ -5962,8 +5975,8 @@ function warBuild(d){
       wPart(T,wBox(2.9,1.2,2.9),0,.6,-.2);wPart(T,wBox(2.6,.2,1.0),0,1.25,.9,-.35);wPart(TD,wCyl(.06,.06,.8,6),0,1.6,-1.0);wPart(TD,wCyl(.85,.85,.14,14),0,2.1,-1.1,Math.PI/2.3);top.v=1.4;break}
     default:{   // ZSU-57-2: open-topped turret with thin walls
       for(const s of [-1,1])wPart(T,wBox(.12,.9,3.0),s*1.4,.45,-.2);wPart(T,wBox(2.9,.9,.12),0,.45,-1.7);wPart(T,wBox(2.9,.5,.12),0,.3,1.3);wPart(TD,wBox(2.6,.1,2.6),0,.05,-.2);top.v=.9}}
-  if(d.team==='blue'&&d.cls==='mbt')for(const sd of [-1,1])wPart(TD,wBox(.35,.45,1.6),sd*1.85,.4,-1.2);   // stowage bins on the turret sides
-  if(d.cls==='mbt'){wPart(TD,wBox(.95,.62,.4),0,d.gy,d.gz-.05);   // gun mantlet
+  if(d.team==='blue'&&d.cls==='mbt')for(const sd of [-1,1])wPart(T,wBox(.35,.45,1.6),sd*1.85,.4,-1.2);   // stowage bins on the turret sides
+  if(d.cls==='mbt'){if(d.look==='box')wPart(T,wBox(.8,.5,.3),0,d.gy,d.gz-.08);   // gun mantlet (cast turrets take the gun straight through the dome)
     wPart(TD,wBarrel(.025,1.1),.7,top.v+.18,-.2);wPart(TD,wBox(.12,.14,.4),.7,top.v+.14,-.25);   // commander's machine gun on its mount
     if(d.look==='box')for(const sd of [-1,1])for(let i=0;i<4;i++)wPart(TD,wCyl(.06,.06,.32,6),sd*(1.0+i*.13),.62,1.75,-1.1,0,0);}   // smoke grenade launchers
   // gun: barrel(s) in their own group so they can elevate and recoil
@@ -5976,8 +5989,8 @@ function warBuild(d){
     if(d.n.indexOf('Leopard')>=0||d.n.indexOf('Abrams')>=0||d.n.indexOf('Chall')>=0)wPart(gunG,wCyl(r*1.3,r*1.3,1.4,10).rotateX(Math.PI/2),0,0,.9)}
   else wPart(gunG,wBarrel(.06,d.barrel),0,0,0);
   if(d.look==='gepard')gg.position.set(0,.8,d.gz);
-  const trk=new THREE.MeshStandardMaterial({color:0xffffff,map:WAR_TRK,roughness:.6,metalness:.5,envMapIntensity:.6});
-  const hull=wMerge(hullG,body),sl=wMerge(sideL,trk),sr=wMerge(sideR,trk),tb=wMerge(turB,tmat),td=wMerge(turD,dk2),gn=wMerge(gunG,dk);
+  const trk=warTrackMat();
+  const hull=wMerge(hullG,body),sl=wMerge(sideL,trk),sr=wMerge(sideR,trk),tb=wMerge(turB,tmat),td=wMerge(turD,dk2),gn=wMerge(gunG,d.cls==='mbt'?tmat:dk);
   const tur=new THREE.Group();tur.position.y=yT;
   g.add(hull);g.add(sl);g.add(sr);g.add(tur);tur.add(tb);if(td)tur.add(td);tur.add(gg);if(gn)gg.add(gn);
   const mk=new THREE.Mesh(new THREE.PlaneGeometry(1.6,1.6).rotateX(-Math.PI/2),new THREE.MeshBasicMaterial({color:d.team==='blue'?0x2b8cff:0xff3b30,side:THREE.DoubleSide}));mk.name='mk';mk.position.set(0,top.v+.05,-.3);tur.add(mk);   // roof panel: readable from the air
