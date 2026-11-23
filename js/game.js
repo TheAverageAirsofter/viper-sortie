@@ -6422,7 +6422,6 @@ function tkHUD(c){const u=TNK.u;if(!u)return;const d=u.def,col=HUD,pj=v=>{const 
   {const m=u.mod,cells=[['TRK',m.trk?2:0],['ENG',m.fire?2:m.eng?1:0],['GUN',m.gun],['TUR',m.tur?1:0],['CREW '+m.crew+'/'+d.crew,m.crew<d.crew?(m.crew<=1?2:1):0]];let x=20;
     for(const [k,v] of cells){const w=k.length*7+12;c.fillStyle=v===2?'rgba(255,80,60,.85)':v===1?'rgba(255,180,60,.85)':'rgba(92,255,138,.18)';c.fillRect(x,H-108,w,18);txt(c,k,x+w/2,H-95,'center',v?'#111':col,11,700);x+=w+4}
     if(m.fire)txt(c,'FIRE · X TO EXTINGUISH ('+TNK.ext+')',20,H-74,'left','#ff6b5c',12,800);if(TNK.repT>0)txt(c,'REPAIRING '+Math.ceil(TNK.repT)+' S',20,H-58,'left','#ffe066',12,800)}
-  txt(c,(TNK.ammo==='HE'?'HE ':'AP ')+(TNK.ammo==='HE'?TNK.heN:TNK.apN)+'  ·  '+(TNK.ammo==='HE'?'AP '+TNK.apN:'HE '+TNK.heN),cx,(TNK.zoom?cy+170:cy+66),'center',col,11,700);
   if(TNK.hm>0){TNK.hm-=1/60;c.strokeStyle=TNK.res&&TNK.res.col||col;c.lineWidth=2.5;c.beginPath();for(const [a,b] of [[-1,-1],[1,-1],[-1,1],[1,1]]){c.moveTo(cx+a*10,cy+b*10);c.lineTo(cx+a*20,cy+b*20)}c.stroke();c.lineWidth=1.5}
   if(TNK.res&&TNK.res.t>0){TNK.res.t-=1/60;const R=TNK.res,y=TNK.zoom?cy-140:cy-90;txt(c,R.txt,cx,y,'center',R.col,20,800);R.notes.slice(0,4).forEach((n,i)=>txt(c,n,cx,y+18+i*14,'center','#ffe066',11,700))}
   // point A
@@ -6433,7 +6432,7 @@ function tkHUD(c){const u=TNK.u;if(!u)return;const d=u.def,col=HUD,pj=v=>{const 
   // enemy markers within 3 km and in sight
   for(const o of WAR.units){if(!o.alive||o.team!=='red')continue;const dd=o.pos.distanceTo(u.pos);if(dd>3000)continue;const p=pj(new V3(o.pos.x,o.pos.y+4.5,o.pos.z));if(!p)continue;
     c.strokeStyle='#ff6b5c';c.beginPath();c.moveTo(p.x,p.y-6);c.lineTo(p.x+6,p.y);c.lineTo(p.x,p.y+6);c.lineTo(p.x-6,p.y);c.closePath();c.stroke();if(dd<1800)txt(c,o.def.n,p.x,p.y-10,'center','#ff6b5c',9,600)}
-  txt(c,'KILLS '+TNK.kills+' · TANKS '+TNK.lives+'/3',W-76,32,'right',col,13,700);
+  txt(c,'KILLS '+TNK.kills+' · TANKS '+TNK.lives+'/3',20,32,'left',col,13,700);
   if(!u.alive&&!TNK.pickOpen)txt(c,'KNOCKED OUT',cx,cy-60,'center','#ffb347',22,800);
   for(const a of TNK.air){if(!a.alive)continue;const p=pj(a.pos);if(p){c.strokeStyle='#ff6b5c';c.beginPath();c.moveTo(p.x,p.y-8);c.lineTo(p.x+8,p.y+6);c.lineTo(p.x-8,p.y+6);c.closePath();c.stroke();txt(c,'SU-25 '+(a.pos.distanceTo(u.pos)/1000).toFixed(1)+' KM',p.x,p.y-12,'center','#ff6b5c',10,700)}}
   // where the last hit came from
@@ -6449,16 +6448,7 @@ function tkHUD(c){const u=TNK.u;if(!u)return;const d=u.def,col=HUD,pj=v=>{const 
 function tkUI(on){
   if(on&&!TNK.ui){const host=$('ctrls').parentNode,el=document.createElement('div');el.id='tkUI';
     el.style.cssText='position:absolute;inset:0;z-index:6;touch-action:none;user-select:none';
-    el.innerHTML='<div id="tkDrive" style="position:absolute;left:0;top:0;bottom:0;width:45%"></div><div id="tkLook" style="position:absolute;right:0;top:0;bottom:0;width:55%"></div>'+
-      '<button id="tkFire" style="position:absolute;right:22px;bottom:30px;width:92px;height:92px;border-radius:50%;border:2px solid var(--hud,#5cff8a);background:rgba(10,20,12,.55);color:var(--hud,#5cff8a);font:700 16px inherit">FIRE</button>'+
-      '<button id="tkZoom" style="position:absolute;right:130px;bottom:44px;width:64px;height:64px;border-radius:50%;border:2px solid var(--hud,#5cff8a);background:rgba(10,20,12,.45);color:var(--hud,#5cff8a);font:700 12px inherit">ZOOM</button>'+
-      '<button id="tkRange" style="position:absolute;right:130px;bottom:118px;width:64px;height:44px;border-radius:10px;border:2px solid var(--hud,#5cff8a);background:rgba(10,20,12,.45);color:var(--hud,#5cff8a);font:700 11px inherit">RANGE</button>'+
-'<button id="tkAmmo" style="position:absolute;right:210px;bottom:44px;width:64px;height:44px;border-radius:10px;border:2px solid var(--hud,#5cff8a);background:rgba(10,20,12,.45);color:var(--hud,#5cff8a);font:700 11px inherit">AMMO</button>'+
-      '<button id="tkView" style="position:absolute;right:210px;bottom:118px;width:64px;height:44px;border-radius:10px;border:2px solid var(--hud,#5cff8a);background:rgba(10,20,12,.45);color:var(--hud,#5cff8a);font:700 11px inherit">VIEW</button>'+
-      '<button id="tkRep" style="position:absolute;right:22px;bottom:140px;width:92px;height:38px;border-radius:10px;border:2px solid var(--hud,#5cff8a);background:rgba(10,20,12,.45);color:var(--hud,#5cff8a);font:700 11px inherit">REPAIR</button>'+
-      '<button id="tkExt" style="position:absolute;right:22px;bottom:184px;width:92px;height:34px;border-radius:10px;border:2px solid var(--hud,#5cff8a);background:rgba(10,20,12,.45);color:var(--hud,#5cff8a);font:700 11px inherit">EXT</button>'+
-      '<button id="tkPause" style="position:absolute;right:14px;top:12px;width:46px;height:40px;border:1px solid var(--hud,#5cff8a);background:rgba(10,20,12,.45);color:var(--hud,#5cff8a);font:700 14px inherit">II</button>'+
-      '<div id="tkKnob" style="position:absolute;width:54px;height:54px;margin:-27px 0 0 -27px;border-radius:50%;border:2px solid rgba(92,255,138,.7);display:none;pointer-events:none"></div>';
+    el.innerHTML='<div id="tkDrive" style="position:absolute;left:0;top:0;bottom:0;width:45%"></div><div id="tkLook" style="position:absolute;right:0;top:0;bottom:0;width:55%"></div><button class="btn" id="tkFire" style="width:96px;height:96px;right:calc(18px + env(safe-area-inset-right,0px));bottom:calc(24px + env(safe-area-inset-bottom,0px));font-size:15px;">FIRE<small id="tkFireS">AP 30</small></button><button class="btn" id="tkZoom" style="width:64px;height:64px;right:calc(124px + env(safe-area-inset-right,0px));bottom:calc(18px + env(safe-area-inset-bottom,0px));">ZOOM<small id="tkZoomS">3RD</small></button><button class="btn" id="tkRange" style="width:64px;height:64px;right:calc(124px + env(safe-area-inset-right,0px));bottom:calc(92px + env(safe-area-inset-bottom,0px));">RANGE<small id="tkRangeS">---</small></button><button class="btn" id="tkAmmo" style="width:64px;height:64px;right:calc(196px + env(safe-area-inset-right,0px));bottom:calc(18px + env(safe-area-inset-bottom,0px));">AMMO<small id="tkAmmoS">AP</small></button><button class="btn" id="tkView" style="width:52px;height:44px;right:calc(198px + env(safe-area-inset-right,0px));top:calc(12px + env(safe-area-inset-top,0px));font-size:11px;">VIEW<small id="tkViewS">3RD</small></button><button class="btn" id="tkRep" style="width:60px;height:44px;right:calc(132px + env(safe-area-inset-right,0px));top:calc(12px + env(safe-area-inset-top,0px));font-size:11px;">REPAIR<small id="tkRepS"></small></button><button class="btn" id="tkExt" style="width:52px;height:44px;right:calc(74px + env(safe-area-inset-right,0px));top:calc(12px + env(safe-area-inset-top,0px));font-size:11px;">EXT<small id="tkExtS">2</small></button><button class="btn" id="tkPause" style="width:44px;height:44px;right:calc(18px + env(safe-area-inset-right,0px));top:calc(12px + env(safe-area-inset-top,0px));font-size:14px" aria-label="Pause">II</button><div id="tkKnob" style="position:absolute;width:54px;height:54px;margin:-27px 0 0 -27px;border-radius:50%;border:2px solid rgba(92,255,138,.7);display:none;pointer-events:none"></div>';
     host.appendChild(el);TNK.ui=el;
     const dv=el.querySelector('#tkDrive'),lk=el.querySelector('#tkLook'),kn=el.querySelector('#tkKnob');let dId=null,o=null,lId=null,lx=0,ly=0;
     dv.addEventListener('pointerdown',e=>{dId=e.pointerId;o={x:e.clientX,y:e.clientY};kn.style.display='block';kn.style.left=e.clientX+'px';kn.style.top=e.clientY+'px';dv.setPointerCapture(e.pointerId);audioInit()});
@@ -6472,7 +6462,12 @@ function tkUI(on){
     el.querySelector('#tkPause').addEventListener('click',()=>pause())}
   if(TNK.ui)TNK.ui.hidden=!on;if(on)$('ctrls').hidden=true;document.body.classList.toggle('tankmode',!!on)}
 // per frame: keep the overlay in step with the game state
-function tkFrame(){if(!TNK.on)return;const show=state==='play';if(TNK.ui&&TNK.ui.hidden===show)TNK.ui.hidden=!show;if(show)$('ctrls').hidden=true;playerJet.visible=false}
+function tkButtons(){const u=TNK.u;if(!TNK.ui||!u)return;const q=id=>TNK.ui.querySelector(id),set=(id,v)=>{const e=q(id);if(e&&e.textContent!==v)e.textContent=v};
+  const ready=u.alive&&u.cd<=0&&u.mod.gun<2;q('#tkFire').classList.toggle('ready',ready);set('#tkFireS',ready?(TNK.ammo+' '+(TNK.ammo==='HE'?TNK.heN:TNK.apN)):'RELOAD');
+  set('#tkZoomS',TNK.zl===2?'×8':TNK.zl===1?'×4':'OFF');set('#tkRangeS',TNK.lased?TNK.lased+' m':'---');set('#tkAmmoS',TNK.ammo);set('#tkViewS',TNK.view?'CMDR':'3RD');
+  const m=u.mod,broken=m.trk||m.eng||m.gun||m.tur;set('#tkRepS',TNK.repT>0?Math.ceil(TNK.repT)+' s':broken?'NEEDED':'OK');q('#tkRep').classList.toggle('on',TNK.repT>0);q('#tkRep').classList.toggle('ready',!!broken&&TNK.repT<=0);
+  set('#tkExtS',String(TNK.ext));q('#tkExt').classList.toggle('ready',!!m.fire&&TNK.ext>0)}
+function tkFrame(){if(!TNK.on)return;tkButtons();const show=state==='play';if(TNK.ui&&TNK.ui.hidden===show)TNK.ui.hidden=!show;if(show)$('ctrls').hidden=true;playerJet.visible=false}
 // a kill by the player's tank
 function tkKill(u,by){if(!by||!by.player||u.team!=='red')return;tkResult('DESTROYED',u);TNK.kills++;kills++;score+=u.def.cls==='mbt'?300:200;message(u.def.n.toUpperCase()+' DESTROYED',1.6);sndKill()}
 
