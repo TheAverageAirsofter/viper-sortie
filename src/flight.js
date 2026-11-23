@@ -390,7 +390,7 @@ function sndNear(){if(!A.ctx||!A.on)return;const c=A.ctx,t=c.currentTime;
   const dop=(pos,vel)=>{_nvB.subVectors(cp,pos).normalize();const cl=_nvB.dot(_nvA.copy(vel).sub(P.vel));return clamp(340/Math.max(120,340-cl),.6,1.7)};
   const voice=(v,hit,maxD,base,fbase,gk)=>{if(!live||!hit){v.g.gain.setTargetAtTime(0,t,.15);return}const k=Math.pow(1-hit.d/maxD,2),dp=dop(hit.pos,hit.j.vel);
     v.g.gain.setTargetAtTime(gk*k,t,.08);v.o.frequency.setTargetAtTime(base*dp,t,.06);v.f.frequency.setTargetAtTime(fbase*(.6+.8*k)*dp,t,.06);if(v.p)v.p.pan.setTargetAtTime(nvPan(hit.pos),t,.05)};
-  voice(A.nv.jet,pick(enemies.concat(friends),2500,j=>j.alive&&j.kind==='fighter'),2500,72,900,.4);
+  voice(A.nv.jet,pick(enemies.concat(friends,TNK&&TNK.on?TNK.air:[]),2500,j=>j.alive&&(j.kind==='fighter'||j.kind==='cas')),2500,72,900,.4);
   const m=pick(missiles.concat(eMissiles),1600,q=>q.on);voice(A.nv.msl,m,1600,180,2600,m&&m.j.t<(SPEC[m.j.type]||{burn:3}).burn?.34:.12)}
 // a one-shot sound placed in stereo
 function sndAt(pos,fn){if(!A.ctx||!A.on||!A.ctx.createStereoPanner)return fn(A.master);const p=A.ctx.createStereoPanner();p.pan.value=nvPan(pos);p.connect(A.master);fn(p)}

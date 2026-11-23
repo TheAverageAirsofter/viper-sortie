@@ -25,7 +25,18 @@ const assert = require('assert'), path = require('path');
   assert(k === 1, 'kill credited: ' + k);
   // knocked out: the next of three tanks rolls out at the start line
   await p.evaluate(() => { const u = __vs.TNK.u; u.hp = 0; __vs.warDie(u, null, 'test'); });
-  await p.waitForFunction(() => __vs.TNK.u.alive && __vs.TNK.lives === 2, null, { timeout: 30000 });
+  await p.waitForSelector('#tkPick button', { state: 'visible', timeout: 30000 });
+  await p.click('#tkPick button:nth-child(3)');
+  const rs = await p.evaluate(() => ({ alive: __vs.TNK.u.alive, lives: __vs.TNK.lives, type: __vs.TNK.u.def.n, used: __vs.TNK.used.length }));
+  assert(rs.alive && rs.lives === 2 && rs.used === 2 && rs.type !== 'M1A1 Abrams', 'picked the next tank from the lineup: ' + JSON.stringify(rs));
+  // enemy jets come in; shooting one down is credited
+  await p.evaluate(() => { __vs.TNK.airT = 0; });
+  await p.waitForFunction(() => __vs.TNK.air.filter(a => a.alive).length >= 2, null, { timeout: 15000 });
+  const j0 = await p.evaluate(() => __vs.TNK.air[0].pos.clone()); await p.waitForTimeout(1000);
+  const jm = await p.evaluate(p0 => { const a = __vs.TNK.air[0]; return Math.hypot(a.pos.x - p0.x, a.pos.z - p0.z); }, j0);
+  assert(jm > 5, 'the jets fly: ' + jm);
+  const k2 = await p.evaluate(() => { const T = __vs.TNK, k = T.kills; __vs.tkAirDown(T.air[0], T.u); return T.kills - k; });
+  assert(k2 === 1, 'jet kill credited');
   // holding point A wins
   await p.evaluate(() => { const T = __vs.TNK; T.hold = 59.9; for (const u of __vs.WAR.units) if (u.team === 'red') u.pos.set(T.zone.x + 5000, u.pos.y, T.zone.z + 5000); T.u.pos.set(T.zone.x, T.u.pos.y, T.zone.z); });
   await p.waitForFunction(() => __vs.deathCause() === 'win', null, { timeout: 8000 });
