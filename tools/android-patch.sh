@@ -18,3 +18,20 @@ PY
 cp -r assets/launcher/mipmap-* android/app/src/main/res/
 rm -rf android/app/src/main/res/mipmap-anydpi-v26
 grep -q sensorLandscape "$M" && grep -q windowFullscreen "$S"
+# sign debug builds with the committed key, named explicitly (the default ~/.android/debug.keystore is not picked up on the CI runner),
+# so every APK carries the same certificate and installs over the previous one
+cat >> android/app/build.gradle <<'GRADLE'
+
+android {
+    signingConfigs {
+        debug {
+            storeFile file("${rootProject.rootDir}/../assets/viper-sortie-debug.keystore")
+            storePassword "android"
+            keyAlias "androiddebugkey"
+            keyPassword "android"
+        }
+    }
+    buildTypes { debug { signingConfig signingConfigs.debug } }
+}
+GRADLE
+grep -q viper-sortie-debug.keystore android/app/build.gradle

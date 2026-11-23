@@ -76,7 +76,7 @@ jobs:
             viper-sortie.apk
             viper-sortie-release.apk
             viper-sortie-release.aab
-          body: Android build. viper-sortie.apk installs directly and updates over the previous version (allow "install unknown apps" for your browser); from v73 on every build uses the same signing key, so no uninstall is needed. The release APK and .aab only appear when signing secrets are configured.
+          body: Android build. viper-sortie.apk installs directly and updates over the previous version (allow "install unknown apps" for your browser); from v75 on every build uses the same signing key, so no uninstall is needed. The release APK and .aab only appear when signing secrets are configured.
   exe:
     # Windows portable exe (Electron) built from the same web files; attached to the same release as the APK
     needs: apk
