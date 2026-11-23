@@ -101,6 +101,9 @@ progress.js: `WEEKLY` tasks (Monday reset, `weeklyAdd`) and the monthly season p
 ## Performance notes
 `mergeStatic` (render.js, called from `buildJet`) merges unnamed static meshes that share a material into one mesh per group, cutting a jet from about 70 draw calls to about 25; named parts (`cs`, `gear`, `canopyG`, `nozG`, `flame`, `wingM`, decals) are never merged. Far ground-war vehicles are hidden beyond 7 / 12 / 20 km (Low / Medium / High). Bloom is off on Medium by default. `__vs.rinfoReset()` / `__vs.rinfo()` read draw calls and triangles (see the perf snippets in the transcript: reset, wait N frames, divide).
 
+## Ground detail
+Terrain shader (render.js): `closeGround` adds ~30 cm grass tufts (hashed, faded by `fwidth` and by distance, 60-650 m), bare-earth patches on flat low ground, and sand ripples on the desert map; a `normal_fragment_maps` hook bumps the lighting normal from the noise texture with screen-space derivatives inside ~900 m (not on snow).
+
 ## App updates
 Every Android build is signed with the committed `assets/viper-sortie-debug.keystore` (the workflow copies it to `~/.android/debug.keystore` before `assembleDebug`), so a new APK installs over the old one; versionCode is the run number. Builds up to v72 used a random key per run, so going from those to v73 needs one last uninstall. `make-www.js` writes `www/version.json` from `VS_VERSION_NAME`; in the Capacitor app the end of main.js compares it with the latest GitHub release and shows an "Update vNN is available · Download" banner (`#vsUpdate`) linking the release APK. The keystore is a debug key in a public repo: anyone could sign an APK that updates over this one; for Play or wider distribution use the ANDROID_* release secrets instead.
 

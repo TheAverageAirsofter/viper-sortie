@@ -123,6 +123,15 @@ vec3 fields(vec3 base,float h,float sl,float n1,float n2){
  float edge=smoothstep(0.,.012,f.x)*smoothstep(0.,.012,f.y)*smoothstep(1.,.988,f.x)*smoothstep(1.,.988,f.y);   // thin hedgerows between lots
  c=mix(vec3(.2,.3,.13),c,edge*.85+.15);
  return mix(base,c,m*.8);}
+// close-range ground detail: ~30 cm grass tufts in greens and straw, bare-earth patches; faded out before the tufts get smaller than a pixel
+vec3 closeGround(vec3 c,float sl,float h,float kind){
+ float d=length(cameraPosition-vWPos),cn=1.-smoothstep(60.,650.,d);if(cn<.01)return c;
+ vec2 q=vWPos.xz*3.2;float fw=fwidth(q.x)+fwidth(q.y),aa=1.-smoothstep(.45,1.3,fw);
+ float g1=hh(floor(q)),g2=hh(floor(q*2.3+7.)),flat2=smoothstep(.32,.16,sl);
+ if(kind<.5){vec3 tint=mix(vec3(.82,.95,.66),vec3(1.12,1.05,.78),g1);c=mix(c,c*tint*(.84+.3*g2),cn*aa*.65*flat2);
+   float sp=smoothstep(.63,.76,texture2D(nTex,vWPos.xz/38.).r)*(1.-smoothstep(150.,250.,h));c=mix(c,vec3(.35,.28,.19)*(.8+.4*g2),sp*cn*.5*flat2);}
+ else{float rp=.5+.5*sin(vWPos.x*2.1+vWPos.z*.7+texture2D(nTex,vWPos.xz/9.).r*6.);c*=1.+cn*aa*((rp-.5)*.12+(g1-.5)*.08);}
+ return c;}
 vec3 terr(){float h=vWPos.y;float sl=1.-normalize(vWN).y;
  float n1=texture2D(nTex,vWPos.xz/2600.).r,n2=texture2D(nTex,vWPos.xz/530.).g,n3=texture2D(nTex,vWPos.xz/95.).b,n4=texture2D(nTex,vWPos.xz/19.).r;
  if(mapId>.5&&mapId<1.5){vec3 c=mix(vec3(.74,.65,.51),vec3(.69,.58,.44),n2*.6+n1*.4);
@@ -131,7 +140,7 @@ vec3 terr(){float h=vWPos.y;float sl=1.-normalize(vWN).y;
    c=mix(c,rk,smoothstep(.16,.3,sl+(n3-.5)*.12));
    c=mix(c,vec3(.45,.43,.28),smoothstep(.78,.9,n4)*smoothstep(.25,.1,sl)*.55);
    c=mix(vec3(.72,.66,.50),c,smoothstep(2.,8.,h));
-   return c*(.86+.28*n4*(.55+.45*n3));}
+   return closeGround(c*(.86+.28*n4*(.55+.45*n3)),sl,h,1.);}
  if(mapId>1.5&&mapId<2.5){vec3 c=mix(vec3(.22,.36,.15),vec3(.33,.42,.19),smoothstep(.3,.72,n2));
    c=mix(c,vec3(.11,.21,.10),smoothstep(.45,.7,n1)*(1.-smoothstep(900.,1150.,h)));
    float nv=texture2D(nTex,vec2(vWPos.x+vWPos.z,vWPos.y*2.2)/140.).b;   // cliffs: noise across the face and up it, so walls don't streak
@@ -140,7 +149,8 @@ vec3 terr(){float h=vWPos.y;float sl=1.-normalize(vWN).y;
    c=mix(c,rk,smoothstep(snowY-150.,snowY+100.,h+(n2-.5)*200.));
    c=mix(c,vec3(.86,.89,.93),smoothstep(snowY,snowY+200.,h+(n1-.5)*260.)*smoothstep(.62,.3,sl+(nv-.5)*.12));
    c=mix(vec3(.55,.52,.45),c,smoothstep(3.,10.,h));
-   return c*(.84+.32*n4*(.55+.45*n3));}
+   c*=.84+.32*n4*(.55+.45*n3);
+   return h<snowY?closeGround(c,sl,h,0.):c;}
  vec3 c=mix(vec3(.25,.39,.16),vec3(.40,.48,.21),smoothstep(.3,.72,n2));
  c=mix(c,vec3(.15,.26,.12),smoothstep(.5,.72,n1)*(1.-smoothstep(260.,380.,h)));
  c=mix(c,vec3(.48,.45,.30),smoothstep(190.,390.,h+(n2-.5)*140.));
@@ -154,9 +164,15 @@ vec3 terr(){float h=vWPos.y;float sl=1.-normalize(vWN).y;
  float n5=texture2D(nTex,vWPos.xz/5.3).g,n6=texture2D(nTex,vWPos.xz/1.7).b;   // close-range grain for low flying
  float cl=1.-smoothstep(500.,2600.,length(cameraPosition-vWPos));
  c*=1.+cl*((n5-.5)*.26+(n6-.5)*.16);
+ c=closeGround(c,sl,h,0.);
  float wet=smoothstep(1.6,.1,h);c=mix(c,c*.62,wet*.8);                                  // wet sand at the waterline
  float foam=smoothstep(.55,.0,abs(h-.28-(n3-.5)*.5))*(.55+.45*n6);c=mix(c,vec3(.93,.96,.97),foam*.75);   // surf line
- return c;}`).replace('#include <color_fragment>','#include <color_fragment>\ndiffuseColor.rgb*=terr();')};
+ return c;}`).replace('#include <color_fragment>','#include <color_fragment>\ndiffuseColor.rgb*=terr();')
+   .replace('#include <normal_fragment_maps>',`#include <normal_fragment_maps>
+ {float dd=length(cameraPosition-vWPos),bk=(1.-smoothstep(80.,900.,dd))*(1.-step(.5,mapId)*step(mapId,2.5)*step(snowY,vWPos.y));
+  if(bk>.01){float bh=(texture2D(nTex,vWPos.xz/3.1).r*.65+texture2D(nTex,vWPos.xz/.85).g*.35)*bk*.6;
+   vec3 sp=-vViewPosition,dpx=dFdx(sp),dpy=dFdy(sp),r1=cross(dpy,normal),r2=cross(normal,dpx);float det=dot(dpx,r1),hx=dFdx(bh),hy=dFdy(bh);
+   normal=normalize(abs(det)*normal-sign(det)*(hx*r1+hy*r2));}}`)};
 const terrain=new THREE.Mesh(buildTerrainGeo(QUALS[quality].seg),terrMat);
 terrain.frustumCulled=false; scene.add(terrain);
 let tCx=NaN,tCz=NaN;
