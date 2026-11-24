@@ -1801,7 +1801,7 @@ for(const id of ['F15C','F15EX','TYPHOON','RAFALE','J10C','J20','FA18E']){const 
    fuselage and nacelles: cross-sections [z, halfWidth, heightAbove, depthBelow, centreY, superellipse n] lofted nose-to-tail;
    wings, canards and stabilators: spanwise sections {x, zle, zte, y, t} with a diamond airfoil (t = thickness/chord);
    fins: sections {h, zle, zte} lofted upward, then canted. +z is forward, +x is the left wing, y up; 1 unit = 1 m. */
-const LOFT_N=28;
+const LOFT_N=36;
 function loftGeo(st,opts){
   opts=opts||{};const N=opts.n||LOFT_N, pos=[], idx=[], sk=opts.skipTop;
   for(const [z,w,ht,hb,yc,ne,nb] of st){const eT=2/(ne||2.4),eB=2/(nb||ne||2.4);   // nb: optional exponent for the lower half (a chine where the two halves meet)
@@ -1814,7 +1814,7 @@ function loftGeo(st,opts){
   if(opts.capTail!==false){const base=pos.length/3;const s0=st[0];pos.push(0,s0[4]||0,s0[0]);for(let j=0;j<N;j++)idx.push(base,j,(j+1)%N)}
   const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));g.setIndex(idx);g.computeVertexNormals();return g}
 // spanwise surface (both sides unless half): a symmetric NACA 4-digit section (rounded leading edge, thin trailing edge), t = thickness / chord
-const AF_X=[0,.025,.1,.25,.45,.7,1], AF_N=AF_X.length*2-2;   // 12 points around each section
+const AF_X=[0,.012,.04,.1,.2,.33,.48,.64,.8,1], AF_N=AF_X.length*2-2;   // 18 points around each section: a round leading edge, a fine trailing edge
 const nacaT=x=>.2969*Math.sqrt(x)-.126*x-.3516*x*x+.2843*x*x*x-.1036*x*x*x*x;   // half-thickness / (5 t), closed trailing edge
 function wingGeo(st,mirror){
   const pos=[],idx=[],N=AF_N;
@@ -1963,7 +1963,7 @@ function bakePaint(g,mat){g.updateMatrixWorld(true);const iv=new THREE.Matrix4()
 // national markings and numbers, drawn once per design on a canvas
 const DECAL_TEX={};
 function decalTex(kind,txt,lowvis){const key=kind+'|'+(txt?txt.s+(txt.red?'r':''):'')+'|'+(lowvis?1:0);if(DECAL_TEX[key])return DECAL_TEX[key];
-  const cv=document.createElement('canvas');cv.width=256;cv.height=kind==='text'?128:256;const c=cv.getContext('2d'),W=256,H=cv.height,cx=128,cy=H/2;
+  const cv=document.createElement('canvas');cv.width=256;cv.height=kind==='text'||kind==='nostep'||kind==='rescue'?128:256;const c=cv.getContext('2d'),W=256,H=cv.height,cx=128,cy=H/2;
   const star=(x,y,r,ri,fill)=>{c.beginPath();for(let i=0;i<10;i++){const a=-Math.PI/2+i*Math.PI/5,rr=i%2?ri:r;c.lineTo(x+Math.cos(a)*rr,y+Math.sin(a)*rr)}c.closePath();c.fillStyle=fill;c.fill()};
   const disc=(r,f)=>{c.beginPath();c.arc(cx,cy,r,0,7);c.fillStyle=f;c.fill()};
   const lv=lowvis;
@@ -1981,6 +1981,11 @@ function decalTex(kind,txt,lowvis){const key=kind+'|'+(txt?txt.s+(txt.red?'r':''
   else if(kind==='prc'){c.fillStyle='#c8102e';c.fillRect(4,104,248,48);c.fillStyle='#f6c400';c.fillRect(4,118,248,6);star(cx,cy,104,42,'#f6c400');star(cx,cy,92,37,'#c8102e');
     c.fillStyle='#f6c400';c.font='bold 46px sans-serif';c.textAlign='center';c.textBaseline='middle';c.fillText('八一',cx,cy+6)}
   else if(kind==='rus'){star(cx,cy+8,124,50,'#c8102e');star(cx,cy+8,112,45,'#ffffff');star(cx,cy+8,96,38,'#c8102e')}
+  else if(kind==='nostep'){c.strokeStyle=lv?'#3a4046':'#1a1c1e';c.lineWidth=5;c.strokeRect(10,22,236,84);c.font='bold 54px "Arial Narrow",Arial,sans-serif';c.textAlign='center';c.textBaseline='middle';c.fillStyle=c.strokeStyle;c.fillText('NO STEP',cx,cy+3)}
+  else if(kind==='eject'){c.beginPath();c.moveTo(cx,14);c.lineTo(cx+112,H-14);c.lineTo(cx-112,H-14);c.closePath();c.fillStyle=lv?'#8a5a5a':'#c8102e';c.fill();c.fillStyle='#f2f2f2';c.beginPath();c.moveTo(cx,64);c.lineTo(cx+62,H-40);c.lineTo(cx-62,H-40);c.closePath();c.fill();
+    c.fillStyle=lv?'#8a5a5a':'#c8102e';c.font='bold 48px Arial,sans-serif';c.textAlign='center';c.textBaseline='middle';c.fillText('!',cx,H-74)}
+  else if(kind==='rescue'){const col=lv?'#7a5a3a':'#e2711d';c.fillStyle=col;c.beginPath();c.moveTo(16,cy-14);c.lineTo(180,cy-14);c.lineTo(180,cy-40);c.lineTo(244,cy);c.lineTo(180,cy+40);c.lineTo(180,cy+14);c.lineTo(16,cy+14);c.closePath();c.fill();
+    c.font='bold 22px Arial,sans-serif';c.textAlign='center';c.textBaseline='middle';c.fillStyle='#111';c.fillText('RESCUE',100,cy+1)}
   else if(kind==='text'){c.font='bold 92px "Arial Narrow",Arial,sans-serif';c.textAlign='center';c.textBaseline='middle';
     if(txt.red){c.lineWidth=10;c.strokeStyle='#f2f2f2';c.strokeText(txt.s,cx,cy+4);c.fillStyle='#c8102e';c.fillText(txt.s,cx,cy+4)}
     else{c.fillStyle=lv?'#40474e':'#151719';c.fillText(txt.s,cx,cy+4)}}
@@ -2061,6 +2066,7 @@ function buildLoftJet(c,S,type){
       const ventral=Math.abs(f.cant||0)>1.5, top=f.st[f.st.length-1].h;
       if(allMove&&!ventral){const b0=finAt(f.st,0),pz=b0.zle-(b0.zle-b0.zte)*.45,geo=finGeo(f.st);geo.translate(0,0,-pz);const mg=new THREE.Group();mg.position.z=pz;mg.name='cs';mg.userData={cs:'afin',s:i?-1:1,ax:[0,1,0]};add(geo,body,null,mg);gr.add(mg)}
       else add(finGeo(f.st),body,null,gr);
+      if(!ventral){const tt=finAt(f.st,top*.97),r=add(new THREE.CylinderGeometry(.006,.006,.3,4).rotateX(Math.PI/2),dark,null,gr);r.position.set(0,tt.h,tt.zte-.13)}
       if(!ventral&&!allMove){const a=finAt(f.st,top*.1),b=finAt(f.st,top*.86),sc=o=>{const ch=o.zle-o.zte;return{h:o.h,zle:o.zte+ch*.3,zte:o.zte-.02,t:(o.t||.05)*1.1}};
         const A=sc(a),B=sc(b),geo=finGeo([A,B]);geo.translate(0,-A.h,-A.zle);const rg=new THREE.Group();rg.position.set(0,A.h,A.zle);rg.name='cs';
         rg.userData={cs:'rud',s:i?-1:1,ax:new THREE.Vector3(0,B.h-A.h,B.zle-A.zle).normalize().toArray()};add(geo,body,null,rg);gr.add(rg)}
@@ -2110,6 +2116,19 @@ function buildLoftJet(c,S,type){
    const aT=cz-S.canopy[4]*1.05-.7,sT=secAt(fst,aT),bl=add(new THREE.BoxGeometry(.018,.2,.14),dark);bl.position.set(0,sT[4]+sT[2]+.08,aT);                       // spine blade antenna
    const aB=cz-1.9,sB=secAt(fst,aB),bb=add(new THREE.BoxGeometry(.018,.16,.12),dark);bb.position.set(0,sB[4]-sB[3]-.07,aB);                                        // belly blade antenna
    const zD=Math.min(...S.noz.map(n=>n[2]))+3.4,sD=secAt(fst,zD);for(const sx2 of [-1,1]){const d=add(new THREE.BoxGeometry(.2,.025,.46),black);d.position.set(sx2*Math.min(.32,sD[1]*.45),sD[4]-sD[3]+.005,zD)}}   // chaff/flare dispensers
+  // small real-jet details: stencils, formation lights, static dischargers, AOA vanes, a glare shield under the glass
+  {const so=main,stc=(kind,w,h,x,y,z,rx,ry)=>{const d=add(new THREE.PlaneGeometry(w,h),decalMat(kind,null,PS.lowvis),'decal');d.position.set(x,y,z);d.rotation.set(rx||0,ry||0,0,'YXZ');return d};
+   for(const f of [.3,.68]){const x=lerp3(so.r.x,so.t.x,f),zle=lerp3(so.r.zle,so.t.zle,f),zte=lerp3(so.r.zte,so.t.zte,f),ch=zle-zte,y=lerp3(so.r.y||0,so.t.y||0,f),th=lerp3(so.r.t||.04,so.t.t||.04,f)*ch/2*.6;
+     if(ch>1.2)for(const sd of [1,-1])stc('nostep',Math.min(.62,ch*.3),Math.min(.31,ch*.15),x*sd,y+th+.03,zte+ch*.2,-Math.PI/2)}
+   const zE=cZ+sz*.35,sE=secAt(fst,zE),zR=cZ-sz*.15,sR=secAt(fst,zR);
+   for(const sd of [1,-1]){stc('eject',.24,.24,sd*(sE[1]*.97+.02),sE[4]+sE[2]*.45,zE,0,sd*Math.PI/2);stc('rescue',.5,.25,sd*(sR[1]*.97+.02),sR[4]+sR[2]*.28,zR,0,sd*Math.PI/2)}
+   const fl2=new THREE.MeshBasicMaterial({color:0x9db682});
+   for(const zz of [cZ+sz*1.25,cZ-sz*1.4]){const q=secAt(fst,zz);if(!(q[1]>.2))continue;for(const sd of [1,-1]){const b=add(new THREE.BoxGeometry(.02,Math.min(.36,q[2]*.6),.07),fl2);b.position.set(sd*(q[1]*.98+.008),q[4]+q[2]*.05,zz);b.rotation.x=.35}}   // formation ("slime") lights
+   const tp=so.t,ex=(x,y,z)=>{const r=add(new THREE.CylinderGeometry(.006,.006,.3,4).rotateX(Math.PI/2),dark);r.position.set(x,y,z-.15)};
+   for(const sd of [1,-1]){ex(sd*(tp.x-.05),tp.y||0,tp.zte);const m2=lerp3(so.r.x,tp.x,.82),z2=lerp3(so.r.zte,tp.zte,.82);ex(sd*m2,lerp3(so.r.y||0,tp.y||0,.82),z2)}   // static dischargers
+   const zA=rz!=null?rz-.35:fst0[fst0.length-1][0]-1.6,sA=secAt(fst,zA);if(sA[1]>.15)for(const sd of [1,-1]){const v=add(new THREE.BoxGeometry(.012,.05,.13),metal);v.position.set(sd*(sA[1]+.02),sA[4]+sA[2]*.15,zA);v.rotation.x=-.5}   // AOA vanes
+   const pg=g.getObjectByName('pilot');if(pg){const D=AC_DEFS[type],e=D&&D.eye?D.eye:[0,cY+sy*.38,cZ+sz*.12],zc=e[2]+.7,t=topAt(zc),cw=Math.min(sx*.85,.42);
+     const gs=add(new THREE.BoxGeometry(cw*2,.1,.42),black,null,pg);gs.position.set(0,t+.02,zc);const hb=add(new THREE.BoxGeometry(.2,.14,.12),black,null,pg);hb.position.set(0,t+.1,zc+.08)}}   // glare shield and HUD body
   if(S.probe){const pr=add(new THREE.CylinderGeometry(.045,.045,S.probe[3],5).rotateX(Math.PI/2),dark);pr.position.set(S.probe[0],S.probe[1],S.probe[2])}
   if(S.stinger)add(loftGeo(S.stinger,{n:10}),body);
   // nozzles: petals open in afterburner; thrust-vectoring ones swivel; a faint heat-haze plume behind each
