@@ -257,6 +257,11 @@ const scene=new THREE.Scene();
 const HORIZON=new THREE.Color(0xc6d9e5);
 scene.background=HORIZON;
 scene.fog=new THREE.Fog(HORIZON,4000,19000);
+/* radial fog (distance, not view depth): the square edge of the terrain and sea planes is fully fogged in every direction, so the world has no visible rim */
+{const C=THREE.ShaderChunk;C.fog_pars_vertex=C.fog_pars_vertex.replace('varying float vFogDepth;','varying float vFogDepth;varying vec3 vFogP;');
+ C.fog_vertex=C.fog_vertex.replace('vFogDepth = - mvPosition.z;','vFogDepth = - mvPosition.z;vFogP = mvPosition.xyz;');
+ C.fog_pars_fragment=C.fog_pars_fragment.replace('varying float vFogDepth;','varying float vFogDepth;varying vec3 vFogP;');
+ C.fog_fragment=C.fog_fragment.split('vFogDepth').join('length( vFogP )');}   /* distance per pixel: big single quads (the sea) interpolate it correctly */
 const camera=new THREE.PerspectiveCamera(66,1,1,40000);
 const hemi=new THREE.HemisphereLight(0xd6e8ff,0x4d5a3c,0.95*LK); scene.add(hemi);
 const sun=new THREE.DirectionalLight(0xfff0d8,1.05*LK); sun.position.set(-0.5,1,0.6); scene.add(sun);
@@ -269,8 +274,8 @@ const sky=new THREE.Mesh(new THREE.SphereGeometry(30000,32,16),new THREE.ShaderM
   fragmentShader:'uniform vec3 top,hor,bot,sun,glow;uniform float disk;varying vec3 vD;void main(){vec3 d=normalize(vD);float h=d.y;float s=max(dot(d,sun),0.);'+
     'vec2 a=normalize(d.xz+1e-4),b=normalize(sun.xz+1e-4);float az=max(dot(a,b),0.);'+
     'vec3 H=mix(hor,glow,pow(az,4.)*.75*(1.-clamp(h*2.5,0.,1.)));'+
-    'vec3 c=h>0.?mix(H,top,pow(clamp(h,0.,1.),.42)):mix(H,bot,min(1.,-h*6.));'+
-    'c=mix(c,H*1.04+.02,exp(-abs(h)*28.)*.55);'+
+    'vec3 c=h>0.?mix(H,top,pow(clamp(h,0.,1.),.42)):mix(H,hor,min(1.,-h*30.));'+   /* below the horizon: the fog colour, so fogged ground meets it seamlessly */
+    'c=mix(c,H*1.04+.02,exp(-abs(h)*28.)*.55*smoothstep(-.03,0.,h));'+
     'c+=glow*pow(s,7.)*.32+vec3(1.,.95,.85)*pow(s,64.)*.3*disk;'+
     'c+=vec3(1.,.97,.9)*smoothstep(.99945,.9998,s)*2.2*disk;'+
     'gl_FragColor=linearToOutputTexel(vec4(c,1.));gl_FragColor.rgb+=(fract(sin(dot(gl_FragCoord.xy,vec2(12.9898,78.233)))*43758.5453)-.5)/160.;}'
@@ -355,6 +360,8 @@ terrMat.onBeforeCompile=sh=>{sh.uniforms.nTex={value:NOISE};sh.uniforms.mapId=TE
   sh.fragmentShader=sh.fragmentShader.replace('#include <common>',`#include <common>
 uniform sampler2D nTex;uniform float mapId;uniform float snowY;varying vec3 vWPos;varying vec3 vWN;
 float hh(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
+// anti-tiling: two samples on rotated, rescaled grids, so the 256 px noise tile never visibly repeats
+vec3 nz(vec2 p){vec3 a=texture2D(nTex,p).rgb,b=texture2D(nTex,mat2(.8,-.6,.6,.8)*p*1.37+vec2(.31,.67)).gbr;return clamp((a+b-1.)*1.35+.5,0.,1.);}
 // farmland on flat lowland: lots on a noise-warped grid (wavy, uneven edges) in muted crop, stubble, plough and pasture tones,
 // faint crop rows that fade out before they alias, broken tree lines between some lots
 vec3 fields(vec3 base,float h,float sl,float n1,float n2){
@@ -385,7 +392,7 @@ vec3 closeGround(vec3 c,float sl,float h,float kind){
  else{float rp=.5+.5*sin(vWPos.x*2.1+vWPos.z*.7+texture2D(nTex,vWPos.xz/9.).r*6.),raa=1.-smoothstep(.3,1.,fwidth(vWPos.x*2.1+vWPos.z*.7));c*=1.+cn*((rp-.5)*.1*raa+(b-.5)*.1);}
  return c;}
 vec3 terr(){float h=vWPos.y;float sl=1.-normalize(vWN).y;
- float n1=texture2D(nTex,vWPos.xz/2600.).r,n2=texture2D(nTex,vWPos.xz/530.).g,n3=texture2D(nTex,vWPos.xz/95.).b,n4=texture2D(nTex,vWPos.xz/19.).r;
+ float n1=texture2D(nTex,vWPos.xz/2600.).r,n2=nz(vWPos.xz/530.).g,n3=nz(vWPos.xz/95.).b,n4=nz(vWPos.xz/19.).r,n0=texture2D(nTex,vWPos.xz/11000.+.5).g;
  if(mapId>.5&&mapId<1.5){vec3 c=mix(vec3(.74,.65,.51),vec3(.69,.58,.44),n2*.6+n1*.4);
    c=mix(c,vec3(.80,.72,.58),smoothstep(.55,.85,n1)*.5);
    vec3 rk=mix(vec3(.60,.39,.25),vec3(.44,.28,.19),.5+.5*sin(h*.16+n3*3.));
@@ -394,7 +401,7 @@ vec3 terr(){float h=vWPos.y;float sl=1.-normalize(vWN).y;
    c=mix(vec3(.72,.66,.50),c,smoothstep(2.,8.,h));
    return closeGround(c*(.86+.28*n4*(.55+.45*n3)),sl,h,1.);}
  if(mapId>1.5&&mapId<2.5){vec3 c=mix(vec3(.22,.36,.15),vec3(.33,.42,.19),smoothstep(.3,.72,n2));
-   c=mix(c,vec3(.11,.21,.10),smoothstep(.45,.7,n1)*(1.-smoothstep(900.,1150.,h)));
+   c=mix(c,vec3(.10,.18,.09)*(.7+.6*nz(vWPos.xz/23.).g),smoothstep(.45,.7,n1)*(1.-smoothstep(900.,1150.,h)));
    float nv=texture2D(nTex,vec2(vWPos.x+vWPos.z,vWPos.y*2.2)/140.).b;   // cliffs: noise across the face and up it, so walls don't streak
    vec3 rk=mix(vec3(.47,.46,.44),vec3(.30,.30,.30),n3*.5+nv*.5)*(.82+.3*nv)*(.92+.08*sin(h*.09+nv*4.));
    c=mix(c,rk,smoothstep(.22,.38,sl+(n3-.5)*.14));
@@ -404,15 +411,17 @@ vec3 terr(){float h=vWPos.y;float sl=1.-normalize(vWN).y;
    c*=.84+.32*n4*(.55+.45*n3);
    return h<snowY?closeGround(c,sl,h,0.):c;}
  vec3 c=mix(vec3(.26,.35,.16),vec3(.38,.42,.22),smoothstep(.3,.72,n2));
- c=mix(c,vec3(.15,.26,.12),smoothstep(.5,.72,n1)*(1.-smoothstep(260.,380.,h)));
+ float fo=smoothstep(.565,.6,n1+(nz(vWPos.xz/170.).r-.5)*.07)*(1.-smoothstep(260.,380.,h));
+ c=mix(c,vec3(.13,.21,.10)*(.7+.6*nz(vWPos.xz/23.).g)*(.85+.3*n3),fo);   /* forest: dark canopy with gaps and clearings */
  c=mix(c,vec3(.48,.45,.30),smoothstep(190.,390.,h+(n2-.5)*140.));
  vec3 rk=mix(vec3(.45,.42,.37),vec3(.31,.30,.28),n3);
  c=mix(c,rk,smoothstep(.2,.36,sl+(n3-.5)*.14));
  c=mix(c,rk,smoothstep(400.,480.,h+(n2-.5)*90.));
  c=mix(c,vec3(.93,.95,.98),smoothstep(500.,560.,h+(n1-.5)*100.)*smoothstep(.5,.22,sl));
  c=fields(c,h,sl,n1,n2);
+ c*=mix(vec3(1.07,1.02,.86),vec3(.93,.99,1.05),n0);   /* regional hue drift over ~10 km: drier and lusher districts */
  c=mix(vec3(.80,.74,.55),c,smoothstep(4.,15.,h+(n3-.5)*9.));
- c*=.84+.32*n4*(.55+.45*n3);
+ c*=.92+.16*n4*(.55+.45*n3);
  float n5=texture2D(nTex,vWPos.xz/5.3).g,n6=texture2D(nTex,vWPos.xz/1.7).b;   // close-range grain for low flying
  float cl=1.-smoothstep(500.,2600.,length(cameraPosition-vWPos));
  c*=1.+cl*((n5-.5)*.16+(n6-.5)*.08);
@@ -449,44 +458,67 @@ void main(){vec4 w=modelMatrix*vec4(position,1.);vW=w.xyz;vec4 mvPosition=viewMa
 #include <fog_pars_fragment>
 void main(){vec2 p=vW.xz;vec2 g=vec2(0.);
  vec2 q=p+vec2(sin(p.y*.0013),cos(p.x*.0011))*260.;
- g+=vec2(.8,.6)*cos(dot(q,vec2(.8,.6))*.031+t*1.1)*.22;
- g+=vec2(-.5,.86)*cos(dot(q,vec2(-.5,.86))*.057+t*1.7)*.2;
- g+=vec2(.96,-.28)*cos(dot(p,vec2(.96,-.28))*.13+t*2.3)*.18;
- g+=vec2(.2,.98)*cos(dot(q,vec2(.2,.98))*.29+t*3.1)*.13;
- float dist=length(cameraPosition-vW);float hf=1.-smoothstep(600.,2500.,dist);
- g+=vec2(-.9,-.43)*cos(dot(p,vec2(-.9,-.43))*.67+t*4.2)*.09*hf;
- g+=vec2(.6,-.8)*cos(dot(q,vec2(.6,-.8))*1.31+t*5.3)*.06*hf;
+ float dist=length(cameraPosition-vW);
+ #define WV(D,P,F,S,A) {vec2 d_=D;float ph_=dot(P,d_)*F;float aa_=1.-smoothstep(.35,1.4,fwidth(ph_));g+=d_*cos(ph_+t*S)*A*aa_;}
+ WV(vec2(.8,.6),q,.031,1.1,.22) WV(vec2(-.5,.86),q,.057,1.7,.2) WV(vec2(.96,-.28),p,.13,2.3,.18) WV(vec2(.2,.98),q,.29,3.1,.13)
+ WV(vec2(-.9,-.43),p,.67,4.2,.09) WV(vec2(.6,-.8),q,1.31,5.3,.06)
 float k=.5*clamp(1.-dist/5000.,.06,1.);
  vec3 N=normalize(vec3(-g.x*k,1.,-g.y*k));vec3 V=normalize(cameraPosition-vW);
  float fr=.02+.98*pow(1.-max(dot(N,V),0.),5.);
  vec3 R=reflect(-V,N);vec3 sk=mix(skyc*.94,skyt,clamp(R.y*2.2,0.,1.));
  vec3 c=mix(deep*(.92+.25*g.x),sk,clamp(fr*.9,0.,1.));
  float sd=max(dot(R,sunDir),0.);
- c+=sunCol*(pow(sd,300.)*3.+pow(sd,24.)*.14)*shine;
+ float gx=mix(300.,70.,smoothstep(300.,4000.,dist));c+=sunCol*(pow(sd,gx)*1.7*(gx/300.)+pow(sd,24.)*.14)*shine;
  gl_FragColor=vec4(c,1.);
 #include <fog_fragment>
 }`});
 const water=new THREE.Mesh(new THREE.PlaneGeometry(TSIZE*1.3,TSIZE*1.3).rotateX(-Math.PI/2),waterMat);
-/* forests: instanced conifers placed (deterministically) where the terrain shader paints forest, re-laid when the terrain recentres */
-const treeGeo=(()=>{const a=new THREE.ConeGeometry(4.2,13,6);a.translate(0,9.5,0);return a})();
-const trees=new THREE.InstancedMesh(treeGeo,new THREE.MeshLambertMaterial({color:0xffffff}),4500);
-trees.frustumCulled=false;trees.count=0;scene.add(trees);
-{const c=new THREE.Color();for(let i=0;i<4500;i++){c.setRGB(.27+Math.random()*.08,.4+Math.random()*.1,.19+Math.random()*.05);trees.setColorAt(i,c)}trees.instanceColor.needsUpdate=true}
+/* forests: two instanced species, tiered conifers and lumpy broadleaf crowns, with vertex-colour shading (dark inside and low down, lit tips),
+   planted in clumps where the terrain shader paints forest and re-laid when the terrain recentres */
+function treeMerge(parts){let n=0;const g2=parts.map(([g,col])=>{const q=g.index?g.toNonIndexed():g;n+=q.attributes.position.count;return [q,col]});
+  const P=new Float32Array(n*3),N=new Float32Array(n*3),C=new Float32Array(n*3);let o=0;
+  for(const [g,col] of g2){const pa=g.attributes.position,na=g.attributes.normal;let lo=1e9,hi=-1e9;for(let i=0;i<pa.count;i++){lo=Math.min(lo,pa.getY(i));hi=Math.max(hi,pa.getY(i))}
+    for(let i=0;i<pa.count;i++){P.set([pa.getX(i),pa.getY(i),pa.getZ(i)],(o+i)*3);N.set([na.getX(i),na.getY(i),na.getZ(i)],(o+i)*3);
+      const k=col(pa.getX(i),pa.getY(i),pa.getZ(i),(pa.getY(i)-lo)/Math.max(hi-lo,1e-3));C.set(k,(o+i)*3)}o+=pa.count}
+  const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(P,3));g.setAttribute('normal',new THREE.BufferAttribute(N,3));g.setAttribute('color',new THREE.BufferAttribute(C,3));return g}
+const TRUNK=[.30,.22,.15];
+const treeGeoC=(()=>{const parts=[[new THREE.CylinderGeometry(.22,.38,4,6).translate(0,2,0),()=>TRUNK]];let r=1;
+  for(let i=0;i<4;i++){const R=3.9*(1-i*.21),H=5.6-i*.5,y=2.4+i*3.0,c=new THREE.ConeGeometry(R,H,9,1,true);c.translate(0,y+H/2,0);
+    const pa=c.attributes.position;for(let k=0;k<pa.count;k++){if(pa.getY(k)<y+.1){r=(r*16807)%2147483647;const j=.82+.3*(r/2147483647);pa.setX(k,pa.getX(k)*j);pa.setZ(k,pa.getZ(k)*j);pa.setY(k,pa.getY(k)-(1-j)*1.6)}}
+    c.computeVertexNormals();
+    parts.push([c,(x,yy,z,t)=>{const v=.55+.45*t,tip=.82+.18*i/3;return [.14*v*tip,.25*v*tip,.13*v*tip]}])}
+  return treeMerge(parts)})();
+const treeGeoD=(()=>{const parts=[[new THREE.CylinderGeometry(.25,.45,4.5,6).translate(0,2.25,0),()=>TRUNK]];let r=7;
+  for(const [x,y,z,R] of [[0,7.4,0,3.6],[1.7,6.2,.9,2.7],[-1.4,6.6,-1.1,2.8],[.3,9.4,-.4,2.4]]){const b=new THREE.IcosahedronGeometry(R,1),pa=b.attributes.position;
+    for(let k=0;k<pa.count;k++){r=(r*16807)%2147483647;const j=.84+.3*(r/2147483647);pa.setXYZ(k,pa.getX(k)*j,pa.getY(k)*j*.86,pa.getZ(k)*j)}
+    b.computeVertexNormals();b.translate(x,y,z);
+    parts.push([b,(px,py,pz,t)=>{const v=.5+.5*Math.min(1,(py-4)/7.5);return [.21*v,.31*v,.13*v]}])}
+  return treeMerge(parts)})();
+const TREE_MAT=new THREE.MeshLambertMaterial({color:0xffffff,vertexColors:true});
+const treesC=new THREE.InstancedMesh(treeGeoC,TREE_MAT,3200),treesD=new THREE.InstancedMesh(treeGeoD,TREE_MAT,3200);
+for(const t of [treesC,treesD]){t.frustumCulled=false;t.count=0;scene.add(t);const c=new THREE.Color();
+  for(let i=0;i<3200;i++){const v=Math.sin(i*12.9898)*43758.5453,f=v-Math.floor(v),w=Math.sin(i*78.233)*43758.5453,g=w-Math.floor(w);
+    c.setRGB(.85+f*.3+g*.12,.88+f*.24,.8+g*.3);t.setColorAt(i,c)}t.instanceColor.needsUpdate=true}
 function placeTrees(cx,cz){
-  const max=Math.round(QUALS[quality].trees*(MAP==='ALPINE'?1.3:MAP==='OCEAN'?.6:1)); if(!max||MAP==='DESERT'){trees.count=0;trees.instanceMatrix.needsUpdate=true;return}
-  const R=3400, cell=Math.round(R*2/Math.sqrt(max*2.2)), m=new THREE.Matrix4(), q=new THREE.Quaternion(), sc=new THREE.Vector3(), ps=new THREE.Vector3(); let n=0;
+  const max=Math.round(QUALS[quality].trees*(MAP==='ALPINE'?1.3:MAP==='OCEAN'?.6:1)); if(!max||MAP==='DESERT'){treesC.count=treesD.count=0;treesC.instanceMatrix.needsUpdate=treesD.instanceMatrix.needsUpdate=true;return}
+  const cap=Math.min(3200,max),R=3400, cell=Math.round(R*2/Math.sqrt(max*.75)), m=new THREE.Matrix4(), q=new THREE.Quaternion(), sc=new THREE.Vector3(), ps=new THREE.Vector3(); let nc=0,nd=0;
   const hs=(i,j,k)=>{const v=Math.sin(i*127.1+j*311.7+k*74.7)*43758.5453;return v-Math.floor(v)};
-  const i0=Math.floor((cx-R)/cell),i1=Math.floor((cx+R)/cell),j0=Math.floor((cz-R)/cell),j1=Math.floor((cz+R)/cell);
-  for(let i=i0;i<=i1&&n<max;i++)for(let j=j0;j<=j1&&n<max;j++){
-    const x=(i+hs(i,j,1))*cell, z=(j+hs(i,j,2))*cell;
-    if(Math.hypot(x*1.6,z)<3100)continue;
-    const f=NOISE.at(x/2600,z/2600,0), p=Math.max(0,Math.min(1,(f-.5)/.2))*.95+.05;
+  const i0=Math.floor((cx-R)/cell),i1=Math.floor((cx+R)/cell),j0=Math.floor((cz-R)/cell),j1=Math.floor((cz+R)/cell),top=MAP==='ALPINE'?1080:360;
+  for(let i=i0;i<=i1;i++)for(let j=j0;j<=j1;j++){
+    const x0=(i+hs(i,j,1))*cell, z0=(j+hs(i,j,2))*cell;
+    if(Math.hypot(x0*1.6,z0)<3100)continue;
+    const f=NOISE.at(x0/2600,z0/2600,0), p=Math.max(0,Math.min(1,(f-.55)/.05))*.95+.03;
     if(hs(i,j,3)>p)continue;
-    const h=groundH(x,z); if(h<14||h>(MAP==='ALPINE'?1080:360))continue;
-    if(Math.abs(groundH(x+8,z)-h)>5||Math.abs(groundH(x,z+8)-h)>5)continue;
-    const k=.9+hs(i,j,4)*.8; sc.set(k,k*(.85+hs(i,j,5)*.4),k); q.setFromAxisAngle(UP,hs(i,j,6)*6.28); ps.set(x,h-1,z);
-    m.compose(ps,q,sc); trees.setMatrixAt(n++,m)}
-  trees.count=n; trees.instanceMatrix.needsUpdate=true}
+    const nk=1+Math.floor(hs(i,j,7)*(2+p*4)),spread=cell*.45;
+    for(let k=0;k<nk;k++){const a=hs(i,j,20+k)*6.283,rr=spread*Math.sqrt(hs(i,j,40+k)),x=x0+Math.cos(a)*rr,z=z0+Math.sin(a)*rr;
+      const h=groundH(x,z); if(h<14||h>top)continue;
+      if(Math.abs(groundH(x+8,z)-h)>5||Math.abs(groundH(x,z+8)-h)>5)continue;
+      const con=MAP==='ALPINE'||h>220?hs(i,j,60+k)<.85:hs(i,j,60+k)<.3+.4*hs(i,j,9);
+      if(con?nc>=cap:nd>=cap)continue;
+      const s=.75+hs(i,j,80+k)*.75; sc.set(s,s*(.85+hs(i,j,100+k)*.4),s); q.setFromAxisAngle(UP,hs(i,j,120+k)*6.28); ps.set(x,h-.6,z);
+      m.compose(ps,q,sc); if(con)treesC.setMatrixAt(nc++,m);else treesD.setMatrixAt(nd++,m)}
+    if(nc+nd>=max)break}
+  treesC.count=nc;treesD.count=nd;treesC.instanceMatrix.needsUpdate=treesD.instanceMatrix.needsUpdate=true}
 /* settlements: warm clusters of lights on gentle low ground, laid deterministically per 5 km cell and re-laid with the terrain; shown at dusk and night */
 const TOWN_MAX=1800, townPos=new Float32Array(TOWN_MAX*3), townCol=new Float32Array(TOWN_MAX*3), townGeo=new THREE.BufferGeometry();
 townGeo.setAttribute('position',new THREE.BufferAttribute(townPos,3).setUsage(THREE.DynamicDrawUsage)); townGeo.setAttribute('color',new THREE.BufferAttribute(townCol,3).setUsage(THREE.DynamicDrawUsage)); townGeo.setDrawRange(0,0);
@@ -527,7 +559,7 @@ applyCloudCount();
 
 /* ---------------- jet model (true scale: 15 m long, 9.9 m span) ---------------- */
 // navigation lights: red left wingtip, green right, white tail (what you see of a jet at night)
-const NAVM=[new THREE.MeshBasicMaterial({color:0xff2a2a}),new THREE.MeshBasicMaterial({color:0x2aff5a}),new THREE.MeshBasicMaterial({color:0xffffff})], NAVG=new THREE.SphereGeometry(.22,6,4);
+const NAVM=[new THREE.MeshBasicMaterial({color:0xff2a2a}),new THREE.MeshBasicMaterial({color:0x2aff5a}),new THREE.MeshBasicMaterial({color:0xffffff})], NAVG=new THREE.SphereGeometry(.075,8,6);
 function withNav(root,type){const D=AC_DEFS[type];if(D&&D.fx&&D.fx.nav){const [sp,tl,tp]=D.fx.nav;[[sp,0,D.fx.navZ!=null?D.fx.navZ:-3.5,0],[-sp,0,D.fx.navZ!=null?D.fx.navZ:-3.5,1],[0,tp,tl,2]].forEach(([x,y,z,i])=>{const m=new THREE.Mesh(NAVG,NAVM[i]);m.position.set(x,y,z);m.name='nav';root.children[0].add(m)});return root}
   const f=type.startsWith('F16'), span=type.startsWith('MIG')||type.startsWith('SU')?5.7:type.startsWith('GRIPEN')?4.3:6.7,tail=type.startsWith('MIG')||type.startsWith('SU')?-8.6:type.startsWith('GRIPEN')?-6:-7.4;   // F-16 model is built in 0.75-scale units
   [[span,0,f?-2.2:-1.5,0],[-span,0,f?-2.2:-1.5,1],[0,f?3.6:2.6,tail,2]].forEach(([x,y,z,i])=>{const m=new THREE.Mesh(NAVG,NAVM[i]);m.position.set(x,y,z);m.name='nav';root.children[0].add(m)});return root}
@@ -918,20 +950,21 @@ vec3 paint(){vec3 n=normalize(vJN);bool side=abs(n.x)>.62;vec2 p=side?vec2(vJP.z
  if(pBelK>.5)c=mix(c,pBel,smoothstep(-.25,-.5,n.y));
  // panel lines: frame stations along the length, plus a panel grid on wings and tails
  float wz=fwidth(vJP.z)+1e-4, lz=abs(fract(vJP.z/1.27+.5)-.5)*1.27, ln=1.-smoothstep(.012,.012+wz*1.4,lz);
+ {float st=floor(vJP.z/1.27+.5),seg=floor((side?vJP.y:vJP.x)/.7+ph(vec2(st,2.))*3.);ln*=step(.38,ph(vec2(st,seg)));}   /* frame seams run in broken lengths, not full rings */
  if(abs(n.y)>.6&&abs(vJP.x)>1.25){float wx=fwidth(vJP.x)+1e-4,lx=abs(fract(vJP.x/1.05+.5)-.5)*1.05;ln=max(ln,1.-smoothstep(.012,.012+wx*1.4,lx));}
  ln*=1.-smoothstep(.015,.05,wz);
  float pid=ph(floor(vec2(vJP.z/1.27,vJP.x/1.05+vJP.y)));
  // access panels: some bays carry a smaller hatch outline, placed per bay
  {vec2 q=side?vec2(vJP.z/1.27,vJP.y/.62):vec2(vJP.z/1.27,vJP.x/1.05);vec2 cid=floor(q),f=fract(q);float hr=ph(cid+3.1);
-  if(hr>.68){vec2 lo=vec2(.18,.2)+vec2(ph(cid+1.7),ph(cid+2.9))*.18,hi=lo+vec2(.32,.3)+vec2(ph(cid+4.3),ph(cid+5.9))*.2;
+  if(hr>.84){vec2 lo=vec2(.18,.2)+vec2(ph(cid+1.7),ph(cid+2.9))*.18,hi=lo+vec2(.32,.3)+vec2(ph(cid+4.3),ph(cid+5.9))*.2;
    vec2 dq=fwidth(q)+1e-4;float e=min(min(abs(f.x-lo.x)/dq.x,abs(f.x-hi.x)/dq.x),min(abs(f.y-lo.y)/dq.y,abs(f.y-hi.y)/dq.y));
    float inside=step(lo.x,f.x)*step(f.x,hi.x)*step(lo.y,f.y)*step(f.y,hi.y),edge=(1.-smoothstep(.6,1.6,e))*max(inside,step(lo.x-.02,f.x)*step(f.x,hi.x+.02)*step(lo.y-.02,f.y)*step(f.y,hi.y+.02));
-   ln=max(ln,edge*.65*(1.-smoothstep(.015,.05,wz)));}}
+   ln=max(ln,edge*.35*(1.-smoothstep(.01,.03,wz)));}}
  // rivet rows a hand's width either side of the frame lines, only up close
  {float rv=abs(fract(vJP.z/1.27+.5)-.5)*1.27;float row=1.-smoothstep(.02,.035,abs(rv-.06));float t=side?vJP.y:vJP.x;float dot2=1.-smoothstep(.15,.3,abs(fract(t/.09)-.5)*2.);
-  c*=1.-.12*row*dot2*(1.-smoothstep(.004,.012,wz));gBump+=row*dot2*.35*(1.-smoothstep(.004,.012,wz));}
+  c*=1.-.06*row*dot2*(1.-smoothstep(.004,.012,wz));gBump+=row*dot2*.35*(1.-smoothstep(.004,.012,wz));}
  gBump=ln*.9;
- c*=(1.-.24*ln)*(.975+.05*pid);
+ c*=(1.-.16*ln)*(.975+.05*pid);
  // walkways: dark outlines on top of the wing roots
  if(n.y>.6&&abs(vJP.x)>1.1&&abs(vJP.x)<2.3){float wx2=fwidth(vJP.x)+1e-4;float ed=min(abs(abs(vJP.x)-1.15),abs(abs(vJP.x)-2.25))/wx2;c*=1.-.35*(1.-smoothstep(.6,1.8,ed))*(1.-smoothstep(.02,.06,wz))*step(pTail+5.,vJP.z);}
  // weathering: sun-faded tops, grime streaking aft with the airflow, darker leading edges, soot behind the exhaust
