@@ -273,7 +273,7 @@ const sky=new THREE.Mesh(new THREE.SphereGeometry(30000,32,16),new THREE.ShaderM
     'c=mix(c,H*1.04+.02,exp(-abs(h)*28.)*.55);'+
     'c+=glow*pow(s,7.)*.32+vec3(1.,.95,.85)*pow(s,64.)*.3*disk;'+
     'c+=vec3(1.,.97,.9)*smoothstep(.99945,.9998,s)*2.2*disk;'+
-    'gl_FragColor=linearToOutputTexel(vec4(c,1.));}'
+    'gl_FragColor=linearToOutputTexel(vec4(c,1.));gl_FragColor.rgb+=(fract(sin(dot(gl_FragCoord.xy,vec2(12.9898,78.233)))*43758.5453)-.5)/160.;}'
 }));
 sky.renderOrder=-1; scene.add(sky);
 const radTex=(stops)=>{const cv=document.createElement('canvas');cv.width=cv.height=128;const c=cv.getContext('2d');const g=c.createRadialGradient(64,64,0,64,64,64);stops.forEach(([o,col])=>g.addColorStop(o,col));c.fillStyle=g;c.fillRect(0,0,128,128);return new THREE.CanvasTexture(cv)};
@@ -355,26 +355,34 @@ terrMat.onBeforeCompile=sh=>{sh.uniforms.nTex={value:NOISE};sh.uniforms.mapId=TE
   sh.fragmentShader=sh.fragmentShader.replace('#include <common>',`#include <common>
 uniform sampler2D nTex;uniform float mapId;uniform float snowY;varying vec3 vWPos;varying vec3 vWN;
 float hh(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
-// patchwork farmland on flat lowland: rotated 200 m lots in crop, stubble, plough and pasture colours with row stripes
+// farmland on flat lowland: lots on a noise-warped grid (wavy, uneven edges) in muted crop, stubble, plough and pasture tones,
+// faint crop rows that fade out before they alias, broken tree lines between some lots
 vec3 fields(vec3 base,float h,float sl,float n1,float n2){
  float m=smoothstep(.1,.05,sl)*smoothstep(5.,14.,h)*(1.-smoothstep(120.,170.,h))*smoothstep(.36,.52,n1);
  if(m<.01)return base;
- mat2 R=mat2(.9659,-.2588,.2588,.9659);vec2 p=R*vWPos.xz;vec2 id=floor(p/215.);vec2 f=fract(p/215.);
+ vec2 w=vec2(texture2D(nTex,vWPos.xz/1100.).g,texture2D(nTex,vWPos.xz/1100.+.37).b)-.5;
+ mat2 R=mat2(.9659,-.2588,.2588,.9659);vec2 p=R*vWPos.xz+w*220.;vec2 L=vec2(250.,170.);vec2 id=floor(p/L);vec2 f=fract(p/L);
  float r=hh(id),r2=hh(id+7.3);
- vec3 c=r<.28?vec3(.62,.58,.27):r<.5?vec3(.37,.5,.2):r<.68?vec3(.45,.34,.22):r<.84?vec3(.29,.43,.17):vec3(.7,.66,.38);
- vec2 dir=r2<.5?vec2(1.,0.):vec2(0.,1.);float rows=.5+.5*sin(dot(p,dir)*(1.1+r2*.9));
- c*=.9+.14*rows*step(.28,r)*step(r,.84);
- float edge=smoothstep(0.,.012,f.x)*smoothstep(0.,.012,f.y)*smoothstep(1.,.988,f.x)*smoothstep(1.,.988,f.y);   // thin hedgerows between lots
- c=mix(vec3(.2,.3,.13),c,edge*.85+.15);
- return mix(base,c,m*.8);}
-// close-range ground detail: ~30 cm grass tufts in greens and straw, bare-earth patches; faded out before the tufts get smaller than a pixel
+ vec3 c=r<.25?vec3(.55,.51,.31):r<.45?vec3(.31,.39,.19):r<.6?vec3(.40,.34,.25):r<.82?vec3(.29,.36,.18):vec3(.58,.54,.38);
+ c=mix(c,base,.35);
+ c*=.9+.2*texture2D(nTex,vWPos.xz/63.).r;
+ vec2 dir=r2<.5?vec2(1.,0.):vec2(0.,1.);float fq=1.3+r2*.8,rp=dot(p,dir)*fq,raa=1.-smoothstep(.25,.7,fwidth(rp));
+ c*=1.+.06*sin(rp)*raa*step(.25,r)*step(r,.82);
+ vec2 eg=min(f,1.-f)*L;float e=min(eg.x,eg.y);
+ float tree=(1.-smoothstep(1.5,4.5,e))*step(.42,texture2D(nTex,vWPos.xz/45.).g)*step(.35,hh(id+2.1));
+ c=mix(c,vec3(.16,.22,.11),tree*.8);
+ return mix(base,c,m*(.45+.2*smoothstep(.0,4.,e)));}
+// close-range ground: smooth texture noise at 0.9, 2.7 and 8 m (mipmapped, so no blocky speckle), dry and green patches, bare earth
 vec3 closeGround(vec3 c,float sl,float h,float kind){
- float d=length(cameraPosition-vWPos),cn=1.-smoothstep(60.,650.,d);if(cn<.01)return c;
- vec2 q=vWPos.xz*3.2;float fw=fwidth(q.x)+fwidth(q.y),aa=1.-smoothstep(.45,1.3,fw);
- float g1=hh(floor(q)),g2=hh(floor(q*2.3+7.)),flat2=smoothstep(.32,.16,sl);
- if(kind<.5){vec3 tint=mix(vec3(.82,.95,.66),vec3(1.12,1.05,.78),g1);c=mix(c,c*tint*(.84+.3*g2),cn*aa*.65*flat2);
-   float sp=smoothstep(.63,.76,texture2D(nTex,vWPos.xz/38.).r)*(1.-smoothstep(150.,250.,h));c=mix(c,vec3(.35,.28,.19)*(.8+.4*g2),sp*cn*.5*flat2);}
- else{float rp=.5+.5*sin(vWPos.x*2.1+vWPos.z*.7+texture2D(nTex,vWPos.xz/9.).r*6.);c*=1.+cn*aa*((rp-.5)*.12+(g1-.5)*.08);}
+ float d=length(cameraPosition-vWPos),cn=1.-smoothstep(40.,700.,d);if(cn<.01)return c;
+ float a=texture2D(nTex,vWPos.xz/.9).r,b=texture2D(nTex,vWPos.xz/2.7).g,e=texture2D(nTex,vWPos.xz/8.).b,flat2=smoothstep(.32,.16,sl);
+ if(kind<.5){float v=(a-.5)*.5+(b-.5)*.7+(e-.5)*.5;
+   vec3 dry=vec3(dot(c,vec3(.333)))*vec3(1.16,1.06,.78);
+   c=mix(c,dry,smoothstep(.5,.8,e)*.3*cn*flat2);
+   c=mix(c,c*vec3(.86,1.02,.9),smoothstep(.5,.25,e)*.5*cn*flat2);
+   c*=1.+v*.2*cn;
+   float sp=smoothstep(.64,.78,texture2D(nTex,vWPos.xz/38.).r)*(1.-smoothstep(150.,250.,h));c=mix(c,vec3(.36,.30,.22)*(.85+.3*b),sp*cn*.4*flat2);}
+ else{float rp=.5+.5*sin(vWPos.x*2.1+vWPos.z*.7+texture2D(nTex,vWPos.xz/9.).r*6.),raa=1.-smoothstep(.3,1.,fwidth(vWPos.x*2.1+vWPos.z*.7));c*=1.+cn*((rp-.5)*.1*raa+(b-.5)*.1);}
  return c;}
 vec3 terr(){float h=vWPos.y;float sl=1.-normalize(vWN).y;
  float n1=texture2D(nTex,vWPos.xz/2600.).r,n2=texture2D(nTex,vWPos.xz/530.).g,n3=texture2D(nTex,vWPos.xz/95.).b,n4=texture2D(nTex,vWPos.xz/19.).r;
@@ -395,7 +403,7 @@ vec3 terr(){float h=vWPos.y;float sl=1.-normalize(vWN).y;
    c=mix(vec3(.55,.52,.45),c,smoothstep(3.,10.,h));
    c*=.84+.32*n4*(.55+.45*n3);
    return h<snowY?closeGround(c,sl,h,0.):c;}
- vec3 c=mix(vec3(.25,.39,.16),vec3(.40,.48,.21),smoothstep(.3,.72,n2));
+ vec3 c=mix(vec3(.26,.35,.16),vec3(.38,.42,.22),smoothstep(.3,.72,n2));
  c=mix(c,vec3(.15,.26,.12),smoothstep(.5,.72,n1)*(1.-smoothstep(260.,380.,h)));
  c=mix(c,vec3(.48,.45,.30),smoothstep(190.,390.,h+(n2-.5)*140.));
  vec3 rk=mix(vec3(.45,.42,.37),vec3(.31,.30,.28),n3);
@@ -407,14 +415,14 @@ vec3 terr(){float h=vWPos.y;float sl=1.-normalize(vWN).y;
  c*=.84+.32*n4*(.55+.45*n3);
  float n5=texture2D(nTex,vWPos.xz/5.3).g,n6=texture2D(nTex,vWPos.xz/1.7).b;   // close-range grain for low flying
  float cl=1.-smoothstep(500.,2600.,length(cameraPosition-vWPos));
- c*=1.+cl*((n5-.5)*.26+(n6-.5)*.16);
+ c*=1.+cl*((n5-.5)*.16+(n6-.5)*.08);
  c=closeGround(c,sl,h,0.);
  float wet=smoothstep(1.6,.1,h);c=mix(c,c*.62,wet*.8);                                  // wet sand at the waterline
  float foam=smoothstep(.55,.0,abs(h-.28-(n3-.5)*.5))*(.55+.45*n6);c=mix(c,vec3(.93,.96,.97),foam*.75);   // surf line
  return c;}`).replace('#include <color_fragment>','#include <color_fragment>\ndiffuseColor.rgb*=terr();')
    .replace('#include <normal_fragment_maps>',`#include <normal_fragment_maps>
  {float dd=length(cameraPosition-vWPos),bk=(1.-smoothstep(80.,900.,dd))*(1.-step(.5,mapId)*step(mapId,2.5)*step(snowY,vWPos.y));
-  if(bk>.01){float bh=(texture2D(nTex,vWPos.xz/3.1).r*.65+texture2D(nTex,vWPos.xz/.85).g*.35)*bk*.6;
+  if(bk>.01){float bh=(texture2D(nTex,vWPos.xz/3.1).r*.65+texture2D(nTex,vWPos.xz/1.3).g*.35)*bk*.22;
    vec3 sp=-vViewPosition,dpx=dFdx(sp),dpy=dFdy(sp),r1=cross(dpy,normal),r2=cross(normal,dpx);float det=dot(dpx,r1),hx=dFdx(bh),hy=dFdy(bh);
    normal=normalize(abs(det)*normal-sign(det)*(hx*r1+hy*r2));}}`)};
 const terrain=new THREE.Mesh(buildTerrainGeo(QUALS[quality].seg),terrMat);
@@ -2893,7 +2901,7 @@ function postInit(){
       'vec3 over=max(c-1.,0.);c=min(c,vec3(1.))+over/(1.+over);'+                                                                                          // highlight roll-off: hot cores keep a bright shoulder
       'c=clamp(c,0.,1.);c=mix(c,c*c*(3.-2.*c),.22);'+                                                                                                      // gentle S-curve
       'float l=dot(c,vec3(.299,.587,.114));c=mix(vec3(l),c,sat);c+=vec3(-.012,.004,.016)*(1.-l)+vec3(.016,.007,-.012)*l*l;'+                                  // split tone: cool shadows, warm highlights
-      'c*=1.-vig*smoothstep(.28,.95,length(d)*1.55);gl_FragColor=vec4(c,1.);}',
+      'c*=1.-vig*smoothstep(.28,.95,length(d)*1.55);c+=(fract(sin(dot(gl_FragCoord.xy,vec2(12.9898,78.233)))*43758.5453)-.5)/200.;gl_FragColor=vec4(c,1.);}',   /* dither: breaks up banding in the sky gradient */
       {tex:{value:null},bloom:{value:null},px:{value:new THREE.Vector2()},bk:{value:.4},vig:{value:.24},sat:{value:1.07}});
     POST.quad=new THREE.Mesh(tri,POST.mComp);POST.quad.frustumCulled=false;POST.scene.add(POST.quad);POST.ok=true;return true
   }catch(e){POST.fail=true;return false}}

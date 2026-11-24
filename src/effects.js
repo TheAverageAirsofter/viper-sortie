@@ -179,7 +179,7 @@ function postInit(){
       'vec3 over=max(c-1.,0.);c=min(c,vec3(1.))+over/(1.+over);'+                                                                                          // highlight roll-off: hot cores keep a bright shoulder
       'c=clamp(c,0.,1.);c=mix(c,c*c*(3.-2.*c),.22);'+                                                                                                      // gentle S-curve
       'float l=dot(c,vec3(.299,.587,.114));c=mix(vec3(l),c,sat);c+=vec3(-.012,.004,.016)*(1.-l)+vec3(.016,.007,-.012)*l*l;'+                                  // split tone: cool shadows, warm highlights
-      'c*=1.-vig*smoothstep(.28,.95,length(d)*1.55);gl_FragColor=vec4(c,1.);}',
+      'c*=1.-vig*smoothstep(.28,.95,length(d)*1.55);c+=(fract(sin(dot(gl_FragCoord.xy,vec2(12.9898,78.233)))*43758.5453)-.5)/200.;gl_FragColor=vec4(c,1.);}',   /* dither: breaks up banding in the sky gradient */
       {tex:{value:null},bloom:{value:null},px:{value:new THREE.Vector2()},bk:{value:.4},vig:{value:.24},sat:{value:1.07}});
     POST.quad=new THREE.Mesh(tri,POST.mComp);POST.quad.frustumCulled=false;POST.scene.add(POST.quad);POST.ok=true;return true
   }catch(e){POST.fail=true;return false}}
