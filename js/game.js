@@ -4494,7 +4494,7 @@ function clearWorld(){
   enemies=[];friends=[];spawnQ=[];[...pBullets,...eBullets,...missiles,...eMissiles].forEach(kill);
 }
 let gunShots=0,gunHits=0;
-function startGame(){aoWarm();AO_SYNC=true;setTimeout(()=>{AO_SYNC=false},0);sortieGround=0;btRestoreConditions();BT.on=false;BT.online=false;hideBtPick();TMAP.z=0;SC.list.length=0;SC.streak=0;SC.lastKill=-99;
+function startGame(){aoWarm();evtReset();AO_SYNC=true;setTimeout(()=>{AO_SYNC=false},0);sortieGround=0;btRestoreConditions();BT.on=false;BT.online=false;hideBtPick();TMAP.z=0;SC.list.length=0;SC.streak=0;SC.lastKill=-99;
   gunShots=0;gunHits=0;clearWorld(); resetPlayer(); resetRadar(); resetCM(); recReset(); rec3Reset(); P.alive=true;
   if(mission!=='ONLINE'){netStop();$('bSb').hidden=true;$('sbBox').hidden=true}
   trainHook=null;
@@ -4544,6 +4544,35 @@ function spawnPair(type,center,lookAt,opts={}){
   const w=spawnFighter('red',type,center.clone().add(_s5.copy(l.right).multiplyScalar(1400)),lookAt,opts);  // 2-ships fly the same jet
   w.lead=l; w.side=1; l.mate=w; w.mate=l; return [l,w];
 }
+/* ---------------- mid-mission surprises: one or two per sortie in the air missions, each worth a bonus if you deal with it in time ---------------- */
+const EVT={t:0,n:0,next:0,list:[]};
+const EVT_MISSIONS=['WAVES','STRIKE','INTERCEPT','RUSH','ESCORT','2V4','4SHIP','CONVOY','GROUNDWAR','ANTISHIP','CAMPAIGN','CRUISE'];
+const evtBrg=p=>{const d=Math.round((Math.atan2(p.x-P.pos.x,p.z-P.pos.z)*180/Math.PI+360)%360);return('00'+d).slice(-3)}, evtMi=p=>Math.max(1,Math.round(p.distanceTo(P.pos)/1852));
+function evtReset(){EVT.t=0;EVT.n=0;EVT.next=rand(55,95);EVT.list.length=0}
+function evtTick(dt){if(EVT_MISSIONS.indexOf(mission)<0||!P.alive||missionDone||P.onGround)return;EVT.t+=dt;
+  for(let i=EVT.list.length-1;i>=0;i--){const v=EVT.list[i];v.t+=dt;if(v.tick(v))EVT.list.splice(i,1)}
+  if(EVT.n>=2||EVT.t<EVT.next)return;EVT.n++;EVT.next=EVT.t+rand(70,120);
+  const pool=['AMBUSH','POPSAM','HVT','WEATHER','MAYDAY'].filter(k=>(k!=='WEATHER'||weather==='CLEAR'||weather==='SCATTERED')&&(k!=='MAYDAY'||mission!=='ESCORT'));
+  evtStart(pool[Math.random()*pool.length|0])}
+function evtStart(k){const f=_s5.copy(P.fwd).setY(0).normalize(),r=new V3(f.z,0,-f.x),done=(v,txt,pts)=>{scEvent(txt,pts,'bonus');score+=pts;radio(v.ok||'nice work.');return true};
+  if(k==='AMBUSH'){const c=P.pos.clone().addScaledVector(f,-7500).addScaledVector(r,rand(-2500,2500));c.y=Math.max(Math.max(groundH(c.x,c.z),0)+500,P.pos.y-1800);
+    const pr=spawnPair(pickBanditType(),c,P.pos.clone());message('AMBUSH · BANDITS ON YOUR SIX',2.6);radio('pop-up group, your six, '+evtMi(c)+' miles, low! Two bandits, hot!');
+    EVT.list.push({t:0,ok:'ambush beaten, good shooting.',tick:v=>v.t>150?true:pr.every(e=>!e.alive)?done(v,'AMBUSH BEATEN',200):false})}
+  else if(k==='POPSAM'){let x=0,z=0,ok=false;for(let i=0;i<8&&!ok;i++){const d=rand(8000,12000),s=rand(-4000,4000);x=P.pos.x+f.x*d+r.x*s;z=P.pos.z+f.z*d+r.z*s;ok=groundH(x,z)>4}
+    if(!ok){evtStart('AMBUSH');return}const g=spawnGround('sam',x,z);message('POP-UP SAM',2.4);radio('mud spike! A SAM site just lit up, bearing '+evtBrg(g.pos)+', '+evtMi(g.pos)+' miles. Take it out or go around.');
+    EVT.list.push({t:0,ok:'SAM site destroyed, the corridor is clear.',tick:v=>v.t>180?true:!g.alive?done(v,'POP-UP SAM DESTROYED',250):false})}
+  else if(k==='MAYDAY'){const c=P.pos.clone().addScaledVector(r,(Math.random()<.5?-1:1)*rand(11000,15000)).addScaledVector(f,rand(2000,8000));c.y=Math.max(4000,Math.max(groundH(c.x,c.z),0)+1500);
+    const away=c.clone().addScaledVector(f,-30000);const t=spawnHeavy('blue','TRANSPORT',c,away,150);t.cs='Hog 3';
+    const pr=spawnPair(pickBanditType(),c.clone().addScaledVector(f,-6000).setY(c.y+600),c.clone(),{escortPref:true});message('MAYDAY · FRIENDLY UNDER ATTACK',2.6);
+    radio('mayday, mayday! Hog 3, a transport under attack, bearing '+evtBrg(c)+', '+evtMi(c)+' miles. Any fighter, we need help!');
+    EVT.list.push({t:0,ok:'Hog 3 here, you saved our necks. Thanks!',tick:v=>{if(!t.alive){radio('Hog 3 is down. We lost them.');return true}if(pr.every(e=>!e.alive))return done(v,'TRANSPORT SAVED',300);
+      if(v.t>200){radio('Hog 3 is clear of the area.');friends.splice(friends.indexOf(t),1);scene.remove(t.obj);return true}return false}})}
+  else if(k==='HVT'){const c=P.pos.clone().addScaledVector(f,rand(22000,28000)).addScaledVector(r,rand(-6000,6000));c.y=9000;
+    const h=spawnHeavy('red','BOMBER',c,c.clone().addScaledVector(f,60000),210);h.hvt=true;spawnPair(pickBanditType(),c.clone().addScaledVector(f,-3000).setY(8500),P.pos.clone());
+    message('HIGH-VALUE TARGET',2.6);radio('high-value target: an enemy AWACS, bearing '+evtBrg(c)+', '+evtMi(c)+' miles, angels 30, running away with escorts. Get it before it escapes.');
+    EVT.list.push({t:0,ok:'the AWACS is down. Huge.',tick:v=>{if(!h.alive)return done(v,'HIGH-VALUE TARGET',500);if(v.t>220){radio('the AWACS has escaped.');h.alive=false;scene.remove(h.obj);return true}return false}})}
+  else if(k==='WEATHER'){if(!BT.saved)BT.saved={weather,timeOfDay};weather=Math.random()<.5?'RAIN':'OVERCAST';applyEnv();message('WEATHER ROLLING IN',2.4);
+    radio('weather is moving in fast: '+(weather==='RAIN'?'rain and':'')+' low cloud, visibility dropping. Heat-seekers will struggle.')}}
 function setupMission(){
   if(mission==='TRAINING'){setupLesson();return}
   if(mission==='ONLINE'){netStart();return}
@@ -7742,7 +7771,8 @@ function frame(now){
       cl.position.set(P.pos.x+Math.sin(a)*d,ovc()?rand(3250,3700):rand(2600,4200),P.pos.z+Math.cos(a)*d)}
   }
   deck.position.x=P.pos.x; deck.position.z=P.pos.z; stars.position.copy(camera.position);
-  if(AO_Q.length)aoPump();   // time-sliced AO bakes for first-time types (about 4 ms a frame)
+  if(AO_Q.length)aoPump();
+  if(state==='play'&&dt>0)evtTick(dt);   // mid-mission surprises   // time-sliced AO bakes for first-time types (about 4 ms a frame)
   if(TNK&&TNK.on&&dt>0)tkAir(dt); (TNK&&TNK.on&&state!=='menu'?tkCamera:updateCamera)(dt||.016); tkFrame(); if(killCamCamera(rdt||.016))playerJet.visible=P.alive; if(state==='replay')updateReplay(dt||.016); if(PHOTO.on)photoCam(); sky.position.copy(camera.position);
   waterMat.uniforms.t.value=now*.001; glare.position.copy(camera.position).addScaledVector(SUN_DIR,26000);
   pMat.uniforms.fogC.value.copy(scene.fog.color); pMat.uniforms.fogN.value=scene.fog.near; pMat.uniforms.fogF.value=scene.fog.far;
@@ -7872,7 +7902,7 @@ const _careerAward=careerAward;
 careerAward=function(){lbAdd();return _careerAward.apply(this,arguments)};
 
 /* ---------- test hook (only with ?test in the URL) ---------- */
-if(/[?&]test\b/.test(location.search))window.__vs={dmgFrom,hitMark,get friends(){return friends},setLock:t=>{lockTarget=t},get KC(){return KC},aoKeys:()=>[...AO_CACHE.keys()],aoQ:()=>AO_Q.length,aoPump,aoDbg:()=>AO_Q.map(j=>j.key+":"+!!j.it),get sortie(){return sortie},tkResult,get camera(){return camera},tkAirDown,get TNK(){return TNK},get WAR(){return WAR},warDie,warBuild,WAR_V,get playerJet(){return playerJet},get CANYON(){return CANYON},groundH,valRings:()=>valRings,buildSAM,buildAAA,buildRadar,buildBunker,buildTruck,buildShip,get ground(){return ground},deathCause:()=>deathCause,spawnFighter,clockNow:()=>clock,cycleRadarSub,radarBlind,radarSub,clutter,R,AA,killEnemy,aaSpawnWave,AG,agRelease,agSight,agWpn,ccip,agReset,btConditions,NET,netScoreCheck,netTeamScore,sbHtml,killGround,get pass(){return pass},passAdd,passClaim,weeklyAdd,scene,rinfoReset:()=>{renderer.info.autoReset=false;renderer.info.reset()},rinfo:()=>({c:renderer.info.render.calls,t:renderer.info.render.triangles,g:renderer.info.memory.geometries,tx:renderer.info.memory.textures}),KB,kbRebuild,playerGunHit,wingHit,BT,die,btRespawn,TMAP,mapStep,KBM,SC,damageSystem,hitAI,killEnemy,setThr,HEAT,explode,puff,camera,LT,townLights,flashLt,P,fly,dlz,flyout,AC_DEFS,feed,WAR,WAR_V,warBuild,warSpawn,warModules,warDie,warFlags,updateWar,warAlive,buildJet,PLAYER_COLORS,M2,V3,atm,clamp,lbAdd,showOverlay:k=>showOverlay(k),setScore:(n,k)=>{score=n;kills=k},get state(){return state},get enemies(){return enemies},missiles:()=>missiles.filter(m=>m.on),setAC:id=>{AC=AC_DEFS[id];applyAC()},wt:{   // weapon-test hooks: a clean sky, one drone, scripted launches
+if(/[?&]test\b/.test(location.search))window.__vs={evtStart,EVT,dmgFrom,hitMark,get friends(){return friends},setLock:t=>{lockTarget=t},get KC(){return KC},aoKeys:()=>[...AO_CACHE.keys()],aoQ:()=>AO_Q.length,aoPump,aoDbg:()=>AO_Q.map(j=>j.key+":"+!!j.it),get sortie(){return sortie},tkResult,get camera(){return camera},tkAirDown,get TNK(){return TNK},get WAR(){return WAR},warDie,warBuild,WAR_V,get playerJet(){return playerJet},get CANYON(){return CANYON},groundH,valRings:()=>valRings,buildSAM,buildAAA,buildRadar,buildBunker,buildTruck,buildShip,get ground(){return ground},deathCause:()=>deathCause,spawnFighter,clockNow:()=>clock,cycleRadarSub,radarBlind,radarSub,clutter,R,AA,killEnemy,aaSpawnWave,AG,agRelease,agSight,agWpn,ccip,agReset,btConditions,NET,netScoreCheck,netTeamScore,sbHtml,killGround,get pass(){return pass},passAdd,passClaim,weeklyAdd,scene,rinfoReset:()=>{renderer.info.autoReset=false;renderer.info.reset()},rinfo:()=>({c:renderer.info.render.calls,t:renderer.info.render.triangles,g:renderer.info.memory.geometries,tx:renderer.info.memory.textures}),KB,kbRebuild,playerGunHit,wingHit,BT,die,btRespawn,TMAP,mapStep,KBM,SC,damageSystem,hitAI,killEnemy,setThr,HEAT,explode,puff,camera,LT,townLights,flashLt,P,fly,dlz,flyout,AC_DEFS,feed,WAR,WAR_V,warBuild,warSpawn,warModules,warDie,warFlags,updateWar,warAlive,buildJet,PLAYER_COLORS,M2,V3,atm,clamp,lbAdd,showOverlay:k=>showOverlay(k),setScore:(n,k)=>{score=n;kills=k},get state(){return state},get enemies(){return enemies},missiles:()=>missiles.filter(m=>m.on),setAC:id=>{AC=AC_DEFS[id];applyAC()},wt:{   // weapon-test hooks: a clean sky, one drone, scripted launches
   begin:id=>{AC=AC_DEFS[id];applyAC();startGame();return AC.id},
   clear:()=>{waveClearT=1e9;for(const e of enemies){e.alive=false;scene.remove(e.obj)}enemies.length=0;P.pos.set(0,6000,0);P.vel.set(0,0,250);throttle=.7;return state},
   target:(type,dz,away,speed)=>{const e=spawnFighter('red',type,new V3(0,P.pos.y,dz),new V3(0,P.pos.y,dz+(away?9999:-9999)),{ir:0,rdr:0,speed:speed||220});e.drone=true;return e.id},
