@@ -1,0 +1,2 @@
+(async()=>{const b=await require('./launch')();const p=await b.newPage();p.on('pageerror',e=>console.log('ERR',e.message));await p.goto('file:///home/user/viper-sortie/index.html?test&noaq');await p.waitForTimeout(2000);
+console.log(await p.evaluate(()=>['F16','SU27','F15C','F14B','A10A'].map(id=>{const t=performance.now();__vs.buildJet(__vs.PLAYER_COLORS,id);const t1=performance.now();__vs.buildJet(__vs.PLAYER_COLORS,id);return id+' '+Math.round(t1-t)+'ms, cached '+Math.round(performance.now()-t1)+'ms'}).join(' | ')));await b.close()})()

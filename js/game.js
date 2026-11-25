@@ -565,6 +565,52 @@ function withNav(root,type){const D=AC_DEFS[type];if(D&&D.fx&&D.fx.nav){const [s
   [[span,0,f?-2.2:-1.5,0],[-span,0,f?-2.2:-1.5,1],[0,f?3.6:2.6,tail,2]].forEach(([x,y,z,i])=>{const m=new THREE.Mesh(NAVG,NAVM[i]);m.position.set(x,y,z);m.name='nav';root.children[0].add(m)});return root}
 /* draw-call diet: unnamed static meshes that share a material inside one group (fuselage panels, strips, missile parts) become one mesh. Named parts
    (control surfaces, gear, canopy, nozzles, flame, wingM, decals...) stay separate so animation, damage and level of detail still find them. */
+/* baked ambient occlusion: each opaque mesh of a model gets a per-vertex 'occ' attribute (0 open sky .. 1 fully enclosed), found by
+   rasterising the whole model into small depth buffers from ~40 directions on a sphere and testing every vertex against them.
+   Materials read it through aoPatch (missing attribute = 0, so unbaked meshes sharing a material are unaffected). Cached per key. */
+let AO_ON=!/[?&]noao\b/.test(location.search);const AO_CACHE=new Map(),AO_DIRS=(()=>{const n=40,o=[],ga=Math.PI*(3-Math.sqrt(5));for(let i=0;i<n;i++){const y=1-2*(i+.5)/n,r=Math.sqrt(1-y*y),a=i*ga;o.push(new THREE.Vector3(Math.cos(a)*r,y,Math.sin(a)*r))}return o})();
+function aoPatch(m){if(!m||m.__ao||m.isMeshBasicMaterial||m.transparent||m.blending===THREE.AdditiveBlending)return;m.__ao=true;
+  const prev=m.onBeforeCompile,key=m.customProgramCacheKey?m.customProgramCacheKey():'';
+  m.onBeforeCompile=(sh,r)=>{if(prev)prev.call(m,sh,r);
+    sh.vertexShader=sh.vertexShader.replace('#include <common>','#include <common>\nattribute float occ;varying float vOcc;').replace('#include <begin_vertex>','#include <begin_vertex>\nvOcc=occ;');
+    sh.fragmentShader=sh.fragmentShader.replace('#include <common>','#include <common>\nvarying float vOcc;')
+      .replace('#include <aomap_fragment>','#include <aomap_fragment>\n {float aoK=clamp(1.-vOcc,0.,1.);aoK*=aoK*(3.-2.*aoK)*.35+aoK*.65;reflectedLight.indirectDiffuse*=aoK;reflectedLight.indirectSpecular*=aoK;reflectedLight.directDiffuse*=mix(1.,aoK,.4);reflectedLight.directSpecular*=mix(1.,aoK,.7);}')};
+  m.customProgramCacheKey=()=>key+'|ao';m.needsUpdate=true}
+function bakeAO(root,cacheKey,opts){opts=opts||{};const res=opts.res||128;
+  root.updateMatrixWorld(true);const inv=new THREE.Matrix4().copy(root.matrixWorld).invert(),M=new THREE.Matrix4(),v=new THREE.Vector3(),nm=new THREE.Matrix3();
+  const shown=o=>{for(let q=o;q&&q!==root;q=q.parent)if(!q.visible)return false;return true};
+  const meshes=[];root.traverse(o=>{if(!o.isMesh||!o.geometry||!o.geometry.attributes.position||Array.isArray(o.material))return;const m=o.material;
+    if(m.transparent||m.isMeshBasicMaterial||m.blending===THREE.AdditiveBlending||o.name==='decal'||o.isInstancedMesh)return;meshes.push(o)});
+  const cached=cacheKey&&AO_CACHE.get(cacheKey);
+  if(cached&&cached.length===meshes.length&&meshes.every((o,i)=>o.geometry.attributes.position.count*1===cached[i].length)){
+    meshes.forEach((o,i)=>{o.geometry.setAttribute('occ',new THREE.BufferAttribute(cached[i],1));aoPatch(o.material)});return}
+  // gather every mesh in root space: receivers get occ, visible ones also occlude
+  const recv=meshes.map(o=>{M.multiplyMatrices(inv,o.matrixWorld);nm.getNormalMatrix(M);const g=o.geometry,P=g.attributes.position,N=g.attributes.normal,n=P.count,p=new Float32Array(n*3),q=new Float32Array(n*3);
+    for(let i=0;i<n;i++){v.fromBufferAttribute(P,i).applyMatrix4(M);p[i*3]=v.x;p[i*3+1]=v.y;p[i*3+2]=v.z;if(N){v.fromBufferAttribute(N,i).applyMatrix3(nm).normalize();q[i*3]=v.x;q[i*3+1]=v.y;q[i*3+2]=v.z}}
+    return{o,p,q,n,idx:g.index?g.index.array:null,occ:shown(o),ds:!!(o.material.side===THREE.DoubleSide)}});
+  let cx=0,cy=0,cz=0,cnt=0;for(const r of recv)for(let i=0;i<r.n;i++){cx+=r.p[i*3];cy+=r.p[i*3+1];cz+=r.p[i*3+2];cnt++}cx/=cnt||1;cy/=cnt||1;cz/=cnt||1;
+  let R=0;for(const r of recv)for(let i=0;i<r.n;i++)R=Math.max(R,Math.hypot(r.p[i*3]-cx,r.p[i*3+1]-cy,r.p[i*3+2]-cz));R=R*1.02+.01;
+  const S=res,px=2*R/S,buf=new Float32Array(S*S),acc=recv.map(r=>new Float32Array(r.n*2)),wsum=recv.map(r=>new Float32Array(r.n*2));   // two hemispheres per vertex: generated normals may point either way
+  const U=new THREE.Vector3(),W=new THREE.Vector3();
+  for(const d of AO_DIRS){U.set(Math.abs(d.y)<.9?0:1,Math.abs(d.y)<.9?1:0,0).cross(d).normalize();W.crossVectors(d,U);
+    buf.fill(-1e9);
+    const pr=(r,i,o)=>{const x=r.p[i*3]-cx,y=r.p[i*3+1]-cy,z=r.p[i*3+2]-cz;o[0]=(x*U.x+y*U.y+z*U.z+R)/px;o[1]=(x*W.x+y*W.y+z*W.z+R)/px;o[2]=x*d.x+y*d.y+z*d.z};
+    const A=[0,0,0],B=[0,0,0],C=[0,0,0];
+    for(const r of recv){if(!r.occ)continue;const tri=r.idx?r.idx.length/3:r.n/3;
+      for(let t=0;t<tri;t++){const ia=r.idx?r.idx[t*3]:t*3,ib=r.idx?r.idx[t*3+1]:t*3+1,ic=r.idx?r.idx[t*3+2]:t*3+2;pr(r,ia,A);pr(r,ib,B);pr(r,ic,C);
+        const x0=Math.max(0,Math.floor(Math.min(A[0],B[0],C[0]))),x1=Math.min(S-1,Math.ceil(Math.max(A[0],B[0],C[0]))),y0=Math.max(0,Math.floor(Math.min(A[1],B[1],C[1]))),y1=Math.min(S-1,Math.ceil(Math.max(A[1],B[1],C[1])));
+        const ar=(B[0]-A[0])*(C[1]-A[1])-(B[1]-A[1])*(C[0]-A[0]);if(Math.abs(ar)<1e-9){const z=Math.max(A[2],B[2],C[2]),k=Math.min(S-1,Math.max(0,Math.round(A[1])))*S+Math.min(S-1,Math.max(0,Math.round(A[0])));if(z>buf[k])buf[k]=z;continue}
+        for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++){const sx=x+.5,sy=y+.5;
+          let w0=((B[0]-sx)*(C[1]-sy)-(B[1]-sy)*(C[0]-sx))/ar,w1=((C[0]-sx)*(A[1]-sy)-(C[1]-sy)*(A[0]-sx))/ar,w2=1-w0-w1;
+          if(w0<-.02||w1<-.02||w2<-.02)continue;const z=w0*A[2]+w1*B[2]+w2*C[2],k=y*S+x;if(z>buf[k])buf[k]=z}}}
+    const Q=[0,0,0];
+    recv.forEach((r,ri)=>{const a=acc[ri],ws=wsum[ri];for(let i=0;i<r.n;i++){let c=r.q[i*3]*d.x+r.q[i*3+1]*d.y+r.q[i*3+2]*d.z;const h=c<0?1:0;c=Math.abs(c);if(c<=.02)continue;
+      pr(r,i,Q);const x=Math.floor(Q[0]),y=Math.floor(Q[1]);if(x<0||y<0||x>=S||y>=S)continue;
+      const bias=.03+px*Math.min(3,.9/Math.max(c,.2));let top=-1e9;for(let yy=Math.max(0,y-1);yy<=Math.min(S-1,y+1);yy++)for(let xx=Math.max(0,x-1);xx<=Math.min(S-1,x+1);xx++){const b=buf[yy*S+xx];if(b>top)top=b}
+      const b0=buf[y*S+x],vis=Q[2]+bias>=b0?1:(Q[2]+bias*2.2>=top?.5:0);a[i*2+h]+=vis*c;ws[i*2+h]+=c}})}
+  const out=recv.map((r,ri)=>{const o=new Float32Array(r.n);for(let i=0;i<r.n;i++){const w=wsum[ri],a=acc[ri],v0=w[i*2]>0?a[i*2]/w[i*2]:0,v1=w[i*2+1]>0?a[i*2+1]/w[i*2+1]:0,vis=Math.max(v0,v1);o[i]=Math.min(.85,Math.max(0,(1-vis)*(opts.k||.95)))}return o});
+  recv.forEach((r,ri)=>{r.o.geometry.setAttribute('occ',new THREE.BufferAttribute(out[ri],1));aoPatch(r.o.material)});
+  if(cacheKey)AO_CACHE.set(cacheKey,out)}
 const MERGE_SKIP=new Set(['cs','gear','flame','nozG','canopyG','pilot']);
 function mergeGeos(ms){
   const names=Object.keys(ms[0].geometry.attributes);let nv=0,ni=0;
@@ -585,13 +631,13 @@ function mergeStatic(root){
     const by=new Map();
     for(const m of g.children){
       if(!m.isMesh||m.name||!m.geometry||!m.material||m.children.length||Array.isArray(m.material))continue;
-      const a=Object.keys(m.geometry.attributes);if(a.some(k=>k!=='position'&&k!=='normal'&&k!=='uv'))continue;
+      const a=Object.keys(m.geometry.attributes);if(a.some(k=>k!=='position'&&k!=='normal'&&k!=='uv'&&k!=='occ'))continue;
       const key=m.material.uuid+'|'+a.join(',');let l=by.get(key);if(!l)by.set(key,l=[]);l.push(m)}
     for(const l of by.values()){if(l.length<2)continue;const nm=new THREE.Mesh(mergeGeos(l),l[0].material);nm.castShadow=l[0].castShadow;nm.receiveShadow=l[0].receiveShadow;g.add(nm);for(const m of l)g.remove(m)}
   }
 }
-function buildJet(c,type){type=type||'F16';const r=withNav(buildJetBase(c,type),type);mergeStatic(r);
-  r.traverse(o=>{const m=o.material;if(m&&m.isMeshStandardMaterial&&!m.__ibl){m.__ibl=true;m.envMapIntensity=.75;if(m.roughness>.55){m.roughness=.48;m.metalness=Math.max(m.metalness,.22)}}});
+function buildJet(c,type){type=type||'F16';const r=withNav(buildJetBase(c,type),type);if(AO_ON)bakeAO(r,'jet:'+type);mergeStatic(r);
+  r.traverse(o=>{const m=o.material;if(m&&m.isMeshStandardMaterial&&!m.__ibl){m.__ibl=true;m.envMapIntensity=.62;if(m.metalness<.5&&!m.transparent){m.roughness=Math.max(m.roughness,.6);m.metalness=Math.min(m.metalness,.08)}}});   // matte military paint: no plastic sheen
   return dressFlames(r)}
 // per-aircraft size correction [across, up, along] so the lofted shapes match the real length and span; filled in the roster slice
 const M2K={};
@@ -5940,8 +5986,8 @@ const WAR_V={
   LEO2A4:{n:'Leopard 2A4',team:'blue',cls:'mbt',br:10.7,hp:8,spd:14,gun:[3100,5.5,1650,3,.0012],look:'box',barrel:6.2,col:0x55613f,hull:[3.5,1,7.7]},
   CHAL:{n:'Challenger Mk.2',team:'blue',cls:'mbt',br:10.3,hp:9,spd:11,gun:[3000,8,1500,3,.0013],look:'box',barrel:6.4,col:0x59603f,hull:[3.5,1.05,7.6]},
   M60A3:{n:'M60A3 TTS',team:'blue',cls:'mbt',br:9.0,hp:7,spd:12,gun:[2800,6.5,1490,2.5,.0016],look:'round',barrel:5.6,col:0x5f6a49,hull:[3.4,1,6.9]},
-  M3:{n:'M3 Bradley',team:'blue',cls:'ifv',br:8.3,hp:5,spd:17,gun:[2200,.3,1100,.35,.004],aa:[1500,3,.6],look:'ifv',barrel:2.4,col:0x58623f,hull:[3.0,1.3,6.4]},
-  MARDER:{n:'Marder 1A3',team:'blue',cls:'ifv',br:8.0,hp:5,spd:18,gun:[2000,.3,1050,.3,.004],aa:[1500,3,.5],look:'ifv',barrel:2.0,col:0x5b6244,hull:[3.1,1.2,6.7]},
+  M3:{n:'M3 Bradley',team:'blue',cls:'ifv',br:8.3,hp:5,spd:17,gun:[2200,.3,1100,.35,.004],aa:[1500,3,.6],look:'ifv',barrel:2.4,col:0x58623f,hull:[3.2,1.6,6.5]},
+  MARDER:{n:'Marder 1A3',team:'blue',cls:'ifv',br:8.0,hp:5,spd:18,gun:[2000,.3,1050,.3,.004],aa:[1500,3,.5],look:'ifv',barrel:2.0,col:0x5b6244,hull:[3.2,1.45,6.8]},
   GEPARD:{n:'Gepard 1A2',team:'blue',cls:'spaa',br:9.7,hp:5,spd:14,gun:[2500,.15,1175,.4,.006],aa:[4500,10,1.2],look:'gepard',barrel:3.2,col:0x55613f,hull:[3.4,1,7.2]},
   M163:{n:'M163 Vulcan',team:'blue',cls:'spaa',br:7.3,hp:3,spd:17,gun:[1800,.1,1030,.2,.008],aa:[2200,12,.7],look:'m163',barrel:1.6,col:0x5b6244,hull:[2.7,1.3,4.9]},
   T80B:{n:'T-80B',team:'red',cls:'mbt',br:10.7,hp:8,spd:15,gun:[3000,7,1780,3,.0013],look:'round',barrel:6.0,col:0x6a5f45,hull:[3.4,.9,6.9]},
@@ -5993,6 +6039,27 @@ function wMerge(list,mat){if(!list.length)return null;const n=list.reduce((a,g)=
   const G=new THREE.BufferGeometry();G.setAttribute('position',new THREE.BufferAttribute(pos,3));G.setAttribute('normal',new THREE.BufferAttribute(nor,3));return new THREE.Mesh(G,mat)}
 // a side-profile polygon (z, y) extruded across x: wedge hulls and sloped turrets
 function wPrism(pts,w){const sh=new THREE.Shape();pts.forEach((p,i)=>i?sh.lineTo(p[0],p[1]):sh.moveTo(p[0],p[1]));sh.closePath();const g=new THREE.ExtrudeGeometry(sh,{depth:w,bevelEnabled:false});g.translate(0,0,-w/2);g.rotateY(-Math.PI/2);return g}
+// a faceted armour block: plan polygon B (x, z pairs, convex, counter-clockwise from above) at y0 and the smaller roof polygon Tp at y1,
+// joined by flat sloped faces (welded turrets, glacis plates); both caps are fans
+function wSlab(B,Tp,y0,y1){const n=B.length,pos=[];const P=(p,y)=>[p[0],y,p[1]];
+  for(let i=0;i<n;i++){const j=(i+1)%n,a=P(B[i],y0),b=P(B[j],y0),c=P(Tp[j],y1),d=P(Tp[i],y1);pos.push(...a,...c,...b,...a,...d,...c)}
+  for(let i=1;i<n-1;i++){pos.push(...P(Tp[0],y1),...P(Tp[i+1],y1),...P(Tp[i],y1));pos.push(...P(B[0],y0),...P(B[i],y0),...P(B[i+1],y0))}
+  let cx=0,cy=0,cz=0;for(let i=0;i<pos.length;i+=3){cx+=pos[i];cy+=pos[i+1];cz+=pos[i+2]}const m=pos.length/3;cx/=m;cy/=m;cz/=m;
+  for(let i=0;i<pos.length;i+=9){const ax=pos[i+3]-pos[i],ay=pos[i+4]-pos[i+1],az=pos[i+5]-pos[i+2],bx=pos[i+6]-pos[i],by=pos[i+7]-pos[i+1],bz=pos[i+8]-pos[i+2];   // turn every face outward (convex solid)
+    const nx=ay*bz-az*by,ny=az*bx-ax*bz,nz=ax*by-ay*bx,ox=(pos[i]+pos[i+3]+pos[i+6])/3-cx,oy=(pos[i+1]+pos[i+4]+pos[i+7])/3-cy,oz=(pos[i+2]+pos[i+5]+pos[i+8])/3-cz;
+    if(nx*ox+ny*oy+nz*oz<0)for(let k=0;k<3;k++){const t=pos[i+3+k];pos[i+3+k]=pos[i+6+k];pos[i+6+k]=t}}
+  const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));g.computeVertexNormals();return g}
+// mirror a half outline (x >= 0, listed front to back) into a full counter-clockwise polygon
+const wHalf=h=>{const r=h.map(([x,z])=>[x,z]),l=h.slice().reverse().map(([x,z])=>[-x,z]);return r.concat(l)};
+// turret outlines [half plan at the ring, half plan on the roof, height]: front first, x is half-width, z forward
+const WAR_TUR={
+  'M1A1 Abrams':[[[1.25,2.55],[1.8,1.15],[1.85,-1.9],[1.7,-2.55],[1.5,-3.15]],[[1.05,2.25],[1.5,1.05],[1.55,-1.8],[1.45,-2.45],[1.3,-3.0]],.82],
+  'Leopard 2A4':[[[1.2,2.3],[1.75,.75],[1.75,-2.2],[1.55,-2.65]],[[1.15,2.2],[1.65,.7],[1.65,-2.1],[1.45,-2.55]],.95],
+  'Challenger Mk.2':[[[.95,2.45],[1.8,.9],[1.85,-2.1],[1.6,-2.8]],[[.7,2.0],[1.4,.8],[1.45,-2.0],[1.3,-2.6]],.92],
+  'Gepard 1A2':[[[1.3,1.9],[1.65,1.3],[1.65,-1.9]],[[1.1,1.6],[1.55,1.15],[1.55,-1.8]],1.3],
+  'M3 Bradley':[[[.75,1.15],[1.05,.6],[1.05,-1.25]],[[.55,.85],[.95,.5],[.95,-1.15]],.78],
+  'Marder 1A3':[[[.7,1.0],[.9,.5],[.9,-1.2]],[[.6,.85],[.8,.4],[.8,-1.1]],.62],
+  'ZSU-23-4M4':[[[1.25,1.35],[1.45,1.0],[1.45,-1.7]],[[1.15,.8],[1.4,.6],[1.4,-1.6]],1.15]};
 const wBox=(w,h,l)=>new THREE.BoxGeometry(w,h,l), wCyl=(r1,r2,h,n)=>new THREE.CylinderGeometry(r1,r2,h,n||10), wSph=()=>new THREE.SphereGeometry(1,14,9);
 const wBarrel=(r,len)=>new THREE.CylinderGeometry(r,r,len,8).rotateX(Math.PI/2).translate(0,0,len/2);
 function warBuild(d){
@@ -6000,11 +6067,16 @@ function warBuild(d){
   const hullG=[],sideL=[],sideR=[],turB=[],turD=[],gunG=[];
   const tier=d.look==='ifv'||d.look==='m163';
   // hull: sloped glacis and rear deck
-  const hp=d.look==='m163'?[[-L/2,.3],[-L/2,.3+H1],[L/2-1.0,.3+H1],[L/2,.3+H1*.6],[L/2,.3]]:tier?[[-L/2,.3],[-L/2,.3+H1],[L/2-1.5,.3+H1],[L/2,.3+H1*.55],[L/2,.3]]:[[-L/2,.3],[-L/2,.3+H1*.92],[-L/2+1.8,.3+H1],[L/2-2.0,.3+H1],[L/2,.3+H1*.5],[L/2,.3]];
-  const tW=.78,tX=W/2-.42,yTop=1.16;   // track width, track centre line, top of the track run
-  wPart(hullG,wPrism(hp,W-2*tW+.1),0,0,0);   // lower hull between the tracks
-  {const sp=hp.map(([z,y])=>[z,Math.max(y,yTop+.02)]);for(const sd of [-1,1])wPart(hullG,wPrism(sp,tW+.08),sd*tX,0,0)}   // sponsons over the tracks
-  for(const sd of [-1,1])wPart(hullG,wBox(tW+.12,.04,L+.35),sd*tX,yTop+.03,0);   // fenders
+  const tW=.78,tX=W/2-.42,yTop=1.16,yH=.3+H1;   // track width, track centre line, top of the track run, hull roof
+  const sov=d.team==='red',ifv=d.look==='ifv',brad=d.n.indexOf('Bradley')>=0,bmp=d.n.indexOf('BMP')===0;
+  // upper hull (full width, over the tracks): rear plate, engine deck, roof, then the upper glacis down to the nose at track-top height
+  const gl=sov&&d.cls!=='mbt'?2.6:sov?2.15:d.look==='m163'?1.1:ifv?(brad?1.45:2.1):d.look==='box'?1.75:1.6;
+  const up=[[-L/2,yTop-.06],[-L/2,yH-.12],[-L/2+.25,yH],[L/2-gl,yH],[L/2-.08,yTop+.04],[L/2,yTop-.06]];
+  wPart(hullG,wPrism(up,W),0,0,0);
+  // lower hull between the tracks: lower glacis and belly
+  const lw=W-2*tW+.1,lo=[[-L/2+.35,.32],[-L/2,.62],[-L/2,yTop],[L/2,yTop],[L/2-(sov?.75:.95),.32]];
+  wPart(hullG,wPrism(lo,lw),0,0,0);
+  if(bmp)for(let k=0;k<6;k++)wPart(hullG,wBox(W-.6,.05,.08),0,yTop+.05+k*(yH-yTop)/6,L/2-.12-k*(gl-.1)/6);   // BMP's ribbed bow (trim vane plates)
   if(!tier||d.look==='m163'){wPart(sideL,wBox(W*.55,.05,1.7),0,.3+H1+.04,-L/2+1.3);}                                       // engine deck grille (hull frame, dark)
   // running gear: road wheels, sprocket, idler, track runs and skirts, one merged mesh per side
   const nW=tier?5:6;
@@ -6024,9 +6096,14 @@ function warBuild(d){
   const top={v:1};
   switch(d.look){
     case 'box':{
-      if(d.n.indexOf('Abrams')>=0){wPart(T,wPrism([[-2.5,0],[-2.5,.92],[-.7,1.06],[1.0,.96],[2.0,.72],[2.3,.35],[2.3,0]],3.3),0,0,0);wPart(T,wBox(3.2,.8,1.1),0,.45,-2.75);wPart(T,wBox(.7,.3,.9),-.75,1.1,-.3);wPart(T,wCyl(.42,.46,.3,14),.75,1.15,-.2);wPart(T,wBox(1.0,.7,.4),0,.5,2.35);top.v=1.2}
-      else if(d.n.indexOf('Leopard')>=0){wPart(T,wPrism([[-2.4,0],[-2.4,.95],[1.7,.95],[2.15,.78],[2.15,0]],3.4),0,0,0);for(const s of [-1,1])wPart(T,wBox(.55,.78,1.5),s*1.55,.45,1.55,0,-s*.55);wPart(T,wBox(3.1,.7,1.0),0,.45,-2.75);wPart(T,wCyl(.4,.44,.3,14),.8,1.1,-.2);wPart(T,wBox(.9,.6,.4),0,.5,2.2);top.v=1.05}
-      else{wPart(T,wPrism([[-2.6,0],[-2.6,.98],[1.4,1.05],[2.25,.78],[2.25,0]],3.5),0,0,0);wPart(T,wBox(3.3,.85,1.4),0,.5,-2.9);wPart(T,wCyl(.42,.46,.3,14),.8,1.18,-.4);wPart(T,wBox(1.1,.7,.4),0,.5,2.3);top.v=1.15}
+      const tt=WAR_TUR[d.n],h=tt[2];wPart(T,wSlab(wHalf(tt[0]),wHalf(tt[1]),0,h),0,0,0);top.v=h;
+      wPart(T,wCyl(.4,.44,.28,14),.75,h+.14,-.35);wPart(TD,wCyl(.28,.28,.06,12),.75,h+.31,-.35);   // commander's cupola and hatch
+      wPart(TD,wCyl(.3,.3,.06,12),-.75,h+.03,-.5);   // loader's hatch
+      wPart(TD,wBox(.42,.32,.36),-.62,h+.16,1.25);wPart(TD,wBox(.34,.2,.02),-.62,h+.2,1.44);   // gunner's primary sight on the roof
+      wPart(T,wSlab(wHalf([[.55,.3],[.6,-.3]]),wHalf([[.45,.22],[.5,-.24]]),-.32,.32),0,d.gy,d.gz);   // gun mantlet
+      if(d.n.indexOf('Abrams')>=0){wPart(TD,wBox(3.1,.5,.06),0,h*.55,-3.35);for(let k=0;k<5;k++)wPart(TD,wBox(.04,.5,.75),-1.4+k*.7,h*.55,-3.0)}   // bustle rack
+      if(d.n.indexOf('Chall')>=0){wPart(TD,wBox(.5,.42,.5),.95,h+.2,.4);wPart(TD,wBox(1.4,.4,.5),0,h*.5,-3.0)}   // TOGS barrel box, rear stowage
+      for(const s of [-1,1])wPart(TD,wCyl(.012,.012,2.4,4),s*1.2,h+1.2,-2.2);   // radio whip antennae
       break}
     case 'round':{
       const m60=d.n.indexOf('M60')>=0,dome=new THREE.LatheGeometry([[0,0],[1.55,0],[1.6,.12],[1.52,.42],[1.3,.66],[.9,.8],[0,.84]].map(([x,y])=>new THREE.Vector2(x,y)),24);
@@ -6037,22 +6114,22 @@ function warBuild(d){
       top.v=m60?1.15:1.07;break}
     case 'ifv':{
       const brad=d.n.indexOf('Bradley')>=0,mard=d.n.indexOf('Marder')>=0;
-      if(!brad&&!mard)wPart(T,wCyl(.78,1.12,.62,10),.3,.31,-.1);else wPart(T,wBox(brad?1.9:1.7,.85,2.0),brad?-.4:.35,.42,-.2);   // BMP-2: a low conical two-man turretif(brad)wPart(TD,wBox(.7,.55,1.2),.95,.8,-.4);else if(mard)wPart(TD,wBox(.5,.4,.8),-.1,.9,-.3);else wPart(TD,wBox(.3,.35,.9),-.5,1.0,.1);
+      if(!brad&&!mard)wPart(T,wCyl(.78,1.12,.62,10),.3,.31,-.1);else{const tt=WAR_TUR[d.n];wPart(T,wSlab(wHalf(tt[0]),wHalf(tt[1]),0,tt[2]),brad?-.3:.35,0,-.1)}   // BMP-2: a low conical two-man turretif(brad)wPart(TD,wBox(.7,.55,1.2),.95,.8,-.4);else if(mard)wPart(TD,wBox(.5,.4,.8),-.1,.9,-.3);else wPart(TD,wBox(.3,.35,.9),-.5,1.0,.1);
       wPart(TD,wCyl(.3,.3,.18,8),brad?-.4:.35,brad||mard?.9:.68,-.3);top.v=brad||mard?.9:.72;break}
     case 'gepard':{
-      wPart(T,wPrism([[-1.9,0],[-1.9,1.25],[1.1,1.35],[1.9,.95],[1.9,0]],3.3),0,0,0);
+      {const tt=WAR_TUR[d.n];wPart(T,wSlab(wHalf(tt[0]),wHalf(tt[1]),0,tt[2]),0,0,0)}
       wPart(TD,wCyl(.06,.06,1.0,6),0,1.8,-1.0);wPart(TD,wCyl(.95,.95,.14,16),0,2.4,-1.0,Math.PI/2.4);wPart(TD,wCyl(.42,.42,.14,12),0,1.55,1.4,Math.PI/2.1);
       for(const s of [-1,1])wPart(TD,wBox(.3,.35,.9),s*1.35,.6,1.2);top.v=1.4;break}
     case 'm163':{
       wPart(T,wCyl(.95,1.0,.65,14),0,.3,0);wPart(T,wBox(.15,.8,1.2),.9,.7,.3);wPart(T,wBox(.15,.8,1.2),-.9,.7,.3);wPart(TD,wBox(1.3,.3,.8),0,.5,-.8);top.v=.8;break}
     case 'zsu23':{
-      wPart(T,wBox(2.9,1.2,2.9),0,.6,-.2);wPart(T,wBox(2.6,.2,1.0),0,1.25,.9,-.35);wPart(TD,wCyl(.06,.06,.8,6),0,1.6,-1.0);wPart(TD,wCyl(.85,.85,.14,14),0,2.1,-1.1,Math.PI/2.3);top.v=1.4;break}
+      {const tt=WAR_TUR[d.n];wPart(T,wSlab(wHalf(tt[0]),wHalf(tt[1]),0,tt[2]),0,0,-.2)}wPart(TD,wCyl(.06,.06,.8,6),0,1.6,-1.0);wPart(TD,wCyl(.85,.85,.14,14),0,2.1,-1.1,Math.PI/2.3);top.v=1.4;break}
     default:{   // ZSU-57-2: open-topped turret with thin walls
       for(const s of [-1,1])wPart(T,wBox(.12,.9,3.0),s*1.4,.45,-.2);wPart(T,wBox(2.9,.9,.12),0,.45,-1.7);wPart(T,wBox(2.9,.5,.12),0,.3,1.3);wPart(TD,wBox(2.6,.1,2.6),0,.05,-.2);top.v=.9}}
-  if(d.team==='blue'&&d.cls==='mbt')for(const sd of [-1,1])wPart(T,wBox(.35,.45,1.6),sd*1.85,.4,-1.2);   // stowage bins on the turret sides
-  if(d.cls==='mbt'){if(d.look==='box')wPart(T,wBox(.8,.5,.3),0,d.gy,d.gz-.08);   // gun mantlet (cast turrets take the gun straight through the dome)
+  if(d.team==='blue'&&d.cls==='mbt'&&d.look==='box'){const tt=WAR_TUR[d.n];const xs=tt[0][2][0];for(const sd of [-1,1])wPart(T,wBox(.32,.42,1.5),sd*(xs+.14),.42,-1.2)}   // stowage bins on the turret sides
+  if(d.cls==='mbt'){
     wPart(TD,wBarrel(.025,1.1),.7,top.v+.18,-.2);wPart(TD,wBox(.12,.14,.4),.7,top.v+.14,-.25);   // commander's machine gun on its mount
-    if(d.look==='box')for(const sd of [-1,1])for(let i=0;i<4;i++)wPart(TD,wCyl(.06,.06,.32,6),sd*(1.0+i*.13),.62,1.75,-1.1,0,0);}   // smoke grenade launchers
+    if(d.look==='box'){const tt=WAR_TUR[d.n],c=tt[0][1];for(const sd of [-1,1])for(let i=0;i<4;i++)wPart(TD,wCyl(.06,.06,.32,6),sd*(c[0]+.08),tt[2]*.55+i*.0,c[1]-.25-i*.16,-1.0,0,0)}}   // smoke grenade launchers on the turret cheeks
   // gun: barrel(s) in their own group so they can elevate and recoil
   const gg=new THREE.Group();gg.position.set(0,d.gy,d.gz);
   if(d.look==='gepard')for(const s of [-1,1]){wPart(gunG,wBarrel(.075,d.barrel),s*1.35,d.gy*0-.15,-d.gz+1.2);wPart(gunG,wCyl(.1,.1,.35,8).rotateX(Math.PI/2),s*1.35,-.15,-d.gz+1.2+d.barrel,0,0,0)}
@@ -6068,6 +6145,7 @@ function warBuild(d){
   const tur=new THREE.Group();tur.position.y=yT;
   g.add(hull);g.add(sl);g.add(sr);g.add(tur);tur.add(tb);if(td)tur.add(td);tur.add(gg);if(gn)gg.add(gn);
   const mk=new THREE.Mesh(new THREE.PlaneGeometry(1.6,1.6).rotateX(-Math.PI/2),new THREE.MeshBasicMaterial({color:d.team==='blue'?0x2b8cff:0xff3b30,side:THREE.DoubleSide}));mk.name='mk';mk.position.set(0,top.v+.05,-.3);tur.add(mk);   // roof panel: readable from the air
+  if(AO_ON)bakeAO(g,'war:'+d.n,{res:112,k:1.05});   // baked ambient occlusion, once per vehicle type
   g.userData={tur,gun:gg,gz:d.gz,sl,sr,yT,L};return g}
 function warSpawn(id,x,z,heading){
   const d=WAR_V[id],obj=warBuild(d);obj.position.set(x,Math.max(groundH(x,z),0)+.2,z);obj.rotation.y=heading;scene.add(obj);

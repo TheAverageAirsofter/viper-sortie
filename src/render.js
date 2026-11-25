@@ -321,6 +321,52 @@ function withNav(root,type){const D=AC_DEFS[type];if(D&&D.fx&&D.fx.nav){const [s
   [[span,0,f?-2.2:-1.5,0],[-span,0,f?-2.2:-1.5,1],[0,f?3.6:2.6,tail,2]].forEach(([x,y,z,i])=>{const m=new THREE.Mesh(NAVG,NAVM[i]);m.position.set(x,y,z);m.name='nav';root.children[0].add(m)});return root}
 /* draw-call diet: unnamed static meshes that share a material inside one group (fuselage panels, strips, missile parts) become one mesh. Named parts
    (control surfaces, gear, canopy, nozzles, flame, wingM, decals...) stay separate so animation, damage and level of detail still find them. */
+/* baked ambient occlusion: each opaque mesh of a model gets a per-vertex 'occ' attribute (0 open sky .. 1 fully enclosed), found by
+   rasterising the whole model into small depth buffers from ~40 directions on a sphere and testing every vertex against them.
+   Materials read it through aoPatch (missing attribute = 0, so unbaked meshes sharing a material are unaffected). Cached per key. */
+let AO_ON=!/[?&]noao\b/.test(location.search);const AO_CACHE=new Map(),AO_DIRS=(()=>{const n=40,o=[],ga=Math.PI*(3-Math.sqrt(5));for(let i=0;i<n;i++){const y=1-2*(i+.5)/n,r=Math.sqrt(1-y*y),a=i*ga;o.push(new THREE.Vector3(Math.cos(a)*r,y,Math.sin(a)*r))}return o})();
+function aoPatch(m){if(!m||m.__ao||m.isMeshBasicMaterial||m.transparent||m.blending===THREE.AdditiveBlending)return;m.__ao=true;
+  const prev=m.onBeforeCompile,key=m.customProgramCacheKey?m.customProgramCacheKey():'';
+  m.onBeforeCompile=(sh,r)=>{if(prev)prev.call(m,sh,r);
+    sh.vertexShader=sh.vertexShader.replace('#include <common>','#include <common>\nattribute float occ;varying float vOcc;').replace('#include <begin_vertex>','#include <begin_vertex>\nvOcc=occ;');
+    sh.fragmentShader=sh.fragmentShader.replace('#include <common>','#include <common>\nvarying float vOcc;')
+      .replace('#include <aomap_fragment>','#include <aomap_fragment>\n {float aoK=clamp(1.-vOcc,0.,1.);aoK*=aoK*(3.-2.*aoK)*.35+aoK*.65;reflectedLight.indirectDiffuse*=aoK;reflectedLight.indirectSpecular*=aoK;reflectedLight.directDiffuse*=mix(1.,aoK,.4);reflectedLight.directSpecular*=mix(1.,aoK,.7);}')};
+  m.customProgramCacheKey=()=>key+'|ao';m.needsUpdate=true}
+function bakeAO(root,cacheKey,opts){opts=opts||{};const res=opts.res||128;
+  root.updateMatrixWorld(true);const inv=new THREE.Matrix4().copy(root.matrixWorld).invert(),M=new THREE.Matrix4(),v=new THREE.Vector3(),nm=new THREE.Matrix3();
+  const shown=o=>{for(let q=o;q&&q!==root;q=q.parent)if(!q.visible)return false;return true};
+  const meshes=[];root.traverse(o=>{if(!o.isMesh||!o.geometry||!o.geometry.attributes.position||Array.isArray(o.material))return;const m=o.material;
+    if(m.transparent||m.isMeshBasicMaterial||m.blending===THREE.AdditiveBlending||o.name==='decal'||o.isInstancedMesh)return;meshes.push(o)});
+  const cached=cacheKey&&AO_CACHE.get(cacheKey);
+  if(cached&&cached.length===meshes.length&&meshes.every((o,i)=>o.geometry.attributes.position.count*1===cached[i].length)){
+    meshes.forEach((o,i)=>{o.geometry.setAttribute('occ',new THREE.BufferAttribute(cached[i],1));aoPatch(o.material)});return}
+  // gather every mesh in root space: receivers get occ, visible ones also occlude
+  const recv=meshes.map(o=>{M.multiplyMatrices(inv,o.matrixWorld);nm.getNormalMatrix(M);const g=o.geometry,P=g.attributes.position,N=g.attributes.normal,n=P.count,p=new Float32Array(n*3),q=new Float32Array(n*3);
+    for(let i=0;i<n;i++){v.fromBufferAttribute(P,i).applyMatrix4(M);p[i*3]=v.x;p[i*3+1]=v.y;p[i*3+2]=v.z;if(N){v.fromBufferAttribute(N,i).applyMatrix3(nm).normalize();q[i*3]=v.x;q[i*3+1]=v.y;q[i*3+2]=v.z}}
+    return{o,p,q,n,idx:g.index?g.index.array:null,occ:shown(o),ds:!!(o.material.side===THREE.DoubleSide)}});
+  let cx=0,cy=0,cz=0,cnt=0;for(const r of recv)for(let i=0;i<r.n;i++){cx+=r.p[i*3];cy+=r.p[i*3+1];cz+=r.p[i*3+2];cnt++}cx/=cnt||1;cy/=cnt||1;cz/=cnt||1;
+  let R=0;for(const r of recv)for(let i=0;i<r.n;i++)R=Math.max(R,Math.hypot(r.p[i*3]-cx,r.p[i*3+1]-cy,r.p[i*3+2]-cz));R=R*1.02+.01;
+  const S=res,px=2*R/S,buf=new Float32Array(S*S),acc=recv.map(r=>new Float32Array(r.n*2)),wsum=recv.map(r=>new Float32Array(r.n*2));   // two hemispheres per vertex: generated normals may point either way
+  const U=new THREE.Vector3(),W=new THREE.Vector3();
+  for(const d of AO_DIRS){U.set(Math.abs(d.y)<.9?0:1,Math.abs(d.y)<.9?1:0,0).cross(d).normalize();W.crossVectors(d,U);
+    buf.fill(-1e9);
+    const pr=(r,i,o)=>{const x=r.p[i*3]-cx,y=r.p[i*3+1]-cy,z=r.p[i*3+2]-cz;o[0]=(x*U.x+y*U.y+z*U.z+R)/px;o[1]=(x*W.x+y*W.y+z*W.z+R)/px;o[2]=x*d.x+y*d.y+z*d.z};
+    const A=[0,0,0],B=[0,0,0],C=[0,0,0];
+    for(const r of recv){if(!r.occ)continue;const tri=r.idx?r.idx.length/3:r.n/3;
+      for(let t=0;t<tri;t++){const ia=r.idx?r.idx[t*3]:t*3,ib=r.idx?r.idx[t*3+1]:t*3+1,ic=r.idx?r.idx[t*3+2]:t*3+2;pr(r,ia,A);pr(r,ib,B);pr(r,ic,C);
+        const x0=Math.max(0,Math.floor(Math.min(A[0],B[0],C[0]))),x1=Math.min(S-1,Math.ceil(Math.max(A[0],B[0],C[0]))),y0=Math.max(0,Math.floor(Math.min(A[1],B[1],C[1]))),y1=Math.min(S-1,Math.ceil(Math.max(A[1],B[1],C[1])));
+        const ar=(B[0]-A[0])*(C[1]-A[1])-(B[1]-A[1])*(C[0]-A[0]);if(Math.abs(ar)<1e-9){const z=Math.max(A[2],B[2],C[2]),k=Math.min(S-1,Math.max(0,Math.round(A[1])))*S+Math.min(S-1,Math.max(0,Math.round(A[0])));if(z>buf[k])buf[k]=z;continue}
+        for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++){const sx=x+.5,sy=y+.5;
+          let w0=((B[0]-sx)*(C[1]-sy)-(B[1]-sy)*(C[0]-sx))/ar,w1=((C[0]-sx)*(A[1]-sy)-(C[1]-sy)*(A[0]-sx))/ar,w2=1-w0-w1;
+          if(w0<-.02||w1<-.02||w2<-.02)continue;const z=w0*A[2]+w1*B[2]+w2*C[2],k=y*S+x;if(z>buf[k])buf[k]=z}}}
+    const Q=[0,0,0];
+    recv.forEach((r,ri)=>{const a=acc[ri],ws=wsum[ri];for(let i=0;i<r.n;i++){let c=r.q[i*3]*d.x+r.q[i*3+1]*d.y+r.q[i*3+2]*d.z;const h=c<0?1:0;c=Math.abs(c);if(c<=.02)continue;
+      pr(r,i,Q);const x=Math.floor(Q[0]),y=Math.floor(Q[1]);if(x<0||y<0||x>=S||y>=S)continue;
+      const bias=.03+px*Math.min(3,.9/Math.max(c,.2));let top=-1e9;for(let yy=Math.max(0,y-1);yy<=Math.min(S-1,y+1);yy++)for(let xx=Math.max(0,x-1);xx<=Math.min(S-1,x+1);xx++){const b=buf[yy*S+xx];if(b>top)top=b}
+      const b0=buf[y*S+x],vis=Q[2]+bias>=b0?1:(Q[2]+bias*2.2>=top?.5:0);a[i*2+h]+=vis*c;ws[i*2+h]+=c}})}
+  const out=recv.map((r,ri)=>{const o=new Float32Array(r.n);for(let i=0;i<r.n;i++){const w=wsum[ri],a=acc[ri],v0=w[i*2]>0?a[i*2]/w[i*2]:0,v1=w[i*2+1]>0?a[i*2+1]/w[i*2+1]:0,vis=Math.max(v0,v1);o[i]=Math.min(.85,Math.max(0,(1-vis)*(opts.k||.95)))}return o});
+  recv.forEach((r,ri)=>{r.o.geometry.setAttribute('occ',new THREE.BufferAttribute(out[ri],1));aoPatch(r.o.material)});
+  if(cacheKey)AO_CACHE.set(cacheKey,out)}
 const MERGE_SKIP=new Set(['cs','gear','flame','nozG','canopyG','pilot']);
 function mergeGeos(ms){
   const names=Object.keys(ms[0].geometry.attributes);let nv=0,ni=0;
@@ -341,13 +387,13 @@ function mergeStatic(root){
     const by=new Map();
     for(const m of g.children){
       if(!m.isMesh||m.name||!m.geometry||!m.material||m.children.length||Array.isArray(m.material))continue;
-      const a=Object.keys(m.geometry.attributes);if(a.some(k=>k!=='position'&&k!=='normal'&&k!=='uv'))continue;
+      const a=Object.keys(m.geometry.attributes);if(a.some(k=>k!=='position'&&k!=='normal'&&k!=='uv'&&k!=='occ'))continue;
       const key=m.material.uuid+'|'+a.join(',');let l=by.get(key);if(!l)by.set(key,l=[]);l.push(m)}
     for(const l of by.values()){if(l.length<2)continue;const nm=new THREE.Mesh(mergeGeos(l),l[0].material);nm.castShadow=l[0].castShadow;nm.receiveShadow=l[0].receiveShadow;g.add(nm);for(const m of l)g.remove(m)}
   }
 }
-function buildJet(c,type){type=type||'F16';const r=withNav(buildJetBase(c,type),type);mergeStatic(r);
-  r.traverse(o=>{const m=o.material;if(m&&m.isMeshStandardMaterial&&!m.__ibl){m.__ibl=true;m.envMapIntensity=.75;if(m.roughness>.55){m.roughness=.48;m.metalness=Math.max(m.metalness,.22)}}});
+function buildJet(c,type){type=type||'F16';const r=withNav(buildJetBase(c,type),type);if(AO_ON)bakeAO(r,'jet:'+type);mergeStatic(r);
+  r.traverse(o=>{const m=o.material;if(m&&m.isMeshStandardMaterial&&!m.__ibl){m.__ibl=true;m.envMapIntensity=.62;if(m.metalness<.5&&!m.transparent){m.roughness=Math.max(m.roughness,.6);m.metalness=Math.min(m.metalness,.08)}}});   // matte military paint: no plastic sheen
   return dressFlames(r)}
 // per-aircraft size correction [across, up, along] so the lofted shapes match the real length and span; filled in the roster slice
 const M2K={};
