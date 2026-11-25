@@ -15,6 +15,7 @@ function pickTarget(e){
   }
   // blue wingman / flight
   if(e.cmd==='REJOIN')return null;
+  if(e.cmd==='ATTACK'){const t=wingTarget();if(t)return t}
   if(e.cmd==='GROUND'){let best=null,bd=80000;for(const g of ground){if(!g.alive)continue;const d=g.pos.distanceTo(e.pos);if(d<bd){bd=d;best=g}}if(best)return best}
   if(e.cmd==='SORT'){const taken=new Set(friends.filter(f=>f!==e&&f.alive&&f.cmd==='SORT'&&f.tgt).map(f=>f.tgt));if(lockTarget)taken.add(lockTarget);
     let best=null,bd=60000;for(const r of enemies){if(!r.alive||taken.has(r))continue;const d=r.pos.distanceTo(e.pos);if(d<bd){bd=d;best=r}}if(best)return best}

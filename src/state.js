@@ -387,13 +387,19 @@ function killFriend(f,how){
   if(isBT())btLoss('blue');
   message(f.kind==='transport'?'C-130 DESTROYED':'WINGMAN DOWN',2.2); recEvent((f.kind==='transport'?'The C-130':'Your wingman')+' was shot down ('+how+')');
 }
-const WCMDS=['ENGAGE','COVER','REJOIN','SORT','GROUND'], WSHORT={ENGAGE:'ENG',COVER:'COVER',REJOIN:'REJN',SORT:'SORT',GROUND:'GRND'};
+const WCMDS=['ATTACK','ENGAGE','COVER','REJOIN','SORT','GROUND'], WSHORT={ATTACK:'ATK',ENGAGE:'ENG',COVER:'COVER',REJOIN:'REJN',SORT:'SORT',GROUND:'GRND'};
+const WNAMES={ATTACK:'Attack my target',ENGAGE:'Engage',COVER:'Cover me',SORT:'Sort · one each',GROUND:'Hit ground targets',REJOIN:'Rejoin'};
+const wingTarget=()=>(lockTarget&&lockTarget.alive&&lockTarget.team!=='blue'&&lockTarget)||(AG.tgt&&AG.tgt.alive&&AG.tgt)||null;
 function syncWing(){const w=friends.filter(f=>f.kind==='fighter'&&f.alive&&!f.remote);$('nWing').textContent=w.length?WSHORT[w[0].cmd]||'ENG':'—'}
-function wingCmd(){const fl=friends.filter(f=>f.kind==='fighter'&&f.alive&&!f.remote);if(!fl.length)return;
-  let i=WCMDS.indexOf(fl[0].cmd); do{i=(i+1)%WCMDS.length}while(WCMDS[i]==='GROUND'&&!ground.some(g=>g.alive));
-  const c=WCMDS[i]; for(const w of fl){w.cmd=c;w.retgtT=0;w.engaged=c==='ENGAGE'||c==='SORT'||c==='GROUND'}
-  const who=fl.length>1?'FLIGHT':'TWO', txt={ENGAGE:who+', ENGAGE',COVER:who+', COVER ME',REJOIN:who+', REJOIN',SORT:who+', SORT · ONE TARGET EACH',GROUND:who+', ATTACK THE GROUND TARGETS'}[c];
-  message(txt,1.4); radio(fl.map(w=>w.cs||2).join(', ')+(c==='REJOIN'?', rejoining.':', copy.'),'wing'); syncWing()}
+function wingCmd(){const fl=friends.filter(f=>f.kind==='fighter'&&f.alive&&!f.remote);if(!fl.length)return;   // cycle (key / gamepad)
+  let i=WCMDS.indexOf(fl[0].cmd); do{i=(i+1)%WCMDS.length}while((WCMDS[i]==='GROUND'&&!ground.some(g=>g.alive))||(WCMDS[i]==='ATTACK'&&!wingTarget()));
+  wingSet(WCMDS[i])}
+function wingSet(c){const fl=friends.filter(f=>f.kind==='fighter'&&f.alive&&!f.remote);if(!fl.length)return;
+  if(c==='ATTACK'&&!wingTarget()){message('LOCK A TARGET FIRST',1.2);return}
+  const tg=c==='ATTACK'?wingTarget():null;
+  for(const w of fl){w.cmd=c;w.retgtT=0;w.tgt=tg||w.tgt;w.engaged=c!=='COVER'&&c!=='REJOIN'}
+  const who=fl.length>1?'FLIGHT':'TWO', txt={ATTACK:who+', ATTACK MY TARGET',ENGAGE:who+', ENGAGE',COVER:who+', COVER ME',REJOIN:who+', REJOIN',SORT:who+', SORT · ONE TARGET EACH',GROUND:who+', ATTACK THE GROUND TARGETS'}[c];
+  message(txt,1.4); radio(fl.map(w=>w.cs||2).join(', ')+(c==='REJOIN'?', rejoining.':c==='ATTACK'?', engaging your target.':', copy.'),'wing'); syncWing()}
 function endMission(win,text){
   if(missionDone)return; missionDone=true; deathCause=win?'win':'fail'; missionText=text; recEvent(text);
   state='dead'; deadT=2.2; $('ctrls').hidden=true; resetStick(); gunHeld=false; brake=false;

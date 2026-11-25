@@ -700,6 +700,10 @@ button:disabled{opacity:.4;cursor:not-allowed}
 #ov .pt:disabled:not(.got){opacity:.45}
 body.tankmode #rdr,body.tankmode #cm,body.tankmode #thr{display:none}
 
+#wingMenu{position:fixed;z-index:30;display:flex;flex-direction:column;gap:4px;width:220px}
+#wingMenu .btn{position:static;width:100%;height:auto;min-height:34px;padding:6px 10px;border-radius:0;text-align:left;font:700 12px/1.2 var(--f-body,inherit);letter-spacing:.06em;text-transform:uppercase}
+#wingMenu .btn.on{outline:2px solid var(--hud)}
+#wingMenu .btn:disabled{opacity:.4}
 </style>
 <meta name="theme-color" content="#0b1217">
 
@@ -5765,13 +5769,19 @@ function killFriend(f,how){
   if(isBT())btLoss('blue');
   message(f.kind==='transport'?'C-130 DESTROYED':'WINGMAN DOWN',2.2); recEvent((f.kind==='transport'?'The C-130':'Your wingman')+' was shot down ('+how+')');
 }
-const WCMDS=['ENGAGE','COVER','REJOIN','SORT','GROUND'], WSHORT={ENGAGE:'ENG',COVER:'COVER',REJOIN:'REJN',SORT:'SORT',GROUND:'GRND'};
+const WCMDS=['ATTACK','ENGAGE','COVER','REJOIN','SORT','GROUND'], WSHORT={ATTACK:'ATK',ENGAGE:'ENG',COVER:'COVER',REJOIN:'REJN',SORT:'SORT',GROUND:'GRND'};
+const WNAMES={ATTACK:'Attack my target',ENGAGE:'Engage',COVER:'Cover me',SORT:'Sort · one each',GROUND:'Hit ground targets',REJOIN:'Rejoin'};
+const wingTarget=()=>(lockTarget&&lockTarget.alive&&lockTarget.team!=='blue'&&lockTarget)||(AG.tgt&&AG.tgt.alive&&AG.tgt)||null;
 function syncWing(){const w=friends.filter(f=>f.kind==='fighter'&&f.alive&&!f.remote);$('nWing').textContent=w.length?WSHORT[w[0].cmd]||'ENG':'—'}
-function wingCmd(){const fl=friends.filter(f=>f.kind==='fighter'&&f.alive&&!f.remote);if(!fl.length)return;
-  let i=WCMDS.indexOf(fl[0].cmd); do{i=(i+1)%WCMDS.length}while(WCMDS[i]==='GROUND'&&!ground.some(g=>g.alive));
-  const c=WCMDS[i]; for(const w of fl){w.cmd=c;w.retgtT=0;w.engaged=c==='ENGAGE'||c==='SORT'||c==='GROUND'}
-  const who=fl.length>1?'FLIGHT':'TWO', txt={ENGAGE:who+', ENGAGE',COVER:who+', COVER ME',REJOIN:who+', REJOIN',SORT:who+', SORT · ONE TARGET EACH',GROUND:who+', ATTACK THE GROUND TARGETS'}[c];
-  message(txt,1.4); radio(fl.map(w=>w.cs||2).join(', ')+(c==='REJOIN'?', rejoining.':', copy.'),'wing'); syncWing()}
+function wingCmd(){const fl=friends.filter(f=>f.kind==='fighter'&&f.alive&&!f.remote);if(!fl.length)return;   // cycle (key / gamepad)
+  let i=WCMDS.indexOf(fl[0].cmd); do{i=(i+1)%WCMDS.length}while((WCMDS[i]==='GROUND'&&!ground.some(g=>g.alive))||(WCMDS[i]==='ATTACK'&&!wingTarget()));
+  wingSet(WCMDS[i])}
+function wingSet(c){const fl=friends.filter(f=>f.kind==='fighter'&&f.alive&&!f.remote);if(!fl.length)return;
+  if(c==='ATTACK'&&!wingTarget()){message('LOCK A TARGET FIRST',1.2);return}
+  const tg=c==='ATTACK'?wingTarget():null;
+  for(const w of fl){w.cmd=c;w.retgtT=0;w.tgt=tg||w.tgt;w.engaged=c!=='COVER'&&c!=='REJOIN'}
+  const who=fl.length>1?'FLIGHT':'TWO', txt={ATTACK:who+', ATTACK MY TARGET',ENGAGE:who+', ENGAGE',COVER:who+', COVER ME',REJOIN:who+', REJOIN',SORT:who+', SORT · ONE TARGET EACH',GROUND:who+', ATTACK THE GROUND TARGETS'}[c];
+  message(txt,1.4); radio(fl.map(w=>w.cs||2).join(', ')+(c==='REJOIN'?', rejoining.':c==='ATTACK'?', engaging your target.':', copy.'),'wing'); syncWing()}
 function endMission(win,text){
   if(missionDone)return; missionDone=true; deathCause=win?'win':'fail'; missionText=text; recEvent(text);
   state='dead'; deadT=2.2; $('ctrls').hidden=true; resetStick(); gunHeld=false; brake=false;
@@ -6281,6 +6291,7 @@ function pickTarget(e){
   }
   // blue wingman / flight
   if(e.cmd==='REJOIN')return null;
+  if(e.cmd==='ATTACK'){const t=wingTarget();if(t)return t}
   if(e.cmd==='GROUND'){let best=null,bd=80000;for(const g of ground){if(!g.alive)continue;const d=g.pos.distanceTo(e.pos);if(d<bd){bd=d;best=g}}if(best)return best}
   if(e.cmd==='SORT'){const taken=new Set(friends.filter(f=>f!==e&&f.alive&&f.cmd==='SORT'&&f.tgt).map(f=>f.tgt));if(lockTarget)taken.add(lockTarget);
     let best=null,bd=60000;for(const r of enemies){if(!r.alive||taken.has(r))continue;const d=r.pos.distanceTo(e.pos);if(d<bd){bd=d;best=r}}if(best)return best}
@@ -8635,7 +8646,14 @@ function renderLd(){
   $('ldSum').textContent=`Stations ${ldUsed(v)}/${c.hp+c.extra} · take-off weight ${(m/1000).toFixed(1)} t · thrust/weight ${tw.toFixed(2)} · fuel ${((.75*e.intFuel+e.tankFuel)/1000).toFixed(1)} t`+` · RCS ≈ ${((RCS[id]??3)+storesRCS(e)).toFixed(2)} m² (est.)`+(c.ag.length?'':' · no air-to-ground stores cleared');
   $('bRole').textContent='Loadout: '+[v.sr+'× '+b.srFull,c.hp?v.mr+'× '+b.mrFull:null,...Object.entries(v.ag).filter(([,n])=>n).map(([k,n])=>n+'× '+AGW[k].sh),v.tk?v.tk+' tank'+(v.tk>1?'s':''):null].filter(Boolean).join(', ')+' ▸'}
 $('bBandit').addEventListener('click',()=>{const k=Object.keys(BANDITS);banditType=k[(k.indexOf(banditType)+1)%k.length];try{localStorage.setItem('viperBandit',banditType)}catch(e){};setMenuLabels()});
-$('cWing').addEventListener('click',wingCmd);
+// WING opens a one-tap order menu (the key / gamepad action still cycles)
+{const m=document.createElement('div');m.id='wingMenu';m.hidden=true;m.setAttribute('role','menu');
+  m.innerHTML=WCMDS.map(c=>'<button type="button" class="btn" role="menuitem" data-c="'+c+'">'+WNAMES[c]+'</button>').join('');document.body.appendChild(m);
+  let tmo=0;const close=()=>{m.hidden=true;clearTimeout(tmo)};
+  m.addEventListener('click',ev=>{const b=ev.target.closest('button');if(!b)return;wingSet(b.dataset.c);close()});
+  $('cWing').addEventListener('click',()=>{if(!m.hidden){close();return}const fl=friends.filter(f=>f.kind==='fighter'&&f.alive&&!f.remote);if(!fl.length)return;
+    m.querySelectorAll('button').forEach(b=>{b.classList.toggle('on',fl[0].cmd===b.dataset.c);b.disabled=(b.dataset.c==='GROUND'&&!ground.some(g=>g.alive))||(b.dataset.c==='ATTACK'&&!wingTarget())});
+    const r=$('cWing').getBoundingClientRect();m.style.left=Math.max(8,Math.min(innerWidth-230,r.left-60))+'px';m.style.bottom=Math.max(8,innerHeight-r.top+8)+'px';m.hidden=false;tmo=setTimeout(close,5000)})}
 $('cGci').addEventListener('click',()=>{audioInit();radio(gciName()+', '+myCall()+', bogey dope.','wing');setTimeout(gciBogeyDope,1200)});
 $('bLesson').addEventListener('click',()=>{const k=Object.keys(LESSONS);lesson=k[(k.indexOf(lesson)+1)%k.length];try{localStorage.setItem('vsLesson',lesson)}catch(e){};setMenuLabels()});
 $('bDiff').addEventListener('click',()=>{const k=Object.keys(DIFF);difficulty=k[(k.indexOf(difficulty)+1)%k.length];try{localStorage.setItem('viperDiff',difficulty)}catch(e){};setMenuLabels()});
@@ -8835,7 +8853,7 @@ const _careerAward=careerAward;
 careerAward=function(){lbAdd();return _careerAward.apply(this,arguments)};
 
 /* ---------- test hook (only with ?test in the URL) ---------- */
-if(/[?&]test\b/.test(location.search))window.__vs={dmgFrom,hitMark,get KC(){return KC},aoKeys:()=>[...AO_CACHE.keys()],aoQ:()=>AO_Q.length,aoPump,aoDbg:()=>AO_Q.map(j=>j.key+":"+!!j.it),get sortie(){return sortie},tkResult,get camera(){return camera},tkAirDown,get TNK(){return TNK},get WAR(){return WAR},warDie,warBuild,WAR_V,get playerJet(){return playerJet},get CANYON(){return CANYON},groundH,valRings:()=>valRings,buildSAM,buildAAA,buildRadar,buildBunker,buildTruck,buildShip,get ground(){return ground},deathCause:()=>deathCause,spawnFighter,clockNow:()=>clock,cycleRadarSub,radarBlind,radarSub,clutter,R,AA,killEnemy,aaSpawnWave,AG,agRelease,agSight,agWpn,ccip,agReset,btConditions,NET,netScoreCheck,netTeamScore,sbHtml,killGround,get pass(){return pass},passAdd,passClaim,weeklyAdd,scene,rinfoReset:()=>{renderer.info.autoReset=false;renderer.info.reset()},rinfo:()=>({c:renderer.info.render.calls,t:renderer.info.render.triangles,g:renderer.info.memory.geometries,tx:renderer.info.memory.textures}),KB,kbRebuild,playerGunHit,wingHit,BT,die,btRespawn,TMAP,mapStep,KBM,SC,damageSystem,hitAI,killEnemy,setThr,HEAT,explode,puff,camera,LT,townLights,flashLt,P,fly,dlz,flyout,AC_DEFS,feed,WAR,WAR_V,warBuild,warSpawn,warModules,warDie,warFlags,updateWar,warAlive,buildJet,PLAYER_COLORS,M2,V3,atm,clamp,lbAdd,showOverlay:k=>showOverlay(k),setScore:(n,k)=>{score=n;kills=k},get state(){return state},get enemies(){return enemies},missiles:()=>missiles.filter(m=>m.on),setAC:id=>{AC=AC_DEFS[id];applyAC()},wt:{   // weapon-test hooks: a clean sky, one drone, scripted launches
+if(/[?&]test\b/.test(location.search))window.__vs={dmgFrom,hitMark,get friends(){return friends},setLock:t=>{lockTarget=t},get KC(){return KC},aoKeys:()=>[...AO_CACHE.keys()],aoQ:()=>AO_Q.length,aoPump,aoDbg:()=>AO_Q.map(j=>j.key+":"+!!j.it),get sortie(){return sortie},tkResult,get camera(){return camera},tkAirDown,get TNK(){return TNK},get WAR(){return WAR},warDie,warBuild,WAR_V,get playerJet(){return playerJet},get CANYON(){return CANYON},groundH,valRings:()=>valRings,buildSAM,buildAAA,buildRadar,buildBunker,buildTruck,buildShip,get ground(){return ground},deathCause:()=>deathCause,spawnFighter,clockNow:()=>clock,cycleRadarSub,radarBlind,radarSub,clutter,R,AA,killEnemy,aaSpawnWave,AG,agRelease,agSight,agWpn,ccip,agReset,btConditions,NET,netScoreCheck,netTeamScore,sbHtml,killGround,get pass(){return pass},passAdd,passClaim,weeklyAdd,scene,rinfoReset:()=>{renderer.info.autoReset=false;renderer.info.reset()},rinfo:()=>({c:renderer.info.render.calls,t:renderer.info.render.triangles,g:renderer.info.memory.geometries,tx:renderer.info.memory.textures}),KB,kbRebuild,playerGunHit,wingHit,BT,die,btRespawn,TMAP,mapStep,KBM,SC,damageSystem,hitAI,killEnemy,setThr,HEAT,explode,puff,camera,LT,townLights,flashLt,P,fly,dlz,flyout,AC_DEFS,feed,WAR,WAR_V,warBuild,warSpawn,warModules,warDie,warFlags,updateWar,warAlive,buildJet,PLAYER_COLORS,M2,V3,atm,clamp,lbAdd,showOverlay:k=>showOverlay(k),setScore:(n,k)=>{score=n;kills=k},get state(){return state},get enemies(){return enemies},missiles:()=>missiles.filter(m=>m.on),setAC:id=>{AC=AC_DEFS[id];applyAC()},wt:{   // weapon-test hooks: a clean sky, one drone, scripted launches
   begin:id=>{AC=AC_DEFS[id];applyAC();startGame();return AC.id},
   clear:()=>{waveClearT=1e9;for(const e of enemies){e.alive=false;scene.remove(e.obj)}enemies.length=0;P.pos.set(0,6000,0);P.vel.set(0,0,250);throttle=.7;return state},
   target:(type,dz,away,speed)=>{const e=spawnFighter('red',type,new V3(0,P.pos.y,dz),new V3(0,P.pos.y,dz+(away?9999:-9999)),{ir:0,rdr:0,speed:speed||220});e.drone=true;return e.id},

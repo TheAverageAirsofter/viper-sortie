@@ -699,3 +699,7 @@ button:disabled{opacity:.4;cursor:not-allowed}
 #ov .pt:disabled:not(.got){opacity:.45}
 body.tankmode #rdr,body.tankmode #cm,body.tankmode #thr{display:none}
 
+#wingMenu{position:fixed;z-index:30;display:flex;flex-direction:column;gap:4px;width:220px}
+#wingMenu .btn{position:static;width:100%;height:auto;min-height:34px;padding:6px 10px;border-radius:0;text-align:left;font:700 12px/1.2 var(--f-body,inherit);letter-spacing:.06em;text-transform:uppercase}
+#wingMenu .btn.on{outline:2px solid var(--hud)}
+#wingMenu .btn:disabled{opacity:.4}
