@@ -3425,14 +3425,17 @@ function spawnWreck(e){if(!e.obj||WRECKS.length>8)return;const obj=e.obj;scene.a
     const pick=[];g.children.forEach(o=>{if(o.name==='finG'||(o.name==='cs'&&o.userData&&o.userData.cs==='stab')||o.name==='nozG'||o.name==='flame')pick.push(o)});
     if(pick.length){pick.forEach(o=>tail.attach(o));w.parts.push({o:tail,vel:e.vel.clone().add(new V3(rand(-15,15),rand(5,20),rand(-15,15))),spin:new V3(rand(-4,4),rand(-4,4),rand(-4,4))})}
     else scene.remove(tail)}
+  if(e.kind==='fighter'||e.kind==='bomber')for(let k=0;k<(QUALS[quality].fx?9:4);k++){const m=new THREE.Mesh(new THREE.BoxGeometry(rand(.25,1.3),.06,rand(.3,1)),DEB_MAT);m.position.copy(e.pos);scene.add(m);   // skin panels and fragments flung out
+    w.parts.push({o:m,small:1,vel:e.vel.clone().add(new V3(rand(-45,45),rand(-15,40),rand(-45,45))),spin:new V3(rand(-9,9),rand(-9,9),rand(-9,9))})}
   WRECKS.push(w)}
+const DEB_MAT=new THREE.MeshStandardMaterial({color:0x3a3d40,roughness:.7,metalness:.4,side:THREE.DoubleSide});
 function updateWrecks(dt){for(let i=WRECKS.length-1;i>=0;i--){const w=WRECKS[i];w.t+=dt;
     const step=(o,vel,spin,fire)=>{vel.y-=G*dt;vel.multiplyScalar(Math.exp(-dt*.25));o.position.addScaledVector(vel,dt);o.rotateX(spin.x*dt);o.rotateY(spin.y*dt);o.rotateZ(spin.z*dt);
       if(fire&&QUALS[quality].fx&&Math.random()<.85){const p=o.position;puff(p.x,p.y,p.z,rand(-2,2),rand(0,3),rand(-2,2),1,rand(.4,.65),.12,.9,rand(4,7),3,.25);
         const s=rand(.06,.14);puff(p.x,p.y,p.z,vel.x*.1,vel.y*.1+3,vel.z*.1,s,s,s,.7,6,18,3.5)}
       return o.position.y<Math.max(groundH(o.position.x,o.position.z),0)+2};
     let gone=step(w.o,w.vel,w.spin,true)||w.t>16;
-    for(const p of w.parts){if(p.done)continue;if(step(p.o,p.vel,p.spin,Math.random()<.4)||w.t>16){p.done=1;scene.remove(p.o);if(w.t<16)explode(p.o.position,false,true)}}
+    for(const p of w.parts){if(p.done)continue;if(step(p.o,p.vel,p.spin,Math.random()<(p.small?.1:.4))||w.t>(p.small?7:16)){p.done=1;scene.remove(p.o);if(w.t<16&&!p.small)explode(p.o.position,false,true)}}
     if(gone){if(w.t<16)explode(w.o.position.clone().setY(Math.max(w.o.position.y,Math.max(groundH(w.o.position.x,w.o.position.z),0)+3)),true,true);scene.remove(w.o);w.parts.forEach(p=>scene.remove(p.o));WRECKS.splice(i,1)}}}
 function clearWrecks(){for(const w of WRECKS){scene.remove(w.o);w.parts.forEach(p=>scene.remove(p.o))}WRECKS.length=0}
 
@@ -3471,6 +3474,14 @@ function killCamWatch(dt){KC.cd=Math.max(0,KC.cd-dt);
     const cl=-_hv.subVectors(m.target.pos,m.m.position).normalize().dot(_gv.subVectors(m.target.vel||m.vel,m.vel));
     if(d<700&&cl>150&&d/cl<1.6&&!m.reason){KC.t=1e-3;KC.m=m;KC.tg=m.target;KC.hold=0;KC.slow=.28;KC.last.copy(m.m.position);$('kcTag').hidden=false;$('hud').style.visibility='hidden';$('ctrls').style.visibility='hidden';
       KC.pos.copy(m.m.position).addScaledVector(_hv.copy(m.vel).normalize(),-28).add(_gv.set(0,6,0));break}}}
+// hit feedback: a hit marker on the target you hit (red and bigger for a critical), a red arc showing where hits on you came from,
+// and a short slow-motion look at a target you shot down with the gun
+const HITMK={t:0,crit:false,pos:new THREE.Vector3()},DMGDIR={t:0,from:new THREE.Vector3()},_dq=new THREE.Quaternion(),_dv=new THREE.Vector3();
+function hitMark(pos,crit){HITMK.t=crit?.45:.24;HITMK.crit=crit;HITMK.pos.copy(pos);sndBeep(crit?1250:1900,.035,crit?.07:.045,'square')}
+function dmgFrom(src){DMGDIR.t=1.4;DMGDIR.from.copy(src)}
+function startGunCam(e){if(!KC.on||KC.cd>0||KC.t>0||state!=='play'||!P.alive||P.onGround)return;KC.t=1e-3;KC.m=null;KC.tg=e;KC.hold=KC.t;KC.slow=.32;KC.last.copy(e.pos);
+  KC.pos.copy(e.pos).addScaledVector(_dv.subVectors(P.pos,e.pos).normalize(),42).add(_gv.set(0,9,0));if(e.right)KC.pos.addScaledVector(e.right,14);
+  $('kcTag').hidden=false;$('hud').style.visibility='hidden';$('ctrls').style.visibility='hidden'}
 function endKillCam(){KC.t=0;KC.m=null;KC.tg=null;KC.slow=1;KC.cd=6;$('kcTag').hidden=true;$('hud').style.visibility='';$('ctrls').style.visibility='';camSnap=true}
 function killCamCamera(dt){if(!(KC.t>0))return false;const m=KC.m,tg=KC.tg,p=m&&m.on?m.m.position:KC.last;
   if(m&&m.on){_hv.copy(m.vel).normalize();_gl.copy(p).addScaledVector(_hv,-24).add(_gv.set(0,4.5,0))}else _gl.copy(KC.pos);
@@ -4723,6 +4734,7 @@ function aiSystems(e,dt){   // per frame: fires burn out or spread, wings and co
 }
 function hitAI(t,amt,how,byPlayer){
   if(!t.alive)return;
+  if(byPlayer&&t.pos)hitMark(t.pos,amt>=5);
   if(t.remote){if(byPlayer){t.hitBy=clock;scEvent(how==='GUNS'?'HIT':'DIRECT HIT',how==='GUNS'?3:20,how==='GUNS'?'':'crit',how==='GUNS'?'hit':'dh');netClaimHit(t,how==='GUNS'?4*amt:75,how)}puff(t.pos.x,t.pos.y,t.pos.z,0,0,0,.3,.3,.3,.8,14,20,2);return}
   if(t.kind==='fighter'&&!t.drone){   // (test drones keep the simple hit-point pool)
     if(amt>=5&&(amt>=50||Math.random()<.85)){if(byPlayer){t.hitBy=clock;scEvent('DIRECT HIT',20,'crit','dh')}aiKill(t,how,byPlayer);return}
@@ -4744,6 +4756,7 @@ function killEnemy(e,how,byPlayer=true){
   if(isBT()){btLoss('red');if(byPlayer)BT.sp+=2}
   const nm=e.kind==='bomber'?'BOMBER':e.kind==='cruise'?'CRUISE MISSILE':'BANDIT';
   if(byPlayer)REC3.lastKill={t:clock,id:e.id};
+  if(byPlayer&&how==='GUNS'&&e.kind==='fighter')startGunCam(e);
   if(byPlayer&&e.pilot&&e.pilot.ace){score+=300;scEvent('ACE KILLED · '+e.pilot.call.toUpperCase(),300,'bonus');radio('splash the ace! '+e.pilot.call+' is down.')}
   if(byPlayer)gciSplash();
   if(!byPlayer&&e.hitBy&&clock-e.hitBy<12)scEvent('ASSIST',40,'bonus');
@@ -5770,7 +5783,7 @@ function updateWeapons(dt){
     if(b.team==='ghost')continue;
     if(b.team==='red'){
       if(state==='play'&&P.alive&&distSeg(P.pos,b.prev,b.m.position)<6){
-        kill(b);if(clock-(P.fdT||-9)>1.5){P.fdT=clock;feed('You were hit by gunfire','loss')}if(Math.random()<.5)addHole(playerJet,1);hurtT=.35;shake=.4;sndHit();buzz(40);
+        kill(b);dmgFrom(b.m.position.clone().addScaledVector(b.vel,-1));if(clock-(P.fdT||-9)>1.5){P.fdT=clock;feed('You were hit by gunfire','loss')}if(Math.random()<.5)addHole(playerJet,1);hurtT=.35;shake=.4;sndHit();buzz(40);
         puff(P.pos.x,P.pos.y+1,P.pos.z,0,0,0,1,.7,.3,1,4,12,.2);
         playerGunHit(b.dmg||1);continue}
       for(const f of friends)if(f.alive&&distSeg(f.pos,b.prev,b.m.position)<(f.kind==='fighter'?7:16)){kill(b);hitAI(f,b.dmg||1,'GUNS',false);break}
@@ -5994,7 +6007,7 @@ function updateEnemyMissiles(dt){
     let done=false;
     const fz=s.fuze;
     if(m.team==='red'&&state==='play'&&P.alive&&distSeg(P.pos,m.prev,p)<fz){
-      done=true;recMsl(m,'HIT','');playerMissileHit();
+      done=true;recMsl(m,'HIT','');dmgFrom(m.m.position.clone().addScaledVector(m.vel,-1));playerMissileHit();
     } else if(CM.decoy&&m.target===CM.decoy&&distSeg(CM.decoy.pos,m.prev,p)<fz){done=true;recMsl(m,'MISS','HIT YOUR TOWED DECOY');explode(p,false);cutDecoy();syncCM();message('DECOY HIT · DECOY LOST',1.4)}
     else if(m.target&&m.target.kind&&m.target!==P&&distSeg(m.target.pos,m.prev,p)<fz*(m.target.kind==='fighter'?1:1.8)){done=true;recMsl(m,'HIT','');explode(p,false);hitAI(m.target,5,m.name,false)}
     else if(m.target&&m.target.type&&!m.target.kind&&distSeg(m.target.pos,m.prev,p)<fz){done=true;explode(p,false);recMsl(m,'MISS',m.reason||'DECOYED')}
@@ -7363,6 +7376,11 @@ function drawHUD(){
   }
   if(hr_)c.restore();
   }
+  // hit marker and the direction of hits taken
+  if(HITMK.t>0){const p=proj(HITMK.pos);if(p.ok){const k=HITMK.crit?14:10,g=5;c.save();c.strokeStyle=HITMK.crit?'#ff5040':'#ffffff';c.lineWidth=2.2;c.globalAlpha=Math.min(1,HITMK.t*5);c.beginPath();
+    for(const [sx,sy] of [[1,1],[1,-1],[-1,1],[-1,-1]]){c.moveTo(p.x+sx*g,p.y+sy*g);c.lineTo(p.x+sx*(g+k),p.y+sy*(g+k))}c.stroke();c.restore()}}
+  if(DMGDIR.t>0){const v=_dv.copy(DMGDIR.from).sub(camera.position).applyQuaternion(_dq.copy(camera.quaternion).invert()),a=Math.atan2(v.x,-v.z),Rr=Math.min(W,H)*.3;
+    c.save();c.strokeStyle='#ff3b30';c.globalAlpha=Math.min(.85,DMGDIR.t);c.lineWidth=7;c.beginPath();c.arc(W/2,H/2,Rr,a-Math.PI/2-.3,a-Math.PI/2+.3);c.stroke();c.restore()}
   // bandits
   const cx=W/2,cy=H/2,rx=W/2-46-Math.max(INS.l,INS.r),ry=H/2-64-Math.max(INS.t,INS.b);
   for(const e of [...enemies,...friends]){
@@ -7660,7 +7678,7 @@ function frame(now){
   let dt=Math.min(.05,(now-last)/1000); autoQuality(now-last); last=now;
   if(state==='paused')dt=0;
   const rdt=dt; killCamWatch(rdt); if(KC.t>0)dt*=KC.slow;
-  clock+=dt;msgT-=dt;hurtT=Math.max(0,hurtT-dt);shake=Math.max(0,shake-dt);
+  clock+=dt;msgT-=dt;hurtT=Math.max(0,hurtT-dt);shake=Math.max(0,shake-dt);HITMK.t-=rdt||dt;DMGDIR.t-=rdt||dt;
   if(dt>0){
     // sub-step physics for stability at high g / Mach 4 missiles
     const steps=Math.max(1,Math.ceil(dt/.0167)), h=dt/steps; // keeps every step <= ~16.7 ms whatever the frame rate
@@ -7820,7 +7838,7 @@ const _careerAward=careerAward;
 careerAward=function(){lbAdd();return _careerAward.apply(this,arguments)};
 
 /* ---------- test hook (only with ?test in the URL) ---------- */
-if(/[?&]test\b/.test(location.search))window.__vs={aoKeys:()=>[...AO_CACHE.keys()],aoQ:()=>AO_Q.length,aoPump,aoDbg:()=>AO_Q.map(j=>j.key+":"+!!j.it),get sortie(){return sortie},tkResult,get camera(){return camera},tkAirDown,get TNK(){return TNK},get WAR(){return WAR},warDie,warBuild,WAR_V,get playerJet(){return playerJet},get CANYON(){return CANYON},groundH,valRings:()=>valRings,buildSAM,buildAAA,buildRadar,buildBunker,buildTruck,buildShip,get ground(){return ground},deathCause:()=>deathCause,spawnFighter,clockNow:()=>clock,cycleRadarSub,radarBlind,radarSub,clutter,R,AA,killEnemy,aaSpawnWave,AG,agRelease,agSight,agWpn,ccip,agReset,btConditions,NET,netScoreCheck,netTeamScore,sbHtml,killGround,get pass(){return pass},passAdd,passClaim,weeklyAdd,scene,rinfoReset:()=>{renderer.info.autoReset=false;renderer.info.reset()},rinfo:()=>({c:renderer.info.render.calls,t:renderer.info.render.triangles,g:renderer.info.memory.geometries,tx:renderer.info.memory.textures}),KB,kbRebuild,playerGunHit,wingHit,BT,die,btRespawn,TMAP,mapStep,KBM,SC,damageSystem,hitAI,killEnemy,setThr,HEAT,explode,puff,camera,LT,townLights,flashLt,P,fly,dlz,flyout,AC_DEFS,feed,WAR,WAR_V,warBuild,warSpawn,warModules,warDie,warFlags,updateWar,warAlive,buildJet,PLAYER_COLORS,M2,V3,atm,clamp,lbAdd,showOverlay:k=>showOverlay(k),setScore:(n,k)=>{score=n;kills=k},get state(){return state},get enemies(){return enemies},missiles:()=>missiles.filter(m=>m.on),setAC:id=>{AC=AC_DEFS[id];applyAC()},wt:{   // weapon-test hooks: a clean sky, one drone, scripted launches
+if(/[?&]test\b/.test(location.search))window.__vs={dmgFrom,hitMark,get KC(){return KC},aoKeys:()=>[...AO_CACHE.keys()],aoQ:()=>AO_Q.length,aoPump,aoDbg:()=>AO_Q.map(j=>j.key+":"+!!j.it),get sortie(){return sortie},tkResult,get camera(){return camera},tkAirDown,get TNK(){return TNK},get WAR(){return WAR},warDie,warBuild,WAR_V,get playerJet(){return playerJet},get CANYON(){return CANYON},groundH,valRings:()=>valRings,buildSAM,buildAAA,buildRadar,buildBunker,buildTruck,buildShip,get ground(){return ground},deathCause:()=>deathCause,spawnFighter,clockNow:()=>clock,cycleRadarSub,radarBlind,radarSub,clutter,R,AA,killEnemy,aaSpawnWave,AG,agRelease,agSight,agWpn,ccip,agReset,btConditions,NET,netScoreCheck,netTeamScore,sbHtml,killGround,get pass(){return pass},passAdd,passClaim,weeklyAdd,scene,rinfoReset:()=>{renderer.info.autoReset=false;renderer.info.reset()},rinfo:()=>({c:renderer.info.render.calls,t:renderer.info.render.triangles,g:renderer.info.memory.geometries,tx:renderer.info.memory.textures}),KB,kbRebuild,playerGunHit,wingHit,BT,die,btRespawn,TMAP,mapStep,KBM,SC,damageSystem,hitAI,killEnemy,setThr,HEAT,explode,puff,camera,LT,townLights,flashLt,P,fly,dlz,flyout,AC_DEFS,feed,WAR,WAR_V,warBuild,warSpawn,warModules,warDie,warFlags,updateWar,warAlive,buildJet,PLAYER_COLORS,M2,V3,atm,clamp,lbAdd,showOverlay:k=>showOverlay(k),setScore:(n,k)=>{score=n;kills=k},get state(){return state},get enemies(){return enemies},missiles:()=>missiles.filter(m=>m.on),setAC:id=>{AC=AC_DEFS[id];applyAC()},wt:{   // weapon-test hooks: a clean sky, one drone, scripted launches
   begin:id=>{AC=AC_DEFS[id];applyAC();startGame();return AC.id},
   clear:()=>{waveClearT=1e9;for(const e of enemies){e.alive=false;scene.remove(e.obj)}enemies.length=0;P.pos.set(0,6000,0);P.vel.set(0,0,250);throttle=.7;return state},
   target:(type,dz,away,speed)=>{const e=spawnFighter('red',type,new V3(0,P.pos.y,dz),new V3(0,P.pos.y,dz+(away?9999:-9999)),{ir:0,rdr:0,speed:speed||220});e.drone=true;return e.id},

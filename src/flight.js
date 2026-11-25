@@ -298,14 +298,17 @@ function spawnWreck(e){if(!e.obj||WRECKS.length>8)return;const obj=e.obj;scene.a
     const pick=[];g.children.forEach(o=>{if(o.name==='finG'||(o.name==='cs'&&o.userData&&o.userData.cs==='stab')||o.name==='nozG'||o.name==='flame')pick.push(o)});
     if(pick.length){pick.forEach(o=>tail.attach(o));w.parts.push({o:tail,vel:e.vel.clone().add(new V3(rand(-15,15),rand(5,20),rand(-15,15))),spin:new V3(rand(-4,4),rand(-4,4),rand(-4,4))})}
     else scene.remove(tail)}
+  if(e.kind==='fighter'||e.kind==='bomber')for(let k=0;k<(QUALS[quality].fx?9:4);k++){const m=new THREE.Mesh(new THREE.BoxGeometry(rand(.25,1.3),.06,rand(.3,1)),DEB_MAT);m.position.copy(e.pos);scene.add(m);   // skin panels and fragments flung out
+    w.parts.push({o:m,small:1,vel:e.vel.clone().add(new V3(rand(-45,45),rand(-15,40),rand(-45,45))),spin:new V3(rand(-9,9),rand(-9,9),rand(-9,9))})}
   WRECKS.push(w)}
+const DEB_MAT=new THREE.MeshStandardMaterial({color:0x3a3d40,roughness:.7,metalness:.4,side:THREE.DoubleSide});
 function updateWrecks(dt){for(let i=WRECKS.length-1;i>=0;i--){const w=WRECKS[i];w.t+=dt;
     const step=(o,vel,spin,fire)=>{vel.y-=G*dt;vel.multiplyScalar(Math.exp(-dt*.25));o.position.addScaledVector(vel,dt);o.rotateX(spin.x*dt);o.rotateY(spin.y*dt);o.rotateZ(spin.z*dt);
       if(fire&&QUALS[quality].fx&&Math.random()<.85){const p=o.position;puff(p.x,p.y,p.z,rand(-2,2),rand(0,3),rand(-2,2),1,rand(.4,.65),.12,.9,rand(4,7),3,.25);
         const s=rand(.06,.14);puff(p.x,p.y,p.z,vel.x*.1,vel.y*.1+3,vel.z*.1,s,s,s,.7,6,18,3.5)}
       return o.position.y<Math.max(groundH(o.position.x,o.position.z),0)+2};
     let gone=step(w.o,w.vel,w.spin,true)||w.t>16;
-    for(const p of w.parts){if(p.done)continue;if(step(p.o,p.vel,p.spin,Math.random()<.4)||w.t>16){p.done=1;scene.remove(p.o);if(w.t<16)explode(p.o.position,false,true)}}
+    for(const p of w.parts){if(p.done)continue;if(step(p.o,p.vel,p.spin,Math.random()<(p.small?.1:.4))||w.t>(p.small?7:16)){p.done=1;scene.remove(p.o);if(w.t<16&&!p.small)explode(p.o.position,false,true)}}
     if(gone){if(w.t<16)explode(w.o.position.clone().setY(Math.max(w.o.position.y,Math.max(groundH(w.o.position.x,w.o.position.z),0)+3)),true,true);scene.remove(w.o);w.parts.forEach(p=>scene.remove(p.o));WRECKS.splice(i,1)}}}
 function clearWrecks(){for(const w of WRECKS){scene.remove(w.o);w.parts.forEach(p=>scene.remove(p.o))}WRECKS.length=0}
 
@@ -344,6 +347,14 @@ function killCamWatch(dt){KC.cd=Math.max(0,KC.cd-dt);
     const cl=-_hv.subVectors(m.target.pos,m.m.position).normalize().dot(_gv.subVectors(m.target.vel||m.vel,m.vel));
     if(d<700&&cl>150&&d/cl<1.6&&!m.reason){KC.t=1e-3;KC.m=m;KC.tg=m.target;KC.hold=0;KC.slow=.28;KC.last.copy(m.m.position);$('kcTag').hidden=false;$('hud').style.visibility='hidden';$('ctrls').style.visibility='hidden';
       KC.pos.copy(m.m.position).addScaledVector(_hv.copy(m.vel).normalize(),-28).add(_gv.set(0,6,0));break}}}
+// hit feedback: a hit marker on the target you hit (red and bigger for a critical), a red arc showing where hits on you came from,
+// and a short slow-motion look at a target you shot down with the gun
+const HITMK={t:0,crit:false,pos:new THREE.Vector3()},DMGDIR={t:0,from:new THREE.Vector3()},_dq=new THREE.Quaternion(),_dv=new THREE.Vector3();
+function hitMark(pos,crit){HITMK.t=crit?.45:.24;HITMK.crit=crit;HITMK.pos.copy(pos);sndBeep(crit?1250:1900,.035,crit?.07:.045,'square')}
+function dmgFrom(src){DMGDIR.t=1.4;DMGDIR.from.copy(src)}
+function startGunCam(e){if(!KC.on||KC.cd>0||KC.t>0||state!=='play'||!P.alive||P.onGround)return;KC.t=1e-3;KC.m=null;KC.tg=e;KC.hold=KC.t;KC.slow=.32;KC.last.copy(e.pos);
+  KC.pos.copy(e.pos).addScaledVector(_dv.subVectors(P.pos,e.pos).normalize(),42).add(_gv.set(0,9,0));if(e.right)KC.pos.addScaledVector(e.right,14);
+  $('kcTag').hidden=false;$('hud').style.visibility='hidden';$('ctrls').style.visibility='hidden'}
 function endKillCam(){KC.t=0;KC.m=null;KC.tg=null;KC.slow=1;KC.cd=6;$('kcTag').hidden=true;$('hud').style.visibility='';$('ctrls').style.visibility='';camSnap=true}
 function killCamCamera(dt){if(!(KC.t>0))return false;const m=KC.m,tg=KC.tg,p=m&&m.on?m.m.position:KC.last;
   if(m&&m.on){_hv.copy(m.vel).normalize();_gl.copy(p).addScaledVector(_hv,-24).add(_gv.set(0,4.5,0))}else _gl.copy(KC.pos);

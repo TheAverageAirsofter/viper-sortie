@@ -198,6 +198,11 @@ function drawHUD(){
   }
   if(hr_)c.restore();
   }
+  // hit marker and the direction of hits taken
+  if(HITMK.t>0){const p=proj(HITMK.pos);if(p.ok){const k=HITMK.crit?14:10,g=5;c.save();c.strokeStyle=HITMK.crit?'#ff5040':'#ffffff';c.lineWidth=2.2;c.globalAlpha=Math.min(1,HITMK.t*5);c.beginPath();
+    for(const [sx,sy] of [[1,1],[1,-1],[-1,1],[-1,-1]]){c.moveTo(p.x+sx*g,p.y+sy*g);c.lineTo(p.x+sx*(g+k),p.y+sy*(g+k))}c.stroke();c.restore()}}
+  if(DMGDIR.t>0){const v=_dv.copy(DMGDIR.from).sub(camera.position).applyQuaternion(_dq.copy(camera.quaternion).invert()),a=Math.atan2(v.x,-v.z),Rr=Math.min(W,H)*.3;
+    c.save();c.strokeStyle='#ff3b30';c.globalAlpha=Math.min(.85,DMGDIR.t);c.lineWidth=7;c.beginPath();c.arc(W/2,H/2,Rr,a-Math.PI/2-.3,a-Math.PI/2+.3);c.stroke();c.restore()}
   // bandits
   const cx=W/2,cy=H/2,rx=W/2-46-Math.max(INS.l,INS.r),ry=H/2-64-Math.max(INS.t,INS.b);
   for(const e of [...enemies,...friends]){

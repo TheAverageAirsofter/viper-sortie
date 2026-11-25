@@ -351,6 +351,7 @@ function aiSystems(e,dt){   // per frame: fires burn out or spread, wings and co
 }
 function hitAI(t,amt,how,byPlayer){
   if(!t.alive)return;
+  if(byPlayer&&t.pos)hitMark(t.pos,amt>=5);
   if(t.remote){if(byPlayer){t.hitBy=clock;scEvent(how==='GUNS'?'HIT':'DIRECT HIT',how==='GUNS'?3:20,how==='GUNS'?'':'crit',how==='GUNS'?'hit':'dh');netClaimHit(t,how==='GUNS'?4*amt:75,how)}puff(t.pos.x,t.pos.y,t.pos.z,0,0,0,.3,.3,.3,.8,14,20,2);return}
   if(t.kind==='fighter'&&!t.drone){   // (test drones keep the simple hit-point pool)
     if(amt>=5&&(amt>=50||Math.random()<.85)){if(byPlayer){t.hitBy=clock;scEvent('DIRECT HIT',20,'crit','dh')}aiKill(t,how,byPlayer);return}
@@ -372,6 +373,7 @@ function killEnemy(e,how,byPlayer=true){
   if(isBT()){btLoss('red');if(byPlayer)BT.sp+=2}
   const nm=e.kind==='bomber'?'BOMBER':e.kind==='cruise'?'CRUISE MISSILE':'BANDIT';
   if(byPlayer)REC3.lastKill={t:clock,id:e.id};
+  if(byPlayer&&how==='GUNS'&&e.kind==='fighter')startGunCam(e);
   if(byPlayer&&e.pilot&&e.pilot.ace){score+=300;scEvent('ACE KILLED · '+e.pilot.call.toUpperCase(),300,'bonus');radio('splash the ace! '+e.pilot.call+' is down.')}
   if(byPlayer)gciSplash();
   if(!byPlayer&&e.hitBy&&clock-e.hitBy<12)scEvent('ASSIST',40,'bonus');
