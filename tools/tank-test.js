@@ -46,6 +46,13 @@ const assert = require('assert'), path = require('path');
   assert(jm > 5, 'the jets fly: ' + jm);
   const k2 = await p.evaluate(() => { const T = __vs.TNK, k = T.kills; __vs.tkAirDown(T.air[0], T.u); return T.kills - k; });
   assert(k2 === 1, 'jet kill credited');
+  // combined arms: J swaps into a jet once per battle; losing it drops you back into the tank
+  await p.keyboard.press('KeyJ'); await p.waitForTimeout(800);
+  const fj = await p.evaluate(() => ({ fly: __vs.TNK.fly, jets: __vs.TNK.jets, ai: !__vs.TNK.u.player, y: __vs.P.pos.y }));
+  assert(fj.fly && fj.jets === 0 && fj.ai && fj.y > 500, 'jet sortie: ' + JSON.stringify(fj));
+  await p.evaluate(() => __vs.die('missile')); await p.waitForTimeout(300);
+  const bk = await p.evaluate(() => ({ fly: __vs.TNK.fly, st: __vs.state, pl: __vs.TNK.u.player }));
+  assert(!bk.fly && bk.st === 'play' && bk.pl, 'back in the tank after losing the jet: ' + JSON.stringify(bk));
   // three capture points: sitting alone in B flips it to blue
   await p.evaluate(() => { const T = __vs.TNK, B = T.pts[1]; for (const u of __vs.WAR.units) if (u.team === 'red') u.pos.set(T.zone.x + 5000, u.pos.y, T.zone.z + 5000); T.u.pos.set(B.x, T.u.pos.y, B.z); B.own = .9; });
   await p.waitForFunction(() => __vs.TNK.pts[1].own >= 1, null, { timeout: 20000 });

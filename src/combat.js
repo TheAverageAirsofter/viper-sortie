@@ -185,7 +185,7 @@ function syncRadarUI(){
 }
 function sizeScope(){const r=scope.getBoundingClientRect();if(!r.width)return false;
   const w=Math.round(r.width*DPR),h=Math.round(r.height*DPR);if(scope.width!==w||scope.height!==h){scope.width=w;scope.height=h}return true}
-function drawRadarPanel(){if(TNK&&TNK.on)return;
+function drawRadarPanel(){if(tkDrv())return;
   if(rdrEl.hidden||state!=='play')return;
   if(!sizeScope())return;
   const w=scope.width/DPR,h=scope.height/DPR;

@@ -14,7 +14,7 @@ function setupTank(){
     if(good){cx=x;cz=z;ok=true}}
   if(!ok)[cx,cz]=findLand(rand(-2000,2000),12000);
   const u=tkSpawn(cx-70,cz-850);
-  Object.assign(TNK,{on:true,u,lives:3,respT:0,used:[tkType],air:[],bombs:[],airT:50,pickOpen:false,start:{x:cx-70,z:cz-850},zl:0,lased:0,laseT:0,hitT:0,hitFrom:null,v:0,camYaw:0,camPitch:.05,zoom:false,fire:false,kills:0,hold:0,range:0,zone:{x:cx,z:cz,r:190},streak:0,call:null,arty:[],cas:[],tix:{blue:1000,red:1000},drainT:0,
+  Object.assign(TNK,{on:true,u,lives:3,respT:0,used:[tkType],air:[],bombs:[],airT:50,pickOpen:false,start:{x:cx-70,z:cz-850},zl:0,lased:0,laseT:0,hitT:0,hitFrom:null,v:0,camYaw:0,camPitch:.05,zoom:false,fire:false,kills:0,hold:0,range:0,zone:{x:cx,z:cz,r:190},streak:0,call:null,arty:[],cas:[],tix:{blue:1000,red:1000},drainT:0,fly:false,jets:1,
     pts:[{n:'A',x:cx,z:cz,r:190,own:0},{n:'B',x:cx-430,z:cz+120,r:90,own:0},{n:'C',x:cx+430,z:cz-120,r:90,own:0}]});
   ['LEO2A4','M1A1','M60A3','M3','GEPARD'].forEach((id,i)=>warSpawn(id,cx+(i-2)*140+rand(-25,25),cz-900-rand(0,140),0));
   ['T80B','T72A','T72A','T62','BMP2','BMP2','ZSU23'].forEach((id,i)=>warSpawn(id,cx+(i-3)*135+rand(-25,25),cz+850+rand(0,200),Math.PI));
@@ -32,7 +32,7 @@ function tkKey(code,down){if(!down)return;
   if(code==='Space')TNK.fire=true;
   if(code==='KeyZ'||code==='ShiftLeft'||code==='ShiftRight')tkZoom(1);
   if(code==='Equal'||code==='NumpadAdd')tkZoom(1,true);if(code==='Minus'||code==='NumpadSubtract')tkZoom(-1,true);
-  if(code==='KeyR')tkLase();if(code==='KeyT')tkCallIn()}
+  if(code==='KeyR')tkLase();if(code==='KeyT')tkCallIn();if(code==='KeyJ')tkFly()}
 function tkZoom(dir,clampIt){const z=(TNK.zl||0)+dir;TNK.zl=clampIt?clamp(z,0,2):(z+3)%3;TNK.zoom=TNK.zl>0}
 // laser rangefinder: measure what's under the reticle and lay the gun for that range
 function tkLase(){if(!TNK.u||!TNK.u.alive)return;TNK.lased=Math.round(tkRange());TNK.laseT=1;message('RANGE '+TNK.lased+' M',1)}
@@ -97,10 +97,11 @@ function tkSound(){const t=A.ctx.currentTime,v=Math.abs(TNK.v),live=state==='pla
   A.roarF.frequency.setTargetAtTime(160+v*18,t,.2);A.roarG.gain.setTargetAtTime(live?.05+v*.004:0,t,.2)}
 // point A: hold it alone to win; red holding it alone wins for them
 function tkCheck(dt){const Z=TNK.zone,u=TNK.u;
-  if(!u.alive){   // three vehicles: watch the wreck, then pick the next one from the lineup (each vehicle once)
+  if(!u.alive&&!TNK.fly){   // three vehicles: watch the wreck, then pick the next one from the lineup (each vehicle once)
     if(TNK.lives>1){TNK.respT+=dt;if(TNK.respT>3&&!TNK.pickOpen)tkPicker(true);if(TNK.respT>18)tkRespawn(TANK_LIST.find(x=>TNK.used.indexOf(x)<0))}
     else endMission(false,'All three tanks knocked out'+(TNK.kills?' · '+TNK.kills+' kill'+(TNK.kills>1?'s':''):''));
     if(!TNK.u.alive)return}
+  if(TNK.fly&&!TNK.u.alive&&!TNK.lostNote){TNK.lostNote=true;message('YOUR TANK WAS KNOCKED OUT · PICK ANOTHER WHEN YOU RETURN',2.4)}
   // capture points: more vehicles of one side inside than the other moves the point towards that side (about 12 s with one tank, faster with more)
   let nb=0,nr=0;for(const q of TNK.pts){let b=0,r=0;for(const o of WAR.units){if(!o.alive)continue;if(Math.hypot(o.pos.x-q.x,o.pos.z-q.z)<q.r){if(o.team==='blue')b++;else r++}}
     const was=q.own>=1?1:q.own<=-1?-1:0;q.own=clamp(q.own+clamp(b-r,-3,3)*dt/12,-1,1);const now=q.own>=1?1:q.own<=-1?-1:0;
@@ -159,7 +160,7 @@ function tkHUD(c){const u=TNK.u;if(!u)return;const d=u.def,col=HUD,pj=v=>{const 
 function tkUI(on){
   if(on&&!TNK.ui){const host=$('ctrls').parentNode,el=document.createElement('div');el.id='tkUI';
     el.style.cssText='position:absolute;inset:0;z-index:6;touch-action:none;user-select:none';
-    el.innerHTML='<div id="tkDrive" style="position:absolute;left:0;top:0;bottom:0;width:45%"></div><div id="tkLook" style="position:absolute;right:0;top:0;bottom:0;width:55%"></div><button class="btn" id="tkFire" style="width:96px;height:96px;right:calc(18px + env(safe-area-inset-right,0px));bottom:calc(24px + env(safe-area-inset-bottom,0px));font-size:15px;">FIRE<small id="tkFireS">AP 30</small></button><button class="btn" id="tkZoom" style="width:64px;height:64px;right:calc(124px + env(safe-area-inset-right,0px));bottom:calc(18px + env(safe-area-inset-bottom,0px));">ZOOM<small id="tkZoomS">3RD</small></button><button class="btn" id="tkRange" style="width:64px;height:64px;right:calc(124px + env(safe-area-inset-right,0px));bottom:calc(92px + env(safe-area-inset-bottom,0px));">RANGE<small id="tkRangeS">---</small></button><button class="btn" id="tkAmmo" style="width:64px;height:64px;right:calc(196px + env(safe-area-inset-right,0px));bottom:calc(18px + env(safe-area-inset-bottom,0px));">AMMO<small id="tkAmmoS">AP</small></button><button class="btn" id="tkView" style="width:52px;height:44px;right:calc(198px + env(safe-area-inset-right,0px));top:calc(12px + env(safe-area-inset-top,0px));font-size:11px;">VIEW<small id="tkViewS">3RD</small></button><button class="btn" id="tkRep" style="width:60px;height:44px;right:calc(132px + env(safe-area-inset-right,0px));top:calc(12px + env(safe-area-inset-top,0px));font-size:11px;">REPAIR<small id="tkRepS"></small></button><button class="btn" id="tkExt" style="width:52px;height:44px;right:calc(74px + env(safe-area-inset-right,0px));top:calc(12px + env(safe-area-inset-top,0px));font-size:11px;">EXT<small id="tkExtS">2</small></button><button class="btn ready" id="tkCall" hidden style="width:66px;height:44px;right:calc(256px + env(safe-area-inset-right,0px));top:calc(12px + env(safe-area-inset-top,0px));font-size:11px;">STRIKE<small id="tkCallS">ARTY</small></button><button class="btn" id="tkPause" style="width:44px;height:44px;right:calc(18px + env(safe-area-inset-right,0px));top:calc(12px + env(safe-area-inset-top,0px));font-size:14px" aria-label="Pause">II</button><div id="tkKnob" style="position:absolute;width:54px;height:54px;margin:-27px 0 0 -27px;border-radius:50%;border:2px solid rgba(92,255,138,.7);display:none;pointer-events:none"></div>';
+    el.innerHTML='<div id="tkDrive" style="position:absolute;left:0;top:0;bottom:0;width:45%"></div><div id="tkLook" style="position:absolute;right:0;top:0;bottom:0;width:55%"></div><button class="btn" id="tkFire" style="width:96px;height:96px;right:calc(18px + env(safe-area-inset-right,0px));bottom:calc(24px + env(safe-area-inset-bottom,0px));font-size:15px;">FIRE<small id="tkFireS">AP 30</small></button><button class="btn" id="tkZoom" style="width:64px;height:64px;right:calc(124px + env(safe-area-inset-right,0px));bottom:calc(18px + env(safe-area-inset-bottom,0px));">ZOOM<small id="tkZoomS">3RD</small></button><button class="btn" id="tkRange" style="width:64px;height:64px;right:calc(124px + env(safe-area-inset-right,0px));bottom:calc(92px + env(safe-area-inset-bottom,0px));">RANGE<small id="tkRangeS">---</small></button><button class="btn" id="tkAmmo" style="width:64px;height:64px;right:calc(196px + env(safe-area-inset-right,0px));bottom:calc(18px + env(safe-area-inset-bottom,0px));">AMMO<small id="tkAmmoS">AP</small></button><button class="btn" id="tkView" style="width:52px;height:44px;right:calc(198px + env(safe-area-inset-right,0px));top:calc(12px + env(safe-area-inset-top,0px));font-size:11px;">VIEW<small id="tkViewS">3RD</small></button><button class="btn" id="tkRep" style="width:60px;height:44px;right:calc(132px + env(safe-area-inset-right,0px));top:calc(12px + env(safe-area-inset-top,0px));font-size:11px;">REPAIR<small id="tkRepS"></small></button><button class="btn" id="tkExt" style="width:52px;height:44px;right:calc(74px + env(safe-area-inset-right,0px));top:calc(12px + env(safe-area-inset-top,0px));font-size:11px;">EXT<small id="tkExtS">2</small></button><button class="btn" id="tkJet" style="width:52px;height:44px;right:calc(330px + env(safe-area-inset-right,0px));top:calc(12px + env(safe-area-inset-top,0px));font-size:11px;">AIR<small id="tkJetS">1</small></button><button class="btn ready" id="tkCall" hidden style="width:66px;height:44px;right:calc(256px + env(safe-area-inset-right,0px));top:calc(12px + env(safe-area-inset-top,0px));font-size:11px;">STRIKE<small id="tkCallS">ARTY</small></button><button class="btn" id="tkPause" style="width:44px;height:44px;right:calc(18px + env(safe-area-inset-right,0px));top:calc(12px + env(safe-area-inset-top,0px));font-size:14px" aria-label="Pause">II</button><div id="tkKnob" style="position:absolute;width:54px;height:54px;margin:-27px 0 0 -27px;border-radius:50%;border:2px solid rgba(92,255,138,.7);display:none;pointer-events:none"></div>';
     host.appendChild(el);TNK.ui=el;
     const dv=el.querySelector('#tkDrive'),lk=el.querySelector('#tkLook'),kn=el.querySelector('#tkKnob');let dId=null,o=null,lId=null,lx=0,ly=0;
     dv.addEventListener('pointerdown',e=>{dId=e.pointerId;o={x:e.clientX,y:e.clientY};kn.style.display='block';kn.style.left=e.clientX+'px';kn.style.top=e.clientY+'px';dv.setPointerCapture(e.pointerId);audioInit()});
@@ -169,7 +170,7 @@ function tkUI(on){
     lk.addEventListener('pointermove',e=>{if(e.pointerId!==lId)return;const k=TNK.zl===2?.0006:TNK.zoom?.0012:.005;TNK.camYaw-=(e.clientX-lx)*k;TNK.camPitch=clamp(TNK.camPitch-(e.clientY-ly)*k,-.25,.45);lx=e.clientX;ly=e.clientY});
     const lEnd=e=>{if(e.pointerId===lId)lId=null};lk.addEventListener('pointerup',lEnd);lk.addEventListener('pointercancel',lEnd);
     el.querySelector('#tkFire').addEventListener('pointerdown',e=>{e.stopPropagation();TNK.fire=true});
-    el.querySelector('#tkZoom').addEventListener('pointerdown',e=>{e.stopPropagation();tkZoom(1)});for(const [id,f] of [['#tkAmmo',tkAmmo],['#tkView',tkView],['#tkRep',tkRepair],['#tkExt',tkExt],['#tkCall',tkCallIn]])el.querySelector(id).addEventListener('pointerdown',e=>{e.stopPropagation();f()});el.querySelector('#tkRange').addEventListener('pointerdown',e=>{e.stopPropagation();tkLase()});
+    el.querySelector('#tkZoom').addEventListener('pointerdown',e=>{e.stopPropagation();tkZoom(1)});for(const [id,f] of [['#tkAmmo',tkAmmo],['#tkView',tkView],['#tkRep',tkRepair],['#tkExt',tkExt],['#tkCall',tkCallIn],['#tkJet',tkFly]])el.querySelector(id).addEventListener('pointerdown',e=>{e.stopPropagation();f()});el.querySelector('#tkRange').addEventListener('pointerdown',e=>{e.stopPropagation();tkLase()});
     el.querySelector('#tkPause').addEventListener('click',()=>pause())}
   if(TNK.ui)TNK.ui.hidden=!on;if(on)$('ctrls').hidden=true;document.body.classList.toggle('tankmode',!!on)}
 // per frame: keep the overlay in step with the game state
@@ -178,8 +179,11 @@ function tkButtons(){const u=TNK.u;if(!TNK.ui||!u)return;const q=id=>TNK.ui.quer
   set('#tkZoomS',TNK.zl===2?'×8':TNK.zl===1?'×4':'OFF');set('#tkRangeS',TNK.lased?TNK.lased+' m':'---');set('#tkAmmoS',TNK.ammo);set('#tkViewS',TNK.view?'CMDR':'3RD');
   const m=u.mod,broken=m.trk||m.eng||m.gun||m.tur;set('#tkRepS',TNK.repT>0?Math.ceil(TNK.repT)+' s':broken?'NEEDED':'OK');q('#tkRep').classList.toggle('on',TNK.repT>0);q('#tkRep').classList.toggle('ready',!!broken&&TNK.repT<=0);
   {const cb=q('#tkCall');if(cb.hidden===!!TNK.call)cb.hidden=!TNK.call;set('#tkCallS',TNK.call==='AIR'?'A-10':'ARTY')}
+  set('#tkJetS',String(TNK.jets));q('#tkJet').classList.toggle('ready',TNK.jets>0&&u.alive);
   set('#tkExtS',String(TNK.ext));q('#tkExt').classList.toggle('ready',!!m.fire&&TNK.ext>0)}
-function tkFrame(){if(!TNK.on)return;tkButtons();const show=state==='play';if(TNK.ui&&TNK.ui.hidden===show)TNK.ui.hidden=!show;if(show)$('ctrls').hidden=true;playerJet.visible=false}
+function tkFrame(){if(!TNK.on)return;const bk=$('tkBack');if(bk)bk.hidden=!(TNK.fly&&state==='play');
+  if(TNK.fly){if(TNK.ui)TNK.ui.hidden=true;$('ctrls').hidden=state!=='play';document.body.classList.remove('tankmode');return}
+  tkButtons();const show=state==='play';if(TNK.ui&&TNK.ui.hidden===show)TNK.ui.hidden=!show;if(show)$('ctrls').hidden=true;playerJet.visible=false}
 // a kill by the player's tank
 function tkKill(u,by){if(!by||!by.player||u.team!=='red')return;tkResult('DESTROYED',u);TNK.kills++;kills++;TNK.streak++;
   if(TNK.streak===2&&!TNK.call){TNK.call='ART';message('KILL STREAK · ARTILLERY READY',2)}else if(TNK.streak===4){TNK.call='AIR';message('KILL STREAK · AIR STRIKE READY',2)}score+=u.def.cls==='mbt'?300:200;message(u.def.n.toUpperCase()+' DESTROYED',1.6);sndKill()}
@@ -238,6 +242,20 @@ function tkCalls(dt){
     const hd=Math.hypot(c.tgt.x-c.pos.x,c.tgt.z-c.pos.z),ahead=(c.tgt.x-c.pos.x)*c.vel.x+(c.tgt.z-c.pos.z)*c.vel.z>0;
     c.dropT-=dt;if(c.bombs>0&&ahead&&hd<560&&c.dropT<=0){c.bombs--;c.dropT=.18;const b=new THREE.Mesh(new THREE.CylinderGeometry(.2,.2,2.2,8).rotateX(Math.PI/2),warMat(0x3a3d33));b.position.copy(c.pos);scene.add(b);TNK.bombs.push({m:b,vel:c.vel.clone().multiplyScalar(.95),t:0,team:'blue',owner:TNK.u})}
     if(!ahead&&hd>9000){c.alive=false;scene.remove(c.obj)}}}
+// combined arms: one jet sortie per battle. Your tank keeps fighting under AI control while you fly; J / TANK takes you back,
+// and losing the jet drops you back into the tank (or the vehicle picker if it was knocked out meanwhile) instead of ending the battle
+function tkDrv(){return !!(TNK&&TNK.on&&!TNK.fly)}
+function tkFly(){if(!TNK.on||state!=='play')return;if(TNK.fly){tkLand(false);return}
+  if(!TNK.jets||!TNK.u||!TNK.u.alive){message(TNK.jets?'NO TANK TO LEAVE':'NO JET LEFT THIS BATTLE',1.4);return}
+  TNK.jets--;TNK.fly=true;TNK.lostNote=false;TNK.u.player=false;TNK.zoom=false;TNK.zl=0;camera.fov=60;camera.updateProjectionMatrix();
+  resetPlayer();const s=TNK.start,z=s.z-3500;P.pos.set(s.x,Math.max(groundH(s.x,z),0)+1500,z);P.vel.set(0,0,230);playerJet.quaternion.identity();axes(P);qPrev.copy(playerJet.quaternion);
+  P.alive=true;playerJet.visible=true;camSnap=true;if(TNK.ui)TNK.ui.hidden=true;$('ctrls').hidden=false;document.body.classList.remove('tankmode');
+  message('AIR SUPPORT · '+(AC.name||'JET').toUpperCase()+' · J OR TANK TO RETURN',2.6)}
+function tkLand(lost){TNK.fly=false;if(lost)explode(P.pos.clone(),true);P.alive=true;playerJet.visible=false;P.vel.set(0,0,0);P.onGround=true;
+  const u=TNK.u;if(u&&u.alive){u.player=true;P.pos.set(u.pos.x,u.pos.y+3,u.pos.z)}TNK.camYaw=0;TNK.camPitch=.05;camSnap=true;
+  if(TNK.ui)TNK.ui.hidden=false;$('ctrls').hidden=true;document.body.classList.add('tankmode');message(lost?'JET LOST · BACK ON THE GROUND':'BACK IN THE TANK',1.8)}
+{const b=document.createElement('button');b.id='tkBack';b.className='btn ready';b.type='button';b.hidden=true;b.innerHTML='TANK<small>J</small>';
+  b.style.cssText='width:64px;height:44px;left:calc(12px + env(safe-area-inset-left,0px));top:calc(12px + env(safe-area-inset-top,0px));font-size:11px;z-index:7';b.addEventListener('click',()=>tkLand(false));document.body.appendChild(b)}
 function tkAirDown(a,by){if(!a.alive)return;a.alive=false;explode(a.pos.clone(),true);scene.remove(a.obj);
   if(by&&by.player){TNK.kills++;kills++;score+=400;message('SU-25 SHOT DOWN',1.8);sndKill()}else if(by)feed('Blue '+by.def.n+' shot down an Su-25','kill')}
 

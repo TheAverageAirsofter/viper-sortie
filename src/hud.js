@@ -148,7 +148,7 @@ function drawHUD(){
   const c=hctx; c.clearRect(0,0,W,H); drawNVG(c);
   if(hurtT>0){const g=c.createRadialGradient(W/2,H/2,Math.min(W,H)*.3,W/2,H/2,Math.max(W,H)*.7);g.addColorStop(0,'rgba(255,40,30,0)');g.addColorStop(1,`rgba(255,40,30,${hurtT*1.2})`);c.fillStyle=g;c.fillRect(0,0,W,H)}
   if(state!=='play')return;
-  if(TNK&&TNK.on){tkHUD(c);return}
+  if(tkDrv()){tkHUD(c);return}
   if(TMAP.z){drawMap(c);return}
   c.lineWidth=1.5;c.strokeStyle=HUD;c.textBaseline='middle';
   if(SC.list.length){let y=H*(W<H?.5:.6);const cols={kill:'#ff8a5c',crit:'#ffd24a',bonus:'#8ee0ff'};c.save();c.textBaseline='middle';

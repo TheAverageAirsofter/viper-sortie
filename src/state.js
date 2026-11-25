@@ -497,6 +497,7 @@ function updateMission(dt){
   // ONLINE: free-for-all until you're shot down or abort
 }
 function die(cause){
+  if(state==='play'&&TNK&&TNK.on&&TNK.fly&&cause!=='abort'){tkLand(true);return}   // tank battle: a lost jet drops you back on the ground
   if(state==='play'&&mission==='CAMPAIGN'&&enemies.some(x=>x.alive&&x.pilot&&x.pilot.campAce!=null&&x.pos.distanceTo(P.pos)<6000))campAceKilledYou=true;
   if(state!=='play')return; state='dead'; deathCause=cause; REC3.deathT=clock; if(mission==='ONLINE'&&NET.active)NET.deaths++; deadT=1.8; P.alive=false; missionDone=true; recEvent('You were '+({terrain:'killed hitting the ground',shot:'shot down by guns',missile:'killed by a missile',ejected:'out of the jet (ejected)',collision:'killed in a mid-air collision',landing:'killed crashing on landing',gearup:'killed landing gear-up',abort:'out (sortie aborted)',fuel:'down after running out of fuel'}[cause]||'down'));
   CM.flrHeld=CM.chfHeld=false; if(isBT())btDied(); if(cause==='ejected'){deadT=7;playerJet.visible=false;$('ctrls').hidden=true;resetStick();gunHeld=false;brake=false;$('bEject').hidden=true;return}
@@ -618,7 +619,8 @@ const KBE={open:false};   // the bindings editor (menu.js) captures keys while i
 addEventListener('keydown',e=>{
   if(KBE.open)return;
   keys[e.code]=true; audioInit();
-  if(state==='play'&&TNK&&TNK.on){tkKey(e.code,true);if(e.code==='Escape')pause();if(e.code==='Space'||e.code.startsWith('Arrow'))e.preventDefault();return}
+  if(state==='play'&&TNK&&TNK.on&&TNK.fly&&e.code==='KeyJ'){tkFly();return}
+  if(state==='play'&&tkDrv()){tkKey(e.code,true);if(e.code==='Escape')pause();if(e.code==='Space'||e.code.startsWith('Arrow'))e.preventDefault();return}
   const a=KB.rev[KBM.on?'kbm':'kb'][e.code];
   if(state==='play'){
     if(a&&!e.repeat){if(a==='gun'||a==='map')e.preventDefault();actDown(a)}
