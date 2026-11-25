@@ -206,7 +206,7 @@ function warWreck(u){u.burnT=45;if(u.obj.userData.tur){u.obj.userData.tur.positi
 // the turret flies off when the ammunition goes up
 function warPop(u){const t=u.obj.userData.tur;if(!t||t.parent!==u.obj)return;u.obj.updateMatrixWorld(true);const wp=new V3();t.getWorldPosition(wp);u.obj.remove(t);t.position.copy(wp);t.rotation.set(0,u.heading,0);scene.add(t);
   WAR.debris.push({o:t,vel:new V3(rand(-4,4),rand(16,22),rand(-4,4)),spin:new V3(rand(-1.5,1.5),rand(-1,1),rand(-1.5,1.5)),t:0})}
-function warDie(u,by,why){if(!u.alive)return;u.alive=false;by=by||u.lastBy;tkKill(u,by);if(BT.on&&BT.ground&&!BT.over)BT.pts[u.team]=Math.max(0,BT.pts[u.team]-6);const big=why==='ammunition detonated';explode(new V3(u.pos.x,u.pos.y+2,u.pos.z),big);
+function warDie(u,by,why){if(!u.alive)return;u.alive=false;by=by||u.lastBy;tkKill(u,by);if(TNK&&TNK.on&&TNK.tix)TNK.tix[u.team]-=25;if(u.player&&TNK)TNK.streak=0;if(BT.on&&BT.ground&&!BT.over)BT.pts[u.team]=Math.max(0,BT.pts[u.team]-6);const big=why==='ammunition detonated';explode(new V3(u.pos.x,u.pos.y+2,u.pos.z),big);
   if(big)warPop(u);warWreck(u);
   if(by&&by.def)feed((by.team==='blue'?'Blue ':'Red ')+by.def.n+' destroyed '+u.def.n+(why?' ('+why+')':''),u.team==='red'?'kill':'loss');else if(why)feed(u.def.n+': '+why,u.team==='red'?'kill':'loss')}
 const warFlags=u=>{const m=u.mod,a=[];if(m.trk)a.push('TRK');if(m.eng)a.push('ENG');if(m.gun)a.push(m.gun>1?'GUN X':'GUN');if(m.tur)a.push('TUR');if(u.def.crew&&m.crew<u.def.crew)a.push('CREW '+m.crew+'/'+u.def.crew);if(m.fire)a.push('FIRE');return a.join(' ')};
@@ -230,6 +230,9 @@ function updateWar(dt){
     const t=u.aim&&u.aim.alive?u.aim:null;let dist=1e9,wantH=u.team==='blue'?0:Math.PI;
     if(t){const dx=t.pos.x-u.pos.x,dz=t.pos.z-u.pos.z;dist=Math.hypot(dx,dz);wantH=Math.atan2(dx,dz)}
     u.moving=!m.trk&&(!t||dist>d.gun[0]*.78||u.los===false);   // no line of sight (a ridge in between): keep advancing
+    if(TNK&&TNK.on&&TNK.pts&&!(t&&dist<d.gun[0]*.78&&u.los!==false)){   // tank battle: head for the nearest point your side does not hold
+      const sg=u.team==='blue'?1:-1;let gl=null,bd=1e9;for(const q of TNK.pts){if(q.own*sg>=1)continue;const gd=Math.hypot(q.x-u.pos.x,q.z-u.pos.z);if(gd<bd){bd=gd;gl=q}}
+      if(gl){wantH=Math.atan2(gl.x-u.pos.x,gl.z-u.pos.z);u.moving=!m.trk&&bd>gl.r*.45}else if(!t)u.moving=false}
     const dh=warAng(wantH-u.heading);if(!m.trk)u.heading+=clamp(dh,-dt*.45,dt*.45);u.obj.rotation.y=u.heading;
     if(u.moving&&Math.abs(dh)<.9){const v=d.spd*.5*(m.eng?.45:1);u.pos.x+=Math.sin(u.heading)*v*dt;u.pos.z+=Math.cos(u.heading)*v*dt;u.vel.set(Math.sin(u.heading)*v,0,Math.cos(u.heading)*v);
       u.dustT-=dt;if(u.dustT<=0){u.dustT=.3;puff(u.pos.x-Math.sin(u.heading)*3,u.pos.y+.4,u.pos.z-Math.cos(u.heading)*3,rand(-1,1),rand(1,2.5),rand(-1,1),.55,.5,.4,.35,rand(4,7),rand(5,9),rand(1.5,2.5),-.2)}}

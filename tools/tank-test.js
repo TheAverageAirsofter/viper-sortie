@@ -46,8 +46,16 @@ const assert = require('assert'), path = require('path');
   assert(jm > 5, 'the jets fly: ' + jm);
   const k2 = await p.evaluate(() => { const T = __vs.TNK, k = T.kills; __vs.tkAirDown(T.air[0], T.u); return T.kills - k; });
   assert(k2 === 1, 'jet kill credited');
-  // holding point A wins
-  await p.evaluate(() => { const T = __vs.TNK; T.hold = 59.9; for (const u of __vs.WAR.units) if (u.team === 'red') u.pos.set(T.zone.x + 5000, u.pos.y, T.zone.z + 5000); T.u.pos.set(T.zone.x, T.u.pos.y, T.zone.z); });
-  await p.waitForFunction(() => __vs.deathCause() === 'win', null, { timeout: 8000 });
+  // three capture points: sitting alone in B flips it to blue
+  await p.evaluate(() => { const T = __vs.TNK, B = T.pts[1]; for (const u of __vs.WAR.units) if (u.team === 'red') u.pos.set(T.zone.x + 5000, u.pos.y, T.zone.z + 5000); T.u.pos.set(B.x, T.u.pos.y, B.z); B.own = .9; });
+  await p.waitForFunction(() => __vs.TNK.pts[1].own >= 1, null, { timeout: 20000 });
+  // kill-streak artillery lands where the crosshair meets the ground
+  const art = await p.evaluate(() => { const T = __vs.TNK; T.call = 'ART'; T.camPitch = -.04; return 1; });
+  await p.keyboard.press('KeyT'); await p.waitForTimeout(300);
+  const q = await p.evaluate(() => ({ arty: __vs.TNK.arty.length, call: __vs.TNK.call }));
+  assert(q.arty > 0 && !q.call, 'artillery called in: ' + JSON.stringify(q));
+  // holding more points than red drains red's tickets to a win
+  await p.evaluate(() => { const T = __vs.TNK; T.pts[0].own = 1; T.pts[1].own = 1; T.tix.red = 8; });
+  await p.waitForFunction(() => __vs.deathCause() === 'win', null, { timeout: 15000 });
   assert.deepEqual(errs, []); console.log('tank ok'); await b.close();
 })().catch(e => { console.error(e); process.exit(1); });
