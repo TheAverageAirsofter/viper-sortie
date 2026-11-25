@@ -332,7 +332,7 @@ function aoPatch(m){if(!m||m.__ao||m.isMeshBasicMaterial||m.transparent||m.blend
     sh.fragmentShader=sh.fragmentShader.replace('#include <common>','#include <common>\nvarying float vOcc;')
       .replace('#include <aomap_fragment>','#include <aomap_fragment>\n {float aoK=clamp(1.-vOcc,0.,1.);aoK*=aoK*(3.-2.*aoK)*.35+aoK*.65;reflectedLight.indirectDiffuse*=aoK;reflectedLight.indirectSpecular*=aoK;reflectedLight.directDiffuse*=mix(1.,aoK,.4);reflectedLight.directSpecular*=mix(1.,aoK,.7);}')};
   m.customProgramCacheKey=()=>key+'|ao';m.needsUpdate=true}
-function bakeAO(root,cacheKey,opts){opts=opts||{};const res=opts.res||128;
+function* aoJob(root,cacheKey,opts){opts=opts||{};const res=opts.res||128;
   root.updateMatrixWorld(true);const inv=new THREE.Matrix4().copy(root.matrixWorld).invert(),M=new THREE.Matrix4(),v=new THREE.Vector3(),nm=new THREE.Matrix3();
   const shown=o=>{for(let q=o;q&&q!==root;q=q.parent)if(!q.visible)return false;return true};
   const meshes=[];root.traverse(o=>{if(!o.isMesh||!o.geometry||!o.geometry.attributes.position||Array.isArray(o.material))return;const m=o.material;
@@ -348,7 +348,7 @@ function bakeAO(root,cacheKey,opts){opts=opts||{};const res=opts.res||128;
   let R=0;for(const r of recv)for(let i=0;i<r.n;i++)R=Math.max(R,Math.hypot(r.p[i*3]-cx,r.p[i*3+1]-cy,r.p[i*3+2]-cz));R=R*1.02+.01;
   const S=res,px=2*R/S,buf=new Float32Array(S*S),acc=recv.map(r=>new Float32Array(r.n*2)),wsum=recv.map(r=>new Float32Array(r.n*2));   // two hemispheres per vertex: generated normals may point either way
   const U=new THREE.Vector3(),W=new THREE.Vector3();
-  for(const d of AO_DIRS){U.set(Math.abs(d.y)<.9?0:1,Math.abs(d.y)<.9?1:0,0).cross(d).normalize();W.crossVectors(d,U);
+  for(const d of AO_DIRS){yield 0;U.set(Math.abs(d.y)<.9?0:1,Math.abs(d.y)<.9?1:0,0).cross(d).normalize();W.crossVectors(d,U);
     buf.fill(-1e9);
     const pr=(r,i,o)=>{const x=r.p[i*3]-cx,y=r.p[i*3+1]-cy,z=r.p[i*3+2]-cz;o[0]=(x*U.x+y*U.y+z*U.z+R)/px;o[1]=(x*W.x+y*W.y+z*W.z+R)/px;o[2]=x*d.x+y*d.y+z*d.z};
     const A=[0,0,0],B=[0,0,0],C=[0,0,0];
@@ -367,6 +367,17 @@ function bakeAO(root,cacheKey,opts){opts=opts||{};const res=opts.res||128;
   const out=recv.map((r,ri)=>{const o=new Float32Array(r.n);for(let i=0;i<r.n;i++){const w=wsum[ri],a=acc[ri],v0=w[i*2]>0?a[i*2]/w[i*2]:0,v1=w[i*2+1]>0?a[i*2+1]/w[i*2+1]:0,vis=Math.max(v0,v1);o[i]=Math.min(.85,Math.max(0,(1-vis)*(opts.k||.95)))}return o});
   recv.forEach((r,ri)=>{r.o.geometry.setAttribute('occ',new THREE.BufferAttribute(out[ri],1));aoPatch(r.o.material)});
   if(cacheKey)AO_CACHE.set(cacheKey,out)}
+// synchronous bake (menu, hangar, mission loading); during play a type not yet cached is baked in slices on a spare copy (aoQueue) and the
+// copy that triggered it simply has no AO, so a first-time type never stalls a frame
+function bakeAO(root,cacheKey,opts){const it=aoJob(root,cacheKey,opts);while(!it.next().done);}
+let AO_SYNC=true;const AO_Q=[],AO_PENDING=new Set();
+function aoNeed(root,key,make,opts){
+  if(AO_CACHE.has(key)||AO_SYNC||typeof state==='undefined'||state!=='play'){bakeAO(root,key,opts);return}
+  if(AO_PENDING.has(key))return;AO_PENDING.add(key);AO_Q.push({key,make,opts})}
+function aoPump(){const t0=performance.now();
+  while(AO_Q.length&&performance.now()-t0<4){const j=AO_Q[0];if(!j.it){try{j.it=aoJob(j.make(),j.key,j.opts)}catch(e){AO_Q.shift();continue}}
+    let r;try{r=j.it.next()}catch(e){r={done:true}}if(r.done){AO_Q.shift();AO_PENDING.delete(j.key)}}
+}
 const MERGE_SKIP=new Set(['cs','gear','flame','nozG','canopyG','pilot']);
 function mergeGeos(ms){
   const names=Object.keys(ms[0].geometry.attributes);let nv=0,ni=0;
@@ -392,7 +403,7 @@ function mergeStatic(root){
     for(const l of by.values()){if(l.length<2)continue;const nm=new THREE.Mesh(mergeGeos(l),l[0].material);nm.castShadow=l[0].castShadow;nm.receiveShadow=l[0].receiveShadow;g.add(nm);for(const m of l)g.remove(m)}
   }
 }
-function buildJet(c,type){type=type||'F16';const r=withNav(buildJetBase(c,type),type);if(AO_ON)bakeAO(r,'jet:'+type);mergeStatic(r);
+function buildJet(c,type){type=type||'F16';const r=withNav(buildJetBase(c,type),type);if(AO_ON)aoNeed(r,'jet:'+type,()=>withNav(buildJetBase(c,type),type));mergeStatic(r);
   r.traverse(o=>{const m=o.material;if(m&&m.isMeshStandardMaterial&&!m.__ibl){m.__ibl=true;m.envMapIntensity=.62;if(m.metalness<.5&&!m.transparent){m.roughness=Math.max(m.roughness,.6);m.metalness=Math.min(m.metalness,.08)}}});   // matte military paint: no plastic sheen
   return dressFlames(r)}
 // per-aircraft size correction [across, up, along] so the lofted shapes match the real length and span; filled in the roster slice

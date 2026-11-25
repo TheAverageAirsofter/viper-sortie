@@ -82,7 +82,7 @@ function clearWorld(){
   enemies=[];friends=[];spawnQ=[];[...pBullets,...eBullets,...missiles,...eMissiles].forEach(kill);
 }
 let gunShots=0,gunHits=0;
-function startGame(){sortieGround=0;btRestoreConditions();BT.on=false;BT.online=false;hideBtPick();TMAP.z=0;SC.list.length=0;SC.streak=0;SC.lastKill=-99;
+function startGame(){aoWarm();AO_SYNC=true;setTimeout(()=>{AO_SYNC=false},0);sortieGround=0;btRestoreConditions();BT.on=false;BT.online=false;hideBtPick();TMAP.z=0;SC.list.length=0;SC.streak=0;SC.lastKill=-99;
   gunShots=0;gunHits=0;clearWorld(); resetPlayer(); resetRadar(); resetCM(); recReset(); rec3Reset(); P.alive=true;
   if(mission!=='ONLINE'){netStop();$('bSb').hidden=true;$('sbBox').hidden=true}
   trainHook=null;
@@ -101,6 +101,10 @@ Object.assign(BANDITS,{F4E:'F-4E Phantom II',FA18C:'F/A-18C',F15E:'F-15E',F35A:'
 // matchmaking: bandits are only ever fighters within MM_BR of the battle rating of the jet you fly (Career and Free play alike)
 const MM_BR=1;
 const banditPool=()=>{const b=progBR(AC.id),p=FIGHTERS.filter(f=>Math.abs(progBR(f)-b)<=MM_BR+1e-6);return p.length?p:[AC.id]};
+// bake the ambient occlusion of the jet types this sortie may spawn later, one every 0.4 s, so a first-time type does not stall a frame mid-fight
+let aoWarmQ=[];function aoWarm(){if(!AO_ON)return;const lu=(typeof BT!=='undefined'&&BT.lineup)||[],want=(FIGHTERS.indexOf(banditType)>=0?[banditType]:banditPool()).concat(lu.map(x=>x&&x.id||x));
+  aoWarmQ=want.filter((t,i,a)=>typeof t==='string'&&AC_DEFS[t]&&a.indexOf(t)===i&&!AO_CACHE.has('jet:'+t));setTimeout(aoStep,1500)}
+function aoStep(){if(!aoWarmQ.length||state==='menu')return;const t=aoWarmQ.shift();if(!AO_CACHE.has('jet:'+t)&&!AO_PENDING.has('jet:'+t)){AO_PENDING.add('jet:'+t);AO_Q.push({key:'jet:'+t,make:()=>withNav(buildJetBase(PLAYER_COLORS,t),t)})}setTimeout(aoStep,250)}
 function pickBanditType(){const pool=banditPool();if(banditType!=='MIXED'&&pool.indexOf(banditType)>=0)return banditType;   // a fixed choice only counts while it is inside the window
   return pool[Math.random()*pool.length|0]}
 // spawn a fighter: team, aircraft type, position, heading toward a point, loadout

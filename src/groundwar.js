@@ -166,7 +166,7 @@ function warBuild(d){
   const tur=new THREE.Group();tur.position.y=yT;
   g.add(hull);g.add(sl);g.add(sr);g.add(tur);tur.add(tb);if(td)tur.add(td);tur.add(gg);if(gn)gg.add(gn);
   const mk=new THREE.Mesh(new THREE.PlaneGeometry(1.6,1.6).rotateX(-Math.PI/2),new THREE.MeshBasicMaterial({color:d.team==='blue'?0x2b8cff:0xff3b30,side:THREE.DoubleSide}));mk.name='mk';mk.position.set(0,top.v+.05,-.3);tur.add(mk);   // roof panel: readable from the air
-  if(AO_ON)bakeAO(g,'war:'+d.n,{res:112,k:1.05});   // baked ambient occlusion, once per vehicle type
+  if(AO_ON&&!d.noAO)aoNeed(g,'war:'+d.n,()=>warBuild(Object.assign({},d,{noAO:1})),{res:112,k:1.05});   // baked ambient occlusion, once per vehicle type
   g.userData={tur,gun:gg,gz:d.gz,sl,sr,yT,L};return g}
 function warSpawn(id,x,z,heading){
   const d=WAR_V[id],obj=warBuild(d);obj.position.set(x,Math.max(groundH(x,z),0)+.2,z);obj.rotation.y=heading;scene.add(obj);
