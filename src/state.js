@@ -93,7 +93,7 @@ function clearWorld(){
   enemies=[];friends=[];spawnQ=[];[...pBullets,...eBullets,...missiles,...eMissiles].forEach(kill);
 }
 let gunShots=0,gunHits=0;
-function startGame(){aoWarm();evtReset();AO_SYNC=true;setTimeout(()=>{AO_SYNC=false},0);sortieGround=0;btRestoreConditions();BT.on=false;BT.online=false;hideBtPick();TMAP.z=0;SC.list.length=0;SC.streak=0;SC.lastKill=-99;
+function startGame(){aoWarm();evtReset();chalStart();AO_SYNC=true;setTimeout(()=>{AO_SYNC=false},0);sortieGround=0;btRestoreConditions();BT.on=false;BT.online=false;hideBtPick();TMAP.z=0;SC.list.length=0;SC.streak=0;SC.lastKill=-99;
   gunShots=0;gunHits=0;clearWorld(); resetPlayer(); resetRadar(); resetCM(); recReset(); rec3Reset(); P.alive=true;
   if(mission!=='ONLINE'){netStop();$('bSb').hidden=true;$('sbBox').hidden=true}
   trainHook=null;
@@ -143,6 +143,26 @@ function spawnPair(type,center,lookAt,opts={}){
   const w=spawnFighter('red',type,center.clone().add(_s5.copy(l.right).multiplyScalar(1400)),lookAt,opts);  // 2-ships fly the same jet
   w.lead=l; w.side=1; l.mate=w; w.mate=l; return [l,w];
 }
+/* ---------------- challenges and medals: two per sortie, picked to suit the mission; finishing one pays a bonus and adds to its medal (bronze 1, silver 5, gold 15) ---------------- */
+const CH_AIR=['WAVES','RUSH','2V4','4SHIP','INTERCEPT','ESCORT','CAMPAIGN','CRUISE'],CH_GND=['STRIKE','CONVOY','GROUNDWAR','ANTISHIP','VALLEY','CAMPAIGN'];
+const CHALS={NOMSL:{n:'Win without firing a missile',m:['RUSH','2V4','4SHIP','INTERCEPT','ESCORT'],end:s=>s.win&&!SCH.launches},
+  GUNCLOSE:{n:'Gun kill inside 500 m',m:CH_AIR},NODMG:{n:'Win without taking damage',m:CH_AIR.concat(CH_GND),end:s=>s.win&&!SCH.hurt},
+  DOUBLE:{n:'Two kills within 10 seconds',m:CH_AIR.concat(['GROUNDWAR','CONVOY'])},LOW:{n:'Kill something below 300 m above the ground',m:CH_AIR.concat(CH_GND)},
+  ACE:{n:'Shoot down an ace',m:['WAVES','RUSH','2V4','4SHIP','INTERCEPT','ESCORT','CAMPAIGN']},FAST:{n:'Win in under 3 minutes',m:['RUSH','2V4','4SHIP','INTERCEPT','STRIKE','CONVOY','ANTISHIP','CRUISE'],end:s=>s.win&&missionT<180},
+  EVENT:{n:'Deal with a surprise event',m:['WAVES','STRIKE','INTERCEPT','RUSH','2V4','4SHIP','CONVOY','GROUNDWAR','ANTISHIP','CAMPAIGN']}};
+const SCH={list:[],launches:0,hurt:false,lastKill:-99};
+let medals={};try{medals=JSON.parse(localStorage.getItem('vsMedals')||'{}')||{}}catch(e){}
+const medalTier=n=>n>=15?'Gold':n>=5?'Silver':n>=1?'Bronze':'';
+function chalStart(){SCH.list.length=0;SCH.launches=0;SCH.hurt=false;SCH.lastKill=-99;if(mission==='TRAINING'||mission==='ONLINE')return;
+  const pool=Object.keys(CHALS).filter(k=>CHALS[k].m.indexOf(mission)>=0);for(let i=0;i<2&&pool.length;i++)SCH.list.push({k:pool.splice(Math.random()*pool.length|0,1)[0],done:false});
+  if(SCH.list.length)setTimeout(()=>{if(state==='play')message('CHALLENGES · '+SCH.list.map(c=>CHALS[c.k].n.toUpperCase()).join(' · '),4)},2600)}
+function chalDone(k){const c=SCH.list.find(x=>x.k===k&&!x.done);if(!c||state!=='play'&&state!=='dead')return;c.done=true;score+=150;
+  medals[k]=(medals[k]||0)+1;try{localStorage.setItem('vsMedals',JSON.stringify(medals))}catch(e){}
+  const t=medalTier(medals[k]),up=medals[k]===1||medals[k]===5||medals[k]===15;c.medal=up?t:'';scEvent('CHALLENGE · '+CHALS[k].n.toUpperCase(),150,'bonus');if(up)message(t.toUpperCase()+' MEDAL · '+CHALS[k].n.toUpperCase(),2.6)}
+function chalEnd(){const s={win:deathCause==='win'};for(const c of SCH.list){const C=CHALS[c.k];if(!c.done&&C.end&&C.end(s)){c.done=true;medals[c.k]=(medals[c.k]||0)+1;const n=medals[c.k];c.medal=n===1||n===5||n===15?medalTier(n):'';score+=150}}
+  try{localStorage.setItem('vsMedals',JSON.stringify(medals))}catch(e){}}
+function chalKill(how,pos,isAce){if(how==='GUNS'&&pos.distanceTo(P.pos)<500)chalDone('GUNCLOSE');if(clock-SCH.lastKill<10)chalDone('DOUBLE');SCH.lastKill=clock;
+  if(P.pos.y-Math.max(groundH(P.pos.x,P.pos.z),0)<300)chalDone('LOW');if(isAce)chalDone('ACE')}
 /* ---------------- mid-mission surprises: one or two per sortie in the air missions, each worth a bonus if you deal with it in time ---------------- */
 const EVT={t:0,n:0,next:0,list:[]};
 const EVT_MISSIONS=['WAVES','STRIKE','INTERCEPT','RUSH','ESCORT','2V4','4SHIP','CONVOY','GROUNDWAR','ANTISHIP','CAMPAIGN','CRUISE'];
@@ -153,7 +173,7 @@ function evtTick(dt){if(EVT_MISSIONS.indexOf(mission)<0||!P.alive||missionDone||
   if(EVT.n>=2||EVT.t<EVT.next)return;EVT.n++;EVT.next=EVT.t+rand(70,120);
   const pool=['AMBUSH','POPSAM','HVT','WEATHER','MAYDAY'].filter(k=>(k!=='WEATHER'||weather==='CLEAR'||weather==='SCATTERED')&&(k!=='MAYDAY'||mission!=='ESCORT'));
   evtStart(pool[Math.random()*pool.length|0])}
-function evtStart(k){const f=_s5.copy(P.fwd).setY(0).normalize(),r=new V3(f.z,0,-f.x),done=(v,txt,pts)=>{scEvent(txt,pts,'bonus');score+=pts;radio(v.ok||'nice work.');return true};
+function evtStart(k){const f=_s5.copy(P.fwd).setY(0).normalize(),r=new V3(f.z,0,-f.x),done=(v,txt,pts)=>{scEvent(txt,pts,'bonus');chalDone('EVENT');score+=pts;radio(v.ok||'nice work.');return true};
   if(k==='AMBUSH'){const c=P.pos.clone().addScaledVector(f,-7500).addScaledVector(r,rand(-2500,2500));c.y=Math.max(Math.max(groundH(c.x,c.z),0)+500,P.pos.y-1800);
     const pr=spawnPair(pickBanditType(),c,P.pos.clone());message('AMBUSH · BANDITS ON YOUR SIX',2.6);radio('pop-up group, your six, '+evtMi(c)+' miles, low! Two bandits, hot!');
     EVT.list.push({t:0,ok:'ambush beaten, good shooting.',tick:v=>v.t>150?true:pr.every(e=>!e.alive)?done(v,'AMBUSH BEATEN',200):false})}
@@ -402,6 +422,7 @@ function killEnemy(e,how,byPlayer=true){
   if(isBT()){btLoss('red');if(byPlayer)BT.sp+=2}
   const nm=e.kind==='bomber'?'BOMBER':e.kind==='cruise'?'CRUISE MISSILE':'BANDIT';
   if(byPlayer)REC3.lastKill={t:clock,id:e.id};
+  if(byPlayer)chalKill(how,e.pos,!!(e.pilot&&e.pilot.ace));
   if(byPlayer&&how==='GUNS'&&e.kind==='fighter')startGunCam(e);
   if(e.pilot&&e.pilot.campAce!=null)campAceDown=true;
   if(byPlayer&&e.pilot&&e.pilot.ace){score+=300;scEvent('ACE KILLED · '+e.pilot.call.toUpperCase(),300,'bonus');radio('splash the ace! '+e.pilot.call+' is down.')}
@@ -785,13 +806,14 @@ function wingHit(side,amt){
     if(sy.wL>=1&&sy.wR>=1){message('BOTH WINGS GONE',2);die('shot')}}
 }
 function playerGunHit(m){
-  m=m||1;const sy=P.sys,sev=PRESETS[preset].dmg;
+  m=m||1;SCH.hurt=true;const sy=P.sys,sev=PRESETS[preset].dmg;
   if(Math.random()<.012*m*sev*(1+3*sy.pilot)){message('PILOT KILLED',1.6);recEvent('The pilot was killed');die('shot');return}
   const r=Math.random();
   if(r<.25)wingHit(Math.random()<.5?'wL':'wR',.08*m*sev);
   else if(r<.37)damageSystem(1);
 }
 function playerMissileHit(){
+  SCH.hurt=true;
   const sy=P.sys,sev=PRESETS[preset].dmg;
   explode(P.pos,false);addHole(playerJet,5);hurtT=.8;shake=1.2;sndHit();buzz([120,60,200]);
   if(Math.random()<Math.min(.9,.5*sev)){message('AIRFRAME DESTROYED',1.6);feed('Critical hit: your airframe was destroyed','loss');die('missile');return}

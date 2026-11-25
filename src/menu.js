@@ -313,7 +313,10 @@ function buildReport(){const src={};for(const e of document.querySelectorAll('#o
     ...(lastAward&&lastAward.prog&&lastAward.prog.breakdown?[]:[['XP',src.XP],['Silver Lions',src['Silver Lions']],['Free RP',src['Free RP']],['Repair cost',src.Repair]])].filter(x=>x[1]!=null);
   const g=$('repGrid');g.innerHTML='';let i=0;
   for(const [l,v] of items){const d=mk('div','rp','<span>'+l+'</span><b></b>');d.style.setProperty('--i',i++);g.appendChild(d);countUp(d.querySelector('b'),String(v),i)}
-  buildItems();overTab()}
+  buildItems();buildChal();overTab()}
+function buildChal(){let el=$('ovChal');if(!el){el=mk('div','chal','');el.id='ovChal';$('oRep').appendChild(el)}
+  el.hidden=!SCH.list.length;el.innerHTML=SCH.list.length?'<h4>Challenges</h4>'+SCH.list.map(c=>{const n=medals[c.k]||0,t=medalTier(n);
+    return'<div class="ch'+(c.done?' ok':'')+'"><i>'+(c.done?'✓':'✗')+'</i><span>'+CHALS[c.k].n+'</span><b>'+(c.medal?'New '+c.medal.toLowerCase()+' medal':t?t+' · '+n:'')+'</b></div>'}).join(''):''}
 /* itemised rewards (Career): every line comes from progAward's breakdown and the lines add up to the totals */
 const sgn=n=>(n<0?'−':'+')+Math.abs(n).toLocaleString();
 function buildItems(){const box=$('ovItems');box.innerHTML='';const bd=lastAward&&lastAward.prog&&lastAward.prog.breakdown;box.hidden=!bd;if(!bd)return;

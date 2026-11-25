@@ -703,3 +703,5 @@ body.tankmode #rdr,body.tankmode #cm,body.tankmode #thr{display:none}
 #wingMenu .btn{position:static;width:100%;height:auto;min-height:34px;padding:6px 10px;border-radius:0;text-align:left;font:700 12px/1.2 var(--f-body,inherit);letter-spacing:.06em;text-transform:uppercase}
 #wingMenu .btn.on{outline:2px solid var(--hud)}
 #wingMenu .btn:disabled{opacity:.4}
+#ov .chal{margin:8px 0 0}#ov .chal h4{margin:0 0 4px;font:700 11px/1.2 var(--f-body);letter-spacing:.18em;text-transform:uppercase;color:var(--mut,#9aa)}
+#ov .chal .ch{display:flex;gap:8px;align-items:baseline;font:500 13px/1.35 var(--f-body);color:var(--mut,#9aa)}#ov .chal .ch.ok{color:var(--txt)}#ov .chal .ch i{font-style:normal;width:14px;color:var(--threat)}#ov .chal .ch.ok i{color:var(--acc)}#ov .chal .ch b{margin-left:auto;font-weight:600;color:#e2b04a;white-space:nowrap}

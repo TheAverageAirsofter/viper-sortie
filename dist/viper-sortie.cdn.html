@@ -704,6 +704,8 @@ body.tankmode #rdr,body.tankmode #cm,body.tankmode #thr{display:none}
 #wingMenu .btn{position:static;width:100%;height:auto;min-height:34px;padding:6px 10px;border-radius:0;text-align:left;font:700 12px/1.2 var(--f-body,inherit);letter-spacing:.06em;text-transform:uppercase}
 #wingMenu .btn.on{outline:2px solid var(--hud)}
 #wingMenu .btn:disabled{opacity:.4}
+#ov .chal{margin:8px 0 0}#ov .chal h4{margin:0 0 4px;font:700 11px/1.2 var(--f-body);letter-spacing:.18em;text-transform:uppercase;color:var(--mut,#9aa)}
+#ov .chal .ch{display:flex;gap:8px;align-items:baseline;font:500 13px/1.35 var(--f-body);color:var(--mut,#9aa)}#ov .chal .ch.ok{color:var(--txt)}#ov .chal .ch i{font-style:normal;width:14px;color:var(--threat)}#ov .chal .ch.ok i{color:var(--acc)}#ov .chal .ch b{margin-left:auto;font-weight:600;color:#e2b04a;white-space:nowrap}
 </style>
 <meta name="theme-color" content="#0b1217">
 
@@ -4694,7 +4696,7 @@ function launchSAM(g){
 }
 function clearGround(){for(const g of ground)scene.remove(g.obj);ground=[];warClear();valleyClear()}
 let sortieGround=0;
-function killGround(g){if(!g.alive)return;g.alive=false;sortieGround++;if(BT.on&&BT.naval&&g.kind==='ship'&&!BT.over){BT.pts.red=Math.max(0,BT.pts.red-100);BT.sp+=3}explode(g.pos.clone().setY(g.pos.y+3),true);g.obj.rotation.z=.3;g.obj.position.y-=1;
+function killGround(g){if(!g.alive)return;g.alive=false;sortieGround++;if(state==='play'&&!g.byAI)chalKill('',g.pos,false);if(BT.on&&BT.naval&&g.kind==='ship'&&!BT.over){BT.pts.red=Math.max(0,BT.pts.red-100);BT.sp+=3}explode(g.pos.clone().setY(g.pos.y+3),true);g.obj.rotation.z=.3;g.obj.position.y-=1;
   kills++;score+=200*Math.max(1,wave);scKill(({sam:'SAM',aaa:'AAA',radar:'RADAR',bunker:'BUNKER',truck:'TRUCK',ship:'FRIGATE',tank:'TANK',ifv:'IFV',spaa:'AA VEHICLE'})[g.kind]+' DESTROYED',0);SC.list[SC.list.length-1].pts=200*Math.max(1,wave);message(({sam:'SAM SITE DESTROYED',aaa:'AAA DESTROYED',radar:'EW RADAR DESTROYED',bunker:'BUNKER DESTROYED',truck:'TRUCK DESTROYED',ship:'FRIGATE SUNK',tank:'TANK DESTROYED',ifv:'IFV DESTROYED',spaa:'AA VEHICLE DESTROYED'})[g.kind],1.6);recEvent('You destroyed '+({sam:'a SAM launcher',aaa:'an AAA gun',radar:'the early-warning radar',bunker:'the command bunker',truck:'a convoy truck',ship:'the frigate',tank:'a '+g.type,ifv:'a '+g.type,spaa:'a '+g.type})[g.kind]);if(g.war)warWreck(g);if(g.kind==='ship'){g.obj.rotation.z=.25;g.obj.position.y=-4}if(typeof campaignKill==='function')campaignKill(g)}
 
 
@@ -5475,7 +5477,7 @@ function clearWorld(){
   enemies=[];friends=[];spawnQ=[];[...pBullets,...eBullets,...missiles,...eMissiles].forEach(kill);
 }
 let gunShots=0,gunHits=0;
-function startGame(){aoWarm();evtReset();AO_SYNC=true;setTimeout(()=>{AO_SYNC=false},0);sortieGround=0;btRestoreConditions();BT.on=false;BT.online=false;hideBtPick();TMAP.z=0;SC.list.length=0;SC.streak=0;SC.lastKill=-99;
+function startGame(){aoWarm();evtReset();chalStart();AO_SYNC=true;setTimeout(()=>{AO_SYNC=false},0);sortieGround=0;btRestoreConditions();BT.on=false;BT.online=false;hideBtPick();TMAP.z=0;SC.list.length=0;SC.streak=0;SC.lastKill=-99;
   gunShots=0;gunHits=0;clearWorld(); resetPlayer(); resetRadar(); resetCM(); recReset(); rec3Reset(); P.alive=true;
   if(mission!=='ONLINE'){netStop();$('bSb').hidden=true;$('sbBox').hidden=true}
   trainHook=null;
@@ -5525,6 +5527,26 @@ function spawnPair(type,center,lookAt,opts={}){
   const w=spawnFighter('red',type,center.clone().add(_s5.copy(l.right).multiplyScalar(1400)),lookAt,opts);  // 2-ships fly the same jet
   w.lead=l; w.side=1; l.mate=w; w.mate=l; return [l,w];
 }
+/* ---------------- challenges and medals: two per sortie, picked to suit the mission; finishing one pays a bonus and adds to its medal (bronze 1, silver 5, gold 15) ---------------- */
+const CH_AIR=['WAVES','RUSH','2V4','4SHIP','INTERCEPT','ESCORT','CAMPAIGN','CRUISE'],CH_GND=['STRIKE','CONVOY','GROUNDWAR','ANTISHIP','VALLEY','CAMPAIGN'];
+const CHALS={NOMSL:{n:'Win without firing a missile',m:['RUSH','2V4','4SHIP','INTERCEPT','ESCORT'],end:s=>s.win&&!SCH.launches},
+  GUNCLOSE:{n:'Gun kill inside 500 m',m:CH_AIR},NODMG:{n:'Win without taking damage',m:CH_AIR.concat(CH_GND),end:s=>s.win&&!SCH.hurt},
+  DOUBLE:{n:'Two kills within 10 seconds',m:CH_AIR.concat(['GROUNDWAR','CONVOY'])},LOW:{n:'Kill something below 300 m above the ground',m:CH_AIR.concat(CH_GND)},
+  ACE:{n:'Shoot down an ace',m:['WAVES','RUSH','2V4','4SHIP','INTERCEPT','ESCORT','CAMPAIGN']},FAST:{n:'Win in under 3 minutes',m:['RUSH','2V4','4SHIP','INTERCEPT','STRIKE','CONVOY','ANTISHIP','CRUISE'],end:s=>s.win&&missionT<180},
+  EVENT:{n:'Deal with a surprise event',m:['WAVES','STRIKE','INTERCEPT','RUSH','2V4','4SHIP','CONVOY','GROUNDWAR','ANTISHIP','CAMPAIGN']}};
+const SCH={list:[],launches:0,hurt:false,lastKill:-99};
+let medals={};try{medals=JSON.parse(localStorage.getItem('vsMedals')||'{}')||{}}catch(e){}
+const medalTier=n=>n>=15?'Gold':n>=5?'Silver':n>=1?'Bronze':'';
+function chalStart(){SCH.list.length=0;SCH.launches=0;SCH.hurt=false;SCH.lastKill=-99;if(mission==='TRAINING'||mission==='ONLINE')return;
+  const pool=Object.keys(CHALS).filter(k=>CHALS[k].m.indexOf(mission)>=0);for(let i=0;i<2&&pool.length;i++)SCH.list.push({k:pool.splice(Math.random()*pool.length|0,1)[0],done:false});
+  if(SCH.list.length)setTimeout(()=>{if(state==='play')message('CHALLENGES · '+SCH.list.map(c=>CHALS[c.k].n.toUpperCase()).join(' · '),4)},2600)}
+function chalDone(k){const c=SCH.list.find(x=>x.k===k&&!x.done);if(!c||state!=='play'&&state!=='dead')return;c.done=true;score+=150;
+  medals[k]=(medals[k]||0)+1;try{localStorage.setItem('vsMedals',JSON.stringify(medals))}catch(e){}
+  const t=medalTier(medals[k]),up=medals[k]===1||medals[k]===5||medals[k]===15;c.medal=up?t:'';scEvent('CHALLENGE · '+CHALS[k].n.toUpperCase(),150,'bonus');if(up)message(t.toUpperCase()+' MEDAL · '+CHALS[k].n.toUpperCase(),2.6)}
+function chalEnd(){const s={win:deathCause==='win'};for(const c of SCH.list){const C=CHALS[c.k];if(!c.done&&C.end&&C.end(s)){c.done=true;medals[c.k]=(medals[c.k]||0)+1;const n=medals[c.k];c.medal=n===1||n===5||n===15?medalTier(n):'';score+=150}}
+  try{localStorage.setItem('vsMedals',JSON.stringify(medals))}catch(e){}}
+function chalKill(how,pos,isAce){if(how==='GUNS'&&pos.distanceTo(P.pos)<500)chalDone('GUNCLOSE');if(clock-SCH.lastKill<10)chalDone('DOUBLE');SCH.lastKill=clock;
+  if(P.pos.y-Math.max(groundH(P.pos.x,P.pos.z),0)<300)chalDone('LOW');if(isAce)chalDone('ACE')}
 /* ---------------- mid-mission surprises: one or two per sortie in the air missions, each worth a bonus if you deal with it in time ---------------- */
 const EVT={t:0,n:0,next:0,list:[]};
 const EVT_MISSIONS=['WAVES','STRIKE','INTERCEPT','RUSH','ESCORT','2V4','4SHIP','CONVOY','GROUNDWAR','ANTISHIP','CAMPAIGN','CRUISE'];
@@ -5535,7 +5557,7 @@ function evtTick(dt){if(EVT_MISSIONS.indexOf(mission)<0||!P.alive||missionDone||
   if(EVT.n>=2||EVT.t<EVT.next)return;EVT.n++;EVT.next=EVT.t+rand(70,120);
   const pool=['AMBUSH','POPSAM','HVT','WEATHER','MAYDAY'].filter(k=>(k!=='WEATHER'||weather==='CLEAR'||weather==='SCATTERED')&&(k!=='MAYDAY'||mission!=='ESCORT'));
   evtStart(pool[Math.random()*pool.length|0])}
-function evtStart(k){const f=_s5.copy(P.fwd).setY(0).normalize(),r=new V3(f.z,0,-f.x),done=(v,txt,pts)=>{scEvent(txt,pts,'bonus');score+=pts;radio(v.ok||'nice work.');return true};
+function evtStart(k){const f=_s5.copy(P.fwd).setY(0).normalize(),r=new V3(f.z,0,-f.x),done=(v,txt,pts)=>{scEvent(txt,pts,'bonus');chalDone('EVENT');score+=pts;radio(v.ok||'nice work.');return true};
   if(k==='AMBUSH'){const c=P.pos.clone().addScaledVector(f,-7500).addScaledVector(r,rand(-2500,2500));c.y=Math.max(Math.max(groundH(c.x,c.z),0)+500,P.pos.y-1800);
     const pr=spawnPair(pickBanditType(),c,P.pos.clone());message('AMBUSH · BANDITS ON YOUR SIX',2.6);radio('pop-up group, your six, '+evtMi(c)+' miles, low! Two bandits, hot!');
     EVT.list.push({t:0,ok:'ambush beaten, good shooting.',tick:v=>v.t>150?true:pr.every(e=>!e.alive)?done(v,'AMBUSH BEATEN',200):false})}
@@ -5784,6 +5806,7 @@ function killEnemy(e,how,byPlayer=true){
   if(isBT()){btLoss('red');if(byPlayer)BT.sp+=2}
   const nm=e.kind==='bomber'?'BOMBER':e.kind==='cruise'?'CRUISE MISSILE':'BANDIT';
   if(byPlayer)REC3.lastKill={t:clock,id:e.id};
+  if(byPlayer)chalKill(how,e.pos,!!(e.pilot&&e.pilot.ace));
   if(byPlayer&&how==='GUNS'&&e.kind==='fighter')startGunCam(e);
   if(e.pilot&&e.pilot.campAce!=null)campAceDown=true;
   if(byPlayer&&e.pilot&&e.pilot.ace){score+=300;scEvent('ACE KILLED · '+e.pilot.call.toUpperCase(),300,'bonus');radio('splash the ace! '+e.pilot.call+' is down.')}
@@ -6167,13 +6190,14 @@ function wingHit(side,amt){
     if(sy.wL>=1&&sy.wR>=1){message('BOTH WINGS GONE',2);die('shot')}}
 }
 function playerGunHit(m){
-  m=m||1;const sy=P.sys,sev=PRESETS[preset].dmg;
+  m=m||1;SCH.hurt=true;const sy=P.sys,sev=PRESETS[preset].dmg;
   if(Math.random()<.012*m*sev*(1+3*sy.pilot)){message('PILOT KILLED',1.6);recEvent('The pilot was killed');die('shot');return}
   const r=Math.random();
   if(r<.25)wingHit(Math.random()<.5?'wL':'wR',.08*m*sev);
   else if(r<.37)damageSystem(1);
 }
 function playerMissileHit(){
+  SCH.hurt=true;
   const sy=P.sys,sev=PRESETS[preset].dmg;
   explode(P.pos,false);addHole(playerJet,5);hurtT=.8;shake=1.2;sndHit();buzz([120,60,200]);
   if(Math.random()<Math.min(.9,.5*sev)){message('AIRFRAME DESTROYED',1.6);feed('Critical hit: your airframe was destroyed','loss');die('missile');return}
@@ -6710,7 +6734,7 @@ function sarhStep(m,s,tg,lockOK,launcher){
 function launch(type,target){
   const isNine=type==='9X';
   const idx=isNine?AC.srN-P.aim9:AC.mrN-P.aim120;
-  if(isNine)P.aim9--; else P.aim120--;
+  if(isNine)P.aim9--; else P.aim120--; SCH.launches++;
   if(!isNine&&P.aim120===0)setTimeout(()=>{if(state==='play')message('LAST '+AC.mrName+' · '+AC.srName+' AND GUN LEFT · LAND AND STOP AT BASE TO REARM',2.8)},1600);
   const rail=playerJet.getObjectByName((isNine?'r9_':'r120_')+idx);
   const m=take(missiles); m.on=true; m.type=type; m.t=0; m.target=target; m.m.visible=true;
@@ -8732,7 +8756,7 @@ function frame(now){
       if(state!=='menu'&&state!=='replay')updateCombat(h);
     }
     rec3(dt); voiceWatch(); updateEject(dt); if(BT.on)btTick(dt); syncEjectBtn();
-    if(state==='dead'){deadT-=dt;if(deadT<=0){state='over';campaignAfter();careerAward();if(score>best){best=score;try{localStorage.setItem('viperBest',best)}catch(e){}}showOverlay('over')}}
+    if(state==='dead'){deadT-=dt;if(deadT<=0){state='over';chalEnd();campaignAfter();careerAward();if(score>best){best=score;try{localStorage.setItem('viperBest',best)}catch(e){}}showOverlay('over')}}
     fxTick++; if(P.alive)jetFX(P,AC.id,true);
     for(const e of enemies)if(e.kind==='fighter')jetFX(e,e.type,false);
     for(const f of friends)if(f.kind==='fighter')jetFX(f,f.type,false);
@@ -8883,13 +8907,13 @@ const _careerAward=careerAward;
 careerAward=function(){lbAdd();return _careerAward.apply(this,arguments)};
 
 /* ---------- test hook (only with ?test in the URL) ---------- */
-if(/[?&]test\b/.test(location.search))window.__vs={evtStart,EVT,dmgFrom,hitMark,get friends(){return friends},setLock:t=>{lockTarget=t},get KC(){return KC},aoKeys:()=>[...AO_CACHE.keys()],aoQ:()=>AO_Q.length,aoPump,aoDbg:()=>AO_Q.map(j=>j.key+":"+!!j.it),get sortie(){return sortie},tkResult,get camera(){return camera},tkAirDown,get TNK(){return TNK},get WAR(){return WAR},warDie,warBuild,WAR_V,get playerJet(){return playerJet},get CANYON(){return CANYON},groundH,valRings:()=>valRings,buildSAM,buildAAA,buildRadar,buildBunker,buildTruck,buildShip,get ground(){return ground},deathCause:()=>deathCause,spawnFighter,clockNow:()=>clock,cycleRadarSub,radarBlind,radarSub,clutter,R,AA,killEnemy,aaSpawnWave,AG,agRelease,agSight,agWpn,ccip,agReset,btConditions,NET,netScoreCheck,netTeamScore,sbHtml,killGround,get pass(){return pass},passAdd,passClaim,weeklyAdd,scene,rinfoReset:()=>{renderer.info.autoReset=false;renderer.info.reset()},rinfo:()=>({c:renderer.info.render.calls,t:renderer.info.render.triangles,g:renderer.info.memory.geometries,tx:renderer.info.memory.textures}),KB,kbRebuild,playerGunHit,wingHit,BT,die,btRespawn,TMAP,mapStep,KBM,SC,damageSystem,hitAI,killEnemy,setThr,HEAT,explode,puff,camera,LT,townLights,flashLt,P,fly,dlz,flyout,AC_DEFS,feed,WAR,WAR_V,warBuild,warSpawn,warModules,warDie,warFlags,updateWar,warAlive,buildJet,PLAYER_COLORS,M2,V3,atm,clamp,lbAdd,showOverlay:k=>showOverlay(k),setScore:(n,k)=>{score=n;kills=k},get state(){return state},get enemies(){return enemies},missiles:()=>missiles.filter(m=>m.on),setAC:id=>{AC=AC_DEFS[id];applyAC()},wt:{   // weapon-test hooks: a clean sky, one drone, scripted launches
+if(/[?&]test\b/.test(location.search))window.__vs={SCH,chalDone,evtStart,EVT,dmgFrom,hitMark,get friends(){return friends},setLock:t=>{lockTarget=t},get KC(){return KC},aoKeys:()=>[...AO_CACHE.keys()],aoQ:()=>AO_Q.length,aoPump,aoDbg:()=>AO_Q.map(j=>j.key+":"+!!j.it),get sortie(){return sortie},tkResult,get camera(){return camera},tkAirDown,get TNK(){return TNK},get WAR(){return WAR},warDie,warBuild,WAR_V,get playerJet(){return playerJet},get CANYON(){return CANYON},groundH,valRings:()=>valRings,buildSAM,buildAAA,buildRadar,buildBunker,buildTruck,buildShip,get ground(){return ground},deathCause:()=>deathCause,spawnFighter,clockNow:()=>clock,cycleRadarSub,radarBlind,radarSub,clutter,R,AA,killEnemy,aaSpawnWave,AG,agRelease,agSight,agWpn,ccip,agReset,btConditions,NET,netScoreCheck,netTeamScore,sbHtml,killGround,get pass(){return pass},passAdd,passClaim,weeklyAdd,scene,rinfoReset:()=>{renderer.info.autoReset=false;renderer.info.reset()},rinfo:()=>({c:renderer.info.render.calls,t:renderer.info.render.triangles,g:renderer.info.memory.geometries,tx:renderer.info.memory.textures}),KB,kbRebuild,playerGunHit,wingHit,BT,die,btRespawn,TMAP,mapStep,KBM,SC,damageSystem,hitAI,killEnemy,setThr,HEAT,explode,puff,camera,LT,townLights,flashLt,P,fly,dlz,flyout,AC_DEFS,feed,WAR,WAR_V,warBuild,warSpawn,warModules,warDie,warFlags,updateWar,warAlive,buildJet,PLAYER_COLORS,M2,V3,atm,clamp,lbAdd,showOverlay:k=>showOverlay(k),setScore:(n,k)=>{score=n;kills=k},get state(){return state},get enemies(){return enemies},missiles:()=>missiles.filter(m=>m.on),setAC:id=>{AC=AC_DEFS[id];applyAC()},wt:{   // weapon-test hooks: a clean sky, one drone, scripted launches
   begin:id=>{AC=AC_DEFS[id];applyAC();startGame();return AC.id},
   clear:()=>{waveClearT=1e9;for(const e of enemies){e.alive=false;scene.remove(e.obj)}enemies.length=0;P.pos.set(0,6000,0);P.vel.set(0,0,250);throttle=.7;return state},
   target:(type,dz,away,speed)=>{const e=spawnFighter('red',type,new V3(0,P.pos.y,dz),new V3(0,P.pos.y,dz+(away?9999:-9999)),{ir:0,rdr:0,speed:speed||220});e.drone=true;return e.id},
   lock:()=>{if(enemies[0])lockOn(enemies[0])},fire:w=>{if(w==='9X')fire9=true;else fire120=true},gun:on=>{gunHeld=on},
   missiles:()=>missiles.filter(m=>m.on),
-  st:()=>{const e=enemies[0];return{can9,can120,aim9:P.aim9,aim120:P.aim120,rounds:P.rounds,alive:!!(e&&e.alive),hp:e?e.hp:0,msl:missiles.filter(m=>m.on).length,stt:!!R.stt,sttAcq:R.acqT,d:e?e.pos.distanceTo(P.pos):0,msg:$('msg')?$('msg').textContent:''}}},mslGeoFor,MSL_MAT,HG,M2dims:()=>{const o={};for(const id in M2){const S=M2[id],zs=S.fus.map(f=>f[0]).concat(S.noz.map(n=>n[2]-n[4]/2)),L=Math.max(...zs)-Math.min(...zs),sp=2*Math.max(...S.wings.flatMap(w=>w.st.map(q=>q.x)));const k=M2K[id]||[1,1,1];o[id]=[+(L*k[2]).toFixed(2),+(sp*k[0]).toFixed(2)]}return o},ROSTER_IDS,restart:()=>startGame(),spawnAll:()=>{let n=0;for(const id of FIGHTERS){spawnFighter('red',id,P.pos.clone().add(new V3(rand(-4000,4000),rand(-300,300),rand(8000,14000))),P.pos);n++}return n},tableRows:id=>({gear:!!GEAR_SPEC[id],snd:!!ENG_SND[id],hp:!!JET_HP[id],rcs:RCS[id]!=null,paint:!!PAINT[id]||!!(AC_DEFS[id].model),band:!!BANDITS[id],fighter:FIGHTERS.indexOf(id)>=0}),get preset(){return preset},PRESETS,get daily(){return daily},dailyAdd,endTest:o=>{deathCause=o.cause||'win';score=o.score||0;kills=o.kills||0;missionT=o.t||90;P.alive=o.alive!==false;P.rescued=!!o.rescued;state='over';campaignAfter();careerAward();showOverlay('over')},get AC(){return AC}};
+  st:()=>{const e=enemies[0];return{can9,can120,aim9:P.aim9,aim120:P.aim120,rounds:P.rounds,alive:!!(e&&e.alive),hp:e?e.hp:0,msl:missiles.filter(m=>m.on).length,stt:!!R.stt,sttAcq:R.acqT,d:e?e.pos.distanceTo(P.pos):0,msg:$('msg')?$('msg').textContent:''}}},mslGeoFor,MSL_MAT,HG,M2dims:()=>{const o={};for(const id in M2){const S=M2[id],zs=S.fus.map(f=>f[0]).concat(S.noz.map(n=>n[2]-n[4]/2)),L=Math.max(...zs)-Math.min(...zs),sp=2*Math.max(...S.wings.flatMap(w=>w.st.map(q=>q.x)));const k=M2K[id]||[1,1,1];o[id]=[+(L*k[2]).toFixed(2),+(sp*k[0]).toFixed(2)]}return o},ROSTER_IDS,restart:()=>startGame(),spawnAll:()=>{let n=0;for(const id of FIGHTERS){spawnFighter('red',id,P.pos.clone().add(new V3(rand(-4000,4000),rand(-300,300),rand(8000,14000))),P.pos);n++}return n},tableRows:id=>({gear:!!GEAR_SPEC[id],snd:!!ENG_SND[id],hp:!!JET_HP[id],rcs:RCS[id]!=null,paint:!!PAINT[id]||!!(AC_DEFS[id].model),band:!!BANDITS[id],fighter:FIGHTERS.indexOf(id)>=0}),get preset(){return preset},PRESETS,get daily(){return daily},dailyAdd,endTest:o=>{deathCause=o.cause||'win';score=o.score||0;kills=o.kills||0;missionT=o.t||90;P.alive=o.alive!==false;P.rescued=!!o.rescued;state='over';chalEnd();campaignAfter();careerAward();showOverlay('over')},get AC(){return AC}};
 
 // Android app: tell the player when a newer release is on GitHub. Every build is signed with the same key, so the new APK installs over this one.
 (function(){const cap=window.Capacitor;if(!cap||!(cap.isNativePlatform?cap.isNativePlatform():cap.getPlatform&&cap.getPlatform()!=='web'))return;
@@ -9469,7 +9493,10 @@ function buildReport(){const src={};for(const e of document.querySelectorAll('#o
     ...(lastAward&&lastAward.prog&&lastAward.prog.breakdown?[]:[['XP',src.XP],['Silver Lions',src['Silver Lions']],['Free RP',src['Free RP']],['Repair cost',src.Repair]])].filter(x=>x[1]!=null);
   const g=$('repGrid');g.innerHTML='';let i=0;
   for(const [l,v] of items){const d=mk('div','rp','<span>'+l+'</span><b></b>');d.style.setProperty('--i',i++);g.appendChild(d);countUp(d.querySelector('b'),String(v),i)}
-  buildItems();overTab()}
+  buildItems();buildChal();overTab()}
+function buildChal(){let el=$('ovChal');if(!el){el=mk('div','chal','');el.id='ovChal';$('oRep').appendChild(el)}
+  el.hidden=!SCH.list.length;el.innerHTML=SCH.list.length?'<h4>Challenges</h4>'+SCH.list.map(c=>{const n=medals[c.k]||0,t=medalTier(n);
+    return'<div class="ch'+(c.done?' ok':'')+'"><i>'+(c.done?'✓':'✗')+'</i><span>'+CHALS[c.k].n+'</span><b>'+(c.medal?'New '+c.medal.toLowerCase()+' medal':t?t+' · '+n:'')+'</b></div>'}).join(''):''}
 /* itemised rewards (Career): every line comes from progAward's breakdown and the lines add up to the totals */
 const sgn=n=>(n<0?'−':'+')+Math.abs(n).toLocaleString();
 function buildItems(){const box=$('ovItems');box.innerHTML='';const bd=lastAward&&lastAward.prog&&lastAward.prog.breakdown;box.hidden=!bd;if(!bd)return;

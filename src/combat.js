@@ -237,7 +237,7 @@ function sarhStep(m,s,tg,lockOK,launcher){
 function launch(type,target){
   const isNine=type==='9X';
   const idx=isNine?AC.srN-P.aim9:AC.mrN-P.aim120;
-  if(isNine)P.aim9--; else P.aim120--;
+  if(isNine)P.aim9--; else P.aim120--; SCH.launches++;
   if(!isNine&&P.aim120===0)setTimeout(()=>{if(state==='play')message('LAST '+AC.mrName+' · '+AC.srName+' AND GUN LEFT · LAND AND STOP AT BASE TO REARM',2.8)},1600);
   const rail=playerJet.getObjectByName((isNine?'r9_':'r120_')+idx);
   const m=take(missiles); m.on=true; m.type=type; m.t=0; m.target=target; m.m.visible=true;
