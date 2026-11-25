@@ -212,6 +212,7 @@ function drawHUD(){
       else{c.beginPath();c.moveTo(p.x,p.y-s);c.lineTo(p.x+s,p.y);c.lineTo(p.x,p.y+s);c.lineTo(p.x-s,p.y);c.closePath();c.stroke();
         if(MK>=2||d<9000)txt(c,(e.kind==='bomber'?'BMR ':'')+nm(d),p.x,p.y+20,'center',col,11);
         if(MK>=2&&!e.remote&&e.kind==='fighter'&&BANDITS[e.type])txt(c,BANDITS[e.type],p.x,p.y-18,'center',col,10,700);   // vehicle tag, like the War Thunder markers   // Realistic: range only when close
+        if(e.pilot&&!e.remote&&(e.pilot.ace?(MK>=1||d<12000):MK>=2&&e.pilot.tier!=='REGULAR')){const pl=e.pilot;txt(c,pl.ace?'★ '+pl.call.toUpperCase()+' · '+pl.kills:pl.tier==='VETERAN'?'VETERAN':'ROOKIE',p.x,p.y-(MK>=2?30:18),'center',pl.ace?'#ffd34d':col,pl.ace?11:9,700)}   // ace tag in gold with his tally
         if(e.remote&&MK>=2)txt(c,(e.name||'PILOT').toUpperCase().slice(0,14)+' · '+(AC_DEFS[e.type]?AC_DEFS[e.type].name:''),p.x,p.y-18,'center',col,10,700)}}
     else{_d.copy(e.pos).applyMatrix4(camera.matrixWorldInverse);
       let dx=_d.x,dy=-_d.y; if(Math.abs(dx)+Math.abs(dy)<1e-3)dy=1;

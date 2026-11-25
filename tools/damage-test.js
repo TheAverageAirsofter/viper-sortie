@@ -21,6 +21,7 @@ const assert = require('assert'), path = require('path');
   assert(d.alive3, 'a few gun hits do not kill by themselves');
   const n = await p.evaluate(() => { __vs.P.sys.wL = 0; __vs.P.sys.wR = 0; __vs.P.sys.pilot = 0; const seen = new Set(); for (let i = 0; i < 200; i++) { const S = __vs.P.sys; const before = JSON.stringify(S); __vs.damageSystem(1); if (JSON.stringify(S) !== before) seen.add(1); } return seen.size });
   // AI fighters take module damage too: wings, fire, pilot; enough gun hits always bring one down, a missile usually does
+  await p.evaluate(() => { const V = __vs; while (V.enemies.filter(x => x.alive && x.kind === 'fighter').length < 2) V.spawnFighter('red', 'MIG29', V.P.pos.clone().add(new V.V3(0, 0, 30000)), V.P.pos); });   // do not wait on the mission's own merge distance
   await p.waitForFunction(() => __vs.enemies.filter(x => x.alive && x.kind === 'fighter').length >= 2, null, { timeout: 40000 });
   const ai = await p.evaluate(async () => { const V = __vs, es = V.enemies.filter(x => x.alive && x.kind === 'fighter'); const a = es[0], b = es[1]; let n = 0, labels = new Set();
     while (a.alive && n < 400) { V.hitAI(a, 1.2, 'GUNS', true); n++; if (a.sys) { if (a.sys.eng) labels.add('eng'); if (a.sys.wL || a.sys.wR) labels.add('wing'); } }

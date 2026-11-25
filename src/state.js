@@ -70,6 +70,17 @@ let rangeKey='LONG'; try{const r=localStorage.getItem('viperRange');if(ENG_RANGE
 const engK=()=>ENG_RANGES[rangeKey].k, farK=()=>1+(engK()-1)*.3;   // engK scales random merge distances; farK scales fixed scripted set-ups
 let difficulty='REGULAR'; try{const d=localStorage.getItem('viperDiff');if(DIFF[d])difficulty=d}catch(e){}
 const sk=e=>e.sk?e.sk:e.remote?REMOTE_SK:e.team==='red'?DIFF[difficulty]:DIFF.VETERAN;   // your wingman flies at veteran level
+/* enemy pilots: each bandit gets a skill tier around the chosen difficulty (some weaker, some stronger) and a name; now and then an ace
+   with a kill tally turns up, announced by AWACS and worth a bonus */
+const TIER_ORDER=['ROOKIE','REGULAR','VETERAN','ACE'];
+const PILOT_NAMES={RUS:['Volkov','Petrov','Sokolov','Orlov','Kuznetsov','Morozov','Lebedev','Zaitsev','Belov','Gromov','Karpov','Titov'],CHN:['Wang','Li','Zhang','Liu','Chen','Yang','Zhao','Huang','Zhou','Wu'],
+  WEST:['Becker','Laurent','Hayes','Moreau','Fischer','Novak','Rossi','Lindqvist','Carter','Dubois','Keller','Varga']};
+const ACE_CALLS=['Wolf','Viper','Ghost','Cobra','Raven','Hammer','Saber','Falcon','Spectre','Talon','Dagger','Reaper'];
+function pilotFor(type){const nat=(typeof NODES!=='undefined'&&NODES[type]&&NODES[type].n)||'RUS',pool=nat==='RUS'?PILOT_NAMES.RUS:nat==='CHN'?PILOT_NAMES.CHN:PILOT_NAMES.WEST;
+  let i=TIER_ORDER.indexOf(difficulty);const r=Math.random();if(r<.18)i--;else if(r>.82)i++;
+  const aceP=.05+Math.min(.15,(wave||0)*.03);let ace=false;if(Math.random()<aceP){i=3;ace=true}
+  i=Math.max(0,Math.min(3,i));const tier=TIER_ORDER[i],rank=['Lt.','Capt.','Maj.','Col.'][i];
+  return{tier,ace,name:rank+' '+pool[Math.random()*pool.length|0],call:ace?ACE_CALLS[Math.random()*ACE_CALLS.length|0]:'',kills:ace?(5+Math.random()*14|0):i>=2?(Math.random()*4|0):0}}
 const RED_COLORS={body:0x6a3f3a,dark:0x2f2523,glass:0x222a30,glassE:0x000000,flame:0xff6a3a};
 const BLUE_COLORS={body:0x7f93a8,dark:0x36404b,glass:0xc9a24a,glassE:0x2a1d00,flame:0xffa64a};
 const templates={};
@@ -114,6 +125,8 @@ function spawnFighter(team,type,pos,lookAt,opts={}){
     team,type,kind:'fighter',hp:3,alive:true,mode:'',tgt:null,retgtT:0,lead:null,side:1,engaged:false,crankSide:Math.random()<.5?1:-1,
     flareCd:0,chaffCd:0,gunAcc:0,mslCd:rand(3,6)*(team==='red'?DIFF[difficulty].cd:1),lockT:0,spiking:false,zoneT:0,zI:null,zR:null,
     espec:aiSpecs(type),ir:opts.ir??ac.srN,rdr:opts.rdr??ac.mrN,cmd:'ENGAGE',escortPref:!!opts.escortPref,id:nextId()});
+  if(team==='red'&&!opts.noPilot&&mission!=='TRAINING'){const pl=pilotFor(type);e.pilot=pl;e.sk=DIFF[pl.tier];e.gLim=Math.min(DIFF[pl.tier].g+wave*.15,ac.gmax);
+    if(pl.ace&&state==='play')setTimeout(()=>{if(e.alive)radio('heads up, ace on station: '+pl.name+' "'+pl.call+'", '+pl.kills+' kills, flying a '+((AC_DEFS[type]||{}).name||type)+'.')},1200)}
   axes(e); e.vel.copy(e.fwd).multiplyScalar(opts.speed||rand(220,250));
   (team==='red'?enemies:friends).push(e); return e;
 }
@@ -128,7 +141,7 @@ let idSeq=0; const nextId=()=>++idSeq;
 function spawnPair(type,center,lookAt,opts={}){
   const l=spawnFighter('red',type,center,lookAt,opts);
   const w=spawnFighter('red',type,center.clone().add(_s5.copy(l.right).multiplyScalar(1400)),lookAt,opts);  // 2-ships fly the same jet
-  w.lead=l; w.side=1; return [l,w];
+  w.lead=l; w.side=1; l.mate=w; w.mate=l; return [l,w];
 }
 function setupMission(){
   if(mission==='TRAINING'){setupLesson();return}
@@ -359,6 +372,7 @@ function killEnemy(e,how,byPlayer=true){
   if(isBT()){btLoss('red');if(byPlayer)BT.sp+=2}
   const nm=e.kind==='bomber'?'BOMBER':e.kind==='cruise'?'CRUISE MISSILE':'BANDIT';
   if(byPlayer)REC3.lastKill={t:clock,id:e.id};
+  if(byPlayer&&e.pilot&&e.pilot.ace){score+=300;scEvent('ACE KILLED · '+e.pilot.call.toUpperCase(),300,'bonus');radio('splash the ace! '+e.pilot.call+' is down.')}
   if(byPlayer)gciSplash();
   if(!byPlayer&&e.hitBy&&clock-e.hitBy<12)scEvent('ASSIST',40,'bonus');
   if(byPlayer){kills++;const kp=(e.kind==='bomber'?150:e.kind==='cruise'?120:100)*Math.max(1,wave)+(how==='GUNS'?50:0);score+=kp;scKill((e.kind==='bomber'?'BOMBER':e.kind==='cruise'?'CRUISE MISSILE':(AC_DEFS[e.type]?AC_DEFS[e.type].name.toUpperCase():'AIRCRAFT'))+' DESTROYED',0);SC.list[SC.list.length-1].pts=kp;message(e.kind==='cruise'?'CRUISE MISSILE DOWN':how==='GUNS'?'GUNS KILL':'SPLASH · '+how,1.4)}

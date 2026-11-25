@@ -114,6 +114,14 @@ function updateAI(e,dt){
     else if(dT>15000||ground.includes(tg)){dir.subVectors(tg.pos,e.pos);if(ground.includes(tg))dir.y=Math.max(dir.y,(4500-e.pos.y)/3000);else if(dir.y<0)dir.y*=.3;dir.normalize()}
     else{const t=clamp(dT/900,0,1.2);dir.copy(tg.pos).addScaledVector(tg.vel,t).sub(e.pos).normalize()}
     thr=dT<6000?1:.85; if(e.kcas<300){gK=.65;thr=1} if(e.mach>1.3)thr=.8;
+    // pair tactics: the one being pointed at drags cold as bait while its partner presses; at medium range the wingman brackets 40 degrees off
+    const mate=e.mate&&e.mate.alive?e.mate:null;
+    if(mate&&mate.tgt===tg&&tg.fwd&&!ground.includes(tg)&&!e.holdOff){
+      const toMe=_s5.subVectors(e.pos,tg.pos).normalize(),aimed=tg.fwd.dot(toMe)>.94;
+      if(aimed&&dT>2500&&dT<14000&&!(e.baitT>clock)&&!(mate.baitT>clock)&&(e.baitCd||0)<clock&&sk(e).notchP>=.3){e.baitT=clock+rand(7,11);e.baitCd=clock+28}
+      if(e.baitT>clock&&dT>1800){e.mode='BAIT';dir.copy(toMe);dir.y=Math.min(dir.y,-.06);dir.normalize();thr=1;gK=1}
+      else if(e.lead&&dT>5000&&dT<20000){const los=_s5.subVectors(tg.pos,e.pos);los.y*=.3;los.normalize();dir.copy(los).applyAxisAngle(UP,(e.side||1)*.7);e.mode='FLANK'}
+    }
   }
   const gh=Math.max(groundH(e.pos.x,e.pos.z),0), agl=e.pos.y-gh;
   if(agl<900||(e.vel.y<-70&&agl<2600)){dir.copy(e.fwd);dir.y=Math.max(.5,dir.y);dir.normalize();thr=1}
