@@ -374,6 +374,7 @@ function killEnemy(e,how,byPlayer=true){
   const nm=e.kind==='bomber'?'BOMBER':e.kind==='cruise'?'CRUISE MISSILE':'BANDIT';
   if(byPlayer)REC3.lastKill={t:clock,id:e.id};
   if(byPlayer&&how==='GUNS'&&e.kind==='fighter')startGunCam(e);
+  if(e.pilot&&e.pilot.campAce!=null)campAceDown=true;
   if(byPlayer&&e.pilot&&e.pilot.ace){score+=300;scEvent('ACE KILLED · '+e.pilot.call.toUpperCase(),300,'bonus');radio('splash the ace! '+e.pilot.call+' is down.')}
   if(byPlayer)gciSplash();
   if(!byPlayer&&e.hitBy&&clock-e.hitBy<12)scEvent('ASSIST',40,'bonus');
@@ -440,6 +441,7 @@ function updateMission(dt){
   // ONLINE: free-for-all until you're shot down or abort
 }
 function die(cause){
+  if(state==='play'&&mission==='CAMPAIGN'&&enemies.some(x=>x.alive&&x.pilot&&x.pilot.campAce!=null&&x.pos.distanceTo(P.pos)<6000))campAceKilledYou=true;
   if(state!=='play')return; state='dead'; deathCause=cause; REC3.deathT=clock; if(mission==='ONLINE'&&NET.active)NET.deaths++; deadT=1.8; P.alive=false; missionDone=true; recEvent('You were '+({terrain:'killed hitting the ground',shot:'shot down by guns',missile:'killed by a missile',ejected:'out of the jet (ejected)',collision:'killed in a mid-air collision',landing:'killed crashing on landing',gearup:'killed landing gear-up',abort:'out (sortie aborted)',fuel:'down after running out of fuel'}[cause]||'down'));
   CM.flrHeld=CM.chfHeld=false; if(isBT())btDied(); if(cause==='ejected'){deadT=7;playerJet.visible=false;$('ctrls').hidden=true;resetStick();gunHeld=false;brake=false;$('bEject').hidden=true;return}
   explode(P.pos,true); explode(P.pos.clone().addScaledVector(P.fwd,10),true);

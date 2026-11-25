@@ -282,7 +282,7 @@ function campMapSvg(){if(typeof camp!=='object'||!camp)return;const S=SECTORS;le
   h+='<text x="14" y="228" fill="#fff" opacity=".6" font-size="8" letter-spacing="2" font-family="inherit">HOME BASE</text><text x="386" y="20" text-anchor="end" fill="#fff" opacity=".6" font-size="8" letter-spacing="2" font-family="inherit">ENEMY CAPITAL</text>';
   $('opSvg').innerHTML=h;
   const f=Math.min(camp.front,5);$('cpSec').textContent='Sector '+(f+1)+' of 6 · front line';$('cpName').textContent=SECTORS[f];
-  $('cpKv').innerHTML=kvs([['Resistance',camp.str[f]+'%'],['Sortie',CAMP_SORTIES[campSortie]],['Sorties flown',camp.sorties],['Wins',camp.wins]])}
+  const ace=camp.aces&&camp.aces[f];$('cpKv').innerHTML=kvs([['Resistance',camp.str[f]+'%'],['Sortie',CAMP_SORTIES[campSortie]],['Sector ace',ace?(ace.alive?'"'+ace.call+'" · '+ace.kills+' kills':'shot down'):'unknown'],['Record',camp.sorties+' flown · '+camp.wins+' won']])}
 
 /* ---- keep everything in step with the game ---- */
 const hgBgWant=()=>{const k=ovEl.dataset.kind;return !ovEl.hidden&&(k==='menu'||k==='over')&&(state==='menu'||state==='over')};

@@ -593,13 +593,16 @@ function sortieCheck(dt){if(!sortie)return;const k=sortie.kind;
 /* ---------------- dynamic campaign: six sectors north of the base, a moving front, and losses that stay lost ---------------- */
 const SECTORS=['Aster Valley','Brimstone Ridge','Cobalt Lakes','Drover Gap','Ember Coast','Falcon Plateau'];
 const CAMP_SORTIES={CAP:'Combat air patrol',STRIKE:'Strike the sector HQ',CONVOY:'Hit the supply convoy',ANTISHIP:'Sink the frigate',CRUISE:'Defend against cruise missiles'};
+const CAMP_INTEL={CONVOY:'a supply convoy is moving up to the front',STRIKE:'the sector HQ has been located',ANTISHIP:'a frigate is covering the coast road',CAP:'enemy fighters are massing over the front'};
 let camp=null, campSortie='CAP', campNote='';
-function campNew(){return{front:2,str:[0,0,100,100,100,100],dead:{},sorties:0,wins:0,log:[]}}
+function campNew(){return{front:2,str:[0,0,100,100,100,100],dead:{},sorties:0,wins:0,log:[],aces:{},intel:null,threat:false}}
+// every enemy sector has a resident ace who hunts you there; he keeps his tally between sorties
+function campAce(f){camp.aces=camp.aces||{};let a=camp.aces[f];if(!a){const p=pilotFor('SU27');a=camp.aces[f]={name:p.name.replace(/^\S+/,'Maj.'),call:ACE_CALLS[(f*5+3)%ACE_CALLS.length],kills:6+f*2+(Math.random()*4|0),alive:true}}return a}
 function campLoad(){try{const c=JSON.parse(localStorage.getItem('vsCampaign')||'null');if(c&&c.str)return c}catch(e){}return campNew()}
 function campSave(){try{localStorage.setItem('vsCampaign',JSON.stringify(camp))}catch(e){}}
 camp=campLoad(); try{campSortie=localStorage.getItem('vsCampSortie')||'CAP'}catch(e){}
 const secZ=i=>8000+i*14000;
-function setupCampaign(){
+function setupCampaign(){campAceDown=false;campAceKilledYou=false;
   const f=Math.min(camp.front,5), cz=secZ(f), cx=rand(-5000,5000); P.pos.set(0,6000,Math.max(0,cz-34000)); P.vel.set(0,0,240);
   const k=campSortie;
   if(k==='CAP'){setupCAP(cz,f>=4?6:4)}
@@ -610,20 +613,35 @@ function setupCampaign(){
   else if(k==='ANTISHIP'){setupShip();spawnPair(pickBanditType(),new V3(19600,7000,36000),new V3(0,5000,0))}
   else if(k==='CRUISE'){P.pos.set(0,5000,6000);setupCruise()}
   if(f>=3)spawnGround('sam',cx+rand(-6000,6000),cz-9000);   // deeper sectors are better defended
+  {const a=campAce(f);if(a.alive&&k!=='CRUISE'&&Math.random()<(k==='CAP'?.75:.45)){const t=pickBanditType(),c=new V3(cx+rand(-4000,4000),7500,cz+rand(14000,20000));
+    const e=spawnFighter('red',t,c,new V3(0,6000,0),{});e.pilot={tier:'ACE',ace:true,name:a.name,call:a.call,kills:a.kills,campAce:f};e.sk=DIFF.ACE;e.gLim=AC_DEFS[t].gmax;
+    setTimeout(()=>{if(e.alive)radio('the '+SECTORS[f]+' ace is up: '+a.name+' "'+a.call+'", '+a.kills+' kills. Watch yourself.')},2500)}}
+  if(camp.threat&&k==='CRUISE')message('COUNTER-ATTACK · STOP THE STRIKE OR LOSE THE SECTOR',3.5);
   message('CAMPAIGN · '+SECTORS[f].toUpperCase()+' · '+CAMP_SORTIES[k].toUpperCase(),3.2)}
 function campaignKill(g){if(mission!=='CAMPAIGN'||g.campSlot==null)return;(camp.dead[g.campSec]=camp.dead[g.campSec]||[]).push(g.campSlot);campSave()}
 function campaignAfter(){
   campNote=''; if(mission!=='CAMPAIGN'||deathCause==='abort')return; const f=camp.front, win=deathCause==='win';
   camp.sorties++; if(win)camp.wins++;
-  const hit=win?(campSortie==='STRIKE'?60:campSortie==='CRUISE'?25:40):0;
+  let hit=win?(campSortie==='STRIKE'?60:campSortie==='CRUISE'?25:40):0;
+  const intel=camp.intel&&camp.intel===campSortie; if(intel&&win)hit*=2;
+  const aceDown=campAceDown;campAceDown=false;if(aceDown){const a=campAce(f);a.alive=false;hit+=win?20:15}
+  if(camp.threat&&campSortie==='CRUISE'){camp.threat=false;if(win)hit+=20;else if(f>1){camp.front--;camp.str[camp.front]=50;camp.intel=null;campNote='The counter-attack broke through: '+SECTORS[camp.front]+' is lost.';camp.log.unshift(campNote);camp.log=camp.log.slice(0,6);campSave();return}}
+  if(!win&&deathCause!=='win'&&P&&!P.alive){const a=campAce(f);if(a.alive&&campAceKilledYou){a.kills++}}campAceKilledYou=false;
   if(win){camp.str[f]=Math.max(0,camp.str[f]-hit);campNote=SECTORS[f]+' resistance down to '+camp.str[f]+'%.';
-    if(camp.str[f]<=0){camp.front++;delete camp.dead[f];campNote=SECTORS[f]+' captured! The front moves north.';if(camp.front>=6){campNote='Falcon Plateau has fallen — campaign won in '+camp.sorties+' sorties!';camp=Object.assign(campNew(),{log:[]})}}}
+    if(intel)campNote+=' The intel paid off: double effect.';if(aceDown)campNote+=' Their ace is gone.';
+    if(camp.str[f]<=0){camp.front++;delete camp.dead[f];campNote=SECTORS[f]+' captured! The front moves north. +6,000 Silver Lions.';if(typeof prog==='object'){prog.sl+=6000;progSave()}if(camp.front>=6){campNote='Falcon Plateau has fallen — campaign won in '+camp.sorties+' sorties!';camp=Object.assign(campNew(),{log:[]})}}}
   else{camp.str[f]=Math.min(100,camp.str[f]+20);campNote='The sortie failed; '+SECTORS[f]+' reinforced to '+camp.str[f]+'%.';
     if(camp.str[f]>=100&&f>1&&Math.random()<.5){camp.front--;camp.str[camp.front]=60;campNote='The enemy counter-attacked and retook '+SECTORS[camp.front]+'.'}}
+  // what comes next: sometimes intel on a juicy target (that sortie counts double), sometimes an enemy counter-attack you must stop
+  camp.intel=null;if(!camp.threat){if(Math.random()<.22&&camp.front>2)camp.threat=true;else if(Math.random()<.45){const ks=Object.keys(CAMP_INTEL);camp.intel=ks[Math.random()*ks.length|0]}}
   camp.log.unshift(campNote); camp.log=camp.log.slice(0,6); campSave()}
+let campAceDown=false,campAceKilledYou=false;
+function campBrief(){if(!camp)return'';if(camp.threat)return'COUNTER-ATTACK: enemy cruise missiles are inbound. Fly "Defend against cruise missiles" now or lose ground.';
+  if(camp.intel)return'INTEL: '+CAMP_INTEL[camp.intel]+'. Fly "'+CAMP_SORTIES[camp.intel]+'" next for double effect.';
+  const a=camp.aces&&camp.aces[Math.min(camp.front,5)];return a&&a.alive?'The sector ace '+a.name+' "'+a.call+'" ('+a.kills+' kills) is still flying.':''}
 function renderCamp(){const el=$('campMap');if(!el)return;let h='';for(let i=5;i>=0;i--){const blue=i<camp.front,front=i===camp.front;
     h+=`<div class="cs ${blue?'cB':'cR'}${front?' cF':''}"><span>${SECTORS[i]}</span><b>${blue?'held':front?'front · '+camp.str[i]+'%':'enemy'}</b></div>`}
-  el.innerHTML=h; $('bSortie').textContent='Sortie: '+CAMP_SORTIES[campSortie]; $('campLog').textContent=camp.log[0]||'Six sectors stand between your base and the enemy capital. Push the front north.'}
+  el.innerHTML=h; $('bSortie').textContent='Sortie: '+CAMP_SORTIES[campSortie]; $('campLog').textContent=(campBrief()?campBrief()+' ':'')+(camp.log[0]||'Six sectors stand between your base and the enemy capital. Push the front north.')}
 
 /* ---------------- targeting pod (FLIR, white-hot / black-hot, two fields of view) and night-vision goggles ---------------- */
 const TGP={mode:0,fov:4,cam:new THREE.PerspectiveCamera(4,1,5,60000),rt:new THREE.WebGLRenderTarget(320,320),rect:null};

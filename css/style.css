@@ -698,3 +698,4 @@ button:disabled{opacity:.4;cursor:not-allowed}
 #ov .pt.got{opacity:.5}
 #ov .pt:disabled:not(.got){opacity:.45}
 body.tankmode #rdr,body.tankmode #cm,body.tankmode #thr{display:none}
+

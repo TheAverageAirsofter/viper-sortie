@@ -699,6 +699,7 @@ button:disabled{opacity:.4;cursor:not-allowed}
 #ov .pt.got{opacity:.5}
 #ov .pt:disabled:not(.got){opacity:.45}
 body.tankmode #rdr,body.tankmode #cm,body.tankmode #thr{display:none}
+
 </style>
 <meta name="theme-color" content="#0b1217">
 
@@ -5158,13 +5159,16 @@ function sortieCheck(dt){if(!sortie)return;const k=sortie.kind;
 /* ---------------- dynamic campaign: six sectors north of the base, a moving front, and losses that stay lost ---------------- */
 const SECTORS=['Aster Valley','Brimstone Ridge','Cobalt Lakes','Drover Gap','Ember Coast','Falcon Plateau'];
 const CAMP_SORTIES={CAP:'Combat air patrol',STRIKE:'Strike the sector HQ',CONVOY:'Hit the supply convoy',ANTISHIP:'Sink the frigate',CRUISE:'Defend against cruise missiles'};
+const CAMP_INTEL={CONVOY:'a supply convoy is moving up to the front',STRIKE:'the sector HQ has been located',ANTISHIP:'a frigate is covering the coast road',CAP:'enemy fighters are massing over the front'};
 let camp=null, campSortie='CAP', campNote='';
-function campNew(){return{front:2,str:[0,0,100,100,100,100],dead:{},sorties:0,wins:0,log:[]}}
+function campNew(){return{front:2,str:[0,0,100,100,100,100],dead:{},sorties:0,wins:0,log:[],aces:{},intel:null,threat:false}}
+// every enemy sector has a resident ace who hunts you there; he keeps his tally between sorties
+function campAce(f){camp.aces=camp.aces||{};let a=camp.aces[f];if(!a){const p=pilotFor('SU27');a=camp.aces[f]={name:p.name.replace(/^\S+/,'Maj.'),call:ACE_CALLS[(f*5+3)%ACE_CALLS.length],kills:6+f*2+(Math.random()*4|0),alive:true}}return a}
 function campLoad(){try{const c=JSON.parse(localStorage.getItem('vsCampaign')||'null');if(c&&c.str)return c}catch(e){}return campNew()}
 function campSave(){try{localStorage.setItem('vsCampaign',JSON.stringify(camp))}catch(e){}}
 camp=campLoad(); try{campSortie=localStorage.getItem('vsCampSortie')||'CAP'}catch(e){}
 const secZ=i=>8000+i*14000;
-function setupCampaign(){
+function setupCampaign(){campAceDown=false;campAceKilledYou=false;
   const f=Math.min(camp.front,5), cz=secZ(f), cx=rand(-5000,5000); P.pos.set(0,6000,Math.max(0,cz-34000)); P.vel.set(0,0,240);
   const k=campSortie;
   if(k==='CAP'){setupCAP(cz,f>=4?6:4)}
@@ -5175,20 +5179,35 @@ function setupCampaign(){
   else if(k==='ANTISHIP'){setupShip();spawnPair(pickBanditType(),new V3(19600,7000,36000),new V3(0,5000,0))}
   else if(k==='CRUISE'){P.pos.set(0,5000,6000);setupCruise()}
   if(f>=3)spawnGround('sam',cx+rand(-6000,6000),cz-9000);   // deeper sectors are better defended
+  {const a=campAce(f);if(a.alive&&k!=='CRUISE'&&Math.random()<(k==='CAP'?.75:.45)){const t=pickBanditType(),c=new V3(cx+rand(-4000,4000),7500,cz+rand(14000,20000));
+    const e=spawnFighter('red',t,c,new V3(0,6000,0),{});e.pilot={tier:'ACE',ace:true,name:a.name,call:a.call,kills:a.kills,campAce:f};e.sk=DIFF.ACE;e.gLim=AC_DEFS[t].gmax;
+    setTimeout(()=>{if(e.alive)radio('the '+SECTORS[f]+' ace is up: '+a.name+' "'+a.call+'", '+a.kills+' kills. Watch yourself.')},2500)}}
+  if(camp.threat&&k==='CRUISE')message('COUNTER-ATTACK · STOP THE STRIKE OR LOSE THE SECTOR',3.5);
   message('CAMPAIGN · '+SECTORS[f].toUpperCase()+' · '+CAMP_SORTIES[k].toUpperCase(),3.2)}
 function campaignKill(g){if(mission!=='CAMPAIGN'||g.campSlot==null)return;(camp.dead[g.campSec]=camp.dead[g.campSec]||[]).push(g.campSlot);campSave()}
 function campaignAfter(){
   campNote=''; if(mission!=='CAMPAIGN'||deathCause==='abort')return; const f=camp.front, win=deathCause==='win';
   camp.sorties++; if(win)camp.wins++;
-  const hit=win?(campSortie==='STRIKE'?60:campSortie==='CRUISE'?25:40):0;
+  let hit=win?(campSortie==='STRIKE'?60:campSortie==='CRUISE'?25:40):0;
+  const intel=camp.intel&&camp.intel===campSortie; if(intel&&win)hit*=2;
+  const aceDown=campAceDown;campAceDown=false;if(aceDown){const a=campAce(f);a.alive=false;hit+=win?20:15}
+  if(camp.threat&&campSortie==='CRUISE'){camp.threat=false;if(win)hit+=20;else if(f>1){camp.front--;camp.str[camp.front]=50;camp.intel=null;campNote='The counter-attack broke through: '+SECTORS[camp.front]+' is lost.';camp.log.unshift(campNote);camp.log=camp.log.slice(0,6);campSave();return}}
+  if(!win&&deathCause!=='win'&&P&&!P.alive){const a=campAce(f);if(a.alive&&campAceKilledYou){a.kills++}}campAceKilledYou=false;
   if(win){camp.str[f]=Math.max(0,camp.str[f]-hit);campNote=SECTORS[f]+' resistance down to '+camp.str[f]+'%.';
-    if(camp.str[f]<=0){camp.front++;delete camp.dead[f];campNote=SECTORS[f]+' captured! The front moves north.';if(camp.front>=6){campNote='Falcon Plateau has fallen — campaign won in '+camp.sorties+' sorties!';camp=Object.assign(campNew(),{log:[]})}}}
+    if(intel)campNote+=' The intel paid off: double effect.';if(aceDown)campNote+=' Their ace is gone.';
+    if(camp.str[f]<=0){camp.front++;delete camp.dead[f];campNote=SECTORS[f]+' captured! The front moves north. +6,000 Silver Lions.';if(typeof prog==='object'){prog.sl+=6000;progSave()}if(camp.front>=6){campNote='Falcon Plateau has fallen — campaign won in '+camp.sorties+' sorties!';camp=Object.assign(campNew(),{log:[]})}}}
   else{camp.str[f]=Math.min(100,camp.str[f]+20);campNote='The sortie failed; '+SECTORS[f]+' reinforced to '+camp.str[f]+'%.';
     if(camp.str[f]>=100&&f>1&&Math.random()<.5){camp.front--;camp.str[camp.front]=60;campNote='The enemy counter-attacked and retook '+SECTORS[camp.front]+'.'}}
+  // what comes next: sometimes intel on a juicy target (that sortie counts double), sometimes an enemy counter-attack you must stop
+  camp.intel=null;if(!camp.threat){if(Math.random()<.22&&camp.front>2)camp.threat=true;else if(Math.random()<.45){const ks=Object.keys(CAMP_INTEL);camp.intel=ks[Math.random()*ks.length|0]}}
   camp.log.unshift(campNote); camp.log=camp.log.slice(0,6); campSave()}
+let campAceDown=false,campAceKilledYou=false;
+function campBrief(){if(!camp)return'';if(camp.threat)return'COUNTER-ATTACK: enemy cruise missiles are inbound. Fly "Defend against cruise missiles" now or lose ground.';
+  if(camp.intel)return'INTEL: '+CAMP_INTEL[camp.intel]+'. Fly "'+CAMP_SORTIES[camp.intel]+'" next for double effect.';
+  const a=camp.aces&&camp.aces[Math.min(camp.front,5)];return a&&a.alive?'The sector ace '+a.name+' "'+a.call+'" ('+a.kills+' kills) is still flying.':''}
 function renderCamp(){const el=$('campMap');if(!el)return;let h='';for(let i=5;i>=0;i--){const blue=i<camp.front,front=i===camp.front;
     h+=`<div class="cs ${blue?'cB':'cR'}${front?' cF':''}"><span>${SECTORS[i]}</span><b>${blue?'held':front?'front · '+camp.str[i]+'%':'enemy'}</b></div>`}
-  el.innerHTML=h; $('bSortie').textContent='Sortie: '+CAMP_SORTIES[campSortie]; $('campLog').textContent=camp.log[0]||'Six sectors stand between your base and the enemy capital. Push the front north.'}
+  el.innerHTML=h; $('bSortie').textContent='Sortie: '+CAMP_SORTIES[campSortie]; $('campLog').textContent=(campBrief()?campBrief()+' ':'')+(camp.log[0]||'Six sectors stand between your base and the enemy capital. Push the front north.')}
 
 /* ---------------- targeting pod (FLIR, white-hot / black-hot, two fields of view) and night-vision goggles ---------------- */
 const TGP={mode:0,fov:4,cam:new THREE.PerspectiveCamera(4,1,5,60000),rt:new THREE.WebGLRenderTarget(320,320),rect:null};
@@ -5733,6 +5752,7 @@ function killEnemy(e,how,byPlayer=true){
   const nm=e.kind==='bomber'?'BOMBER':e.kind==='cruise'?'CRUISE MISSILE':'BANDIT';
   if(byPlayer)REC3.lastKill={t:clock,id:e.id};
   if(byPlayer&&how==='GUNS'&&e.kind==='fighter')startGunCam(e);
+  if(e.pilot&&e.pilot.campAce!=null)campAceDown=true;
   if(byPlayer&&e.pilot&&e.pilot.ace){score+=300;scEvent('ACE KILLED · '+e.pilot.call.toUpperCase(),300,'bonus');radio('splash the ace! '+e.pilot.call+' is down.')}
   if(byPlayer)gciSplash();
   if(!byPlayer&&e.hitBy&&clock-e.hitBy<12)scEvent('ASSIST',40,'bonus');
@@ -5799,6 +5819,7 @@ function updateMission(dt){
   // ONLINE: free-for-all until you're shot down or abort
 }
 function die(cause){
+  if(state==='play'&&mission==='CAMPAIGN'&&enemies.some(x=>x.alive&&x.pilot&&x.pilot.campAce!=null&&x.pos.distanceTo(P.pos)<6000))campAceKilledYou=true;
   if(state!=='play')return; state='dead'; deathCause=cause; REC3.deathT=clock; if(mission==='ONLINE'&&NET.active)NET.deaths++; deadT=1.8; P.alive=false; missionDone=true; recEvent('You were '+({terrain:'killed hitting the ground',shot:'shot down by guns',missile:'killed by a missile',ejected:'out of the jet (ejected)',collision:'killed in a mid-air collision',landing:'killed crashing on landing',gearup:'killed landing gear-up',abort:'out (sortie aborted)',fuel:'down after running out of fuel'}[cause]||'down'));
   CM.flrHeld=CM.chfHeld=false; if(isBT())btDied(); if(cause==='ejected'){deadT=7;playerJet.visible=false;$('ctrls').hidden=true;resetStick();gunHeld=false;brake=false;$('bEject').hidden=true;return}
   explode(P.pos,true); explode(P.pos.clone().addScaledVector(P.fwd,10),true);
@@ -8820,7 +8841,7 @@ if(/[?&]test\b/.test(location.search))window.__vs={dmgFrom,hitMark,get KC(){retu
   target:(type,dz,away,speed)=>{const e=spawnFighter('red',type,new V3(0,P.pos.y,dz),new V3(0,P.pos.y,dz+(away?9999:-9999)),{ir:0,rdr:0,speed:speed||220});e.drone=true;return e.id},
   lock:()=>{if(enemies[0])lockOn(enemies[0])},fire:w=>{if(w==='9X')fire9=true;else fire120=true},gun:on=>{gunHeld=on},
   missiles:()=>missiles.filter(m=>m.on),
-  st:()=>{const e=enemies[0];return{can9,can120,aim9:P.aim9,aim120:P.aim120,rounds:P.rounds,alive:!!(e&&e.alive),hp:e?e.hp:0,msl:missiles.filter(m=>m.on).length,stt:!!R.stt,sttAcq:R.acqT,d:e?e.pos.distanceTo(P.pos):0,msg:$('msg')?$('msg').textContent:''}}},mslGeoFor,MSL_MAT,HG,M2dims:()=>{const o={};for(const id in M2){const S=M2[id],zs=S.fus.map(f=>f[0]).concat(S.noz.map(n=>n[2]-n[4]/2)),L=Math.max(...zs)-Math.min(...zs),sp=2*Math.max(...S.wings.flatMap(w=>w.st.map(q=>q.x)));const k=M2K[id]||[1,1,1];o[id]=[+(L*k[2]).toFixed(2),+(sp*k[0]).toFixed(2)]}return o},ROSTER_IDS,restart:()=>startGame(),spawnAll:()=>{let n=0;for(const id of FIGHTERS){spawnFighter('red',id,P.pos.clone().add(new V3(rand(-4000,4000),rand(-300,300),rand(8000,14000))),P.pos);n++}return n},tableRows:id=>({gear:!!GEAR_SPEC[id],snd:!!ENG_SND[id],hp:!!JET_HP[id],rcs:RCS[id]!=null,paint:!!PAINT[id]||!!(AC_DEFS[id].model),band:!!BANDITS[id],fighter:FIGHTERS.indexOf(id)>=0}),get preset(){return preset},PRESETS,get daily(){return daily},dailyAdd,endTest:o=>{deathCause=o.cause||'win';score=o.score||0;kills=o.kills||0;missionT=o.t||90;P.alive=o.alive!==false;P.rescued=!!o.rescued;state='over';careerAward();showOverlay('over')},get AC(){return AC}};
+  st:()=>{const e=enemies[0];return{can9,can120,aim9:P.aim9,aim120:P.aim120,rounds:P.rounds,alive:!!(e&&e.alive),hp:e?e.hp:0,msl:missiles.filter(m=>m.on).length,stt:!!R.stt,sttAcq:R.acqT,d:e?e.pos.distanceTo(P.pos):0,msg:$('msg')?$('msg').textContent:''}}},mslGeoFor,MSL_MAT,HG,M2dims:()=>{const o={};for(const id in M2){const S=M2[id],zs=S.fus.map(f=>f[0]).concat(S.noz.map(n=>n[2]-n[4]/2)),L=Math.max(...zs)-Math.min(...zs),sp=2*Math.max(...S.wings.flatMap(w=>w.st.map(q=>q.x)));const k=M2K[id]||[1,1,1];o[id]=[+(L*k[2]).toFixed(2),+(sp*k[0]).toFixed(2)]}return o},ROSTER_IDS,restart:()=>startGame(),spawnAll:()=>{let n=0;for(const id of FIGHTERS){spawnFighter('red',id,P.pos.clone().add(new V3(rand(-4000,4000),rand(-300,300),rand(8000,14000))),P.pos);n++}return n},tableRows:id=>({gear:!!GEAR_SPEC[id],snd:!!ENG_SND[id],hp:!!JET_HP[id],rcs:RCS[id]!=null,paint:!!PAINT[id]||!!(AC_DEFS[id].model),band:!!BANDITS[id],fighter:FIGHTERS.indexOf(id)>=0}),get preset(){return preset},PRESETS,get daily(){return daily},dailyAdd,endTest:o=>{deathCause=o.cause||'win';score=o.score||0;kills=o.kills||0;missionT=o.t||90;P.alive=o.alive!==false;P.rescued=!!o.rescued;state='over';campaignAfter();careerAward();showOverlay('over')},get AC(){return AC}};
 
 // Android app: tell the player when a newer release is on GitHub. Every build is signed with the same key, so the new APK installs over this one.
 (function(){const cap=window.Capacitor;if(!cap||!(cap.isNativePlatform?cap.isNativePlatform():cap.getPlatform&&cap.getPlatform()!=='web'))return;
@@ -9369,7 +9390,7 @@ function campMapSvg(){if(typeof camp!=='object'||!camp)return;const S=SECTORS;le
   h+='<text x="14" y="228" fill="#fff" opacity=".6" font-size="8" letter-spacing="2" font-family="inherit">HOME BASE</text><text x="386" y="20" text-anchor="end" fill="#fff" opacity=".6" font-size="8" letter-spacing="2" font-family="inherit">ENEMY CAPITAL</text>';
   $('opSvg').innerHTML=h;
   const f=Math.min(camp.front,5);$('cpSec').textContent='Sector '+(f+1)+' of 6 · front line';$('cpName').textContent=SECTORS[f];
-  $('cpKv').innerHTML=kvs([['Resistance',camp.str[f]+'%'],['Sortie',CAMP_SORTIES[campSortie]],['Sorties flown',camp.sorties],['Wins',camp.wins]])}
+  const ace=camp.aces&&camp.aces[f];$('cpKv').innerHTML=kvs([['Resistance',camp.str[f]+'%'],['Sortie',CAMP_SORTIES[campSortie]],['Sector ace',ace?(ace.alive?'"'+ace.call+'" · '+ace.kills+' kills':'shot down'):'unknown'],['Record',camp.sorties+' flown · '+camp.wins+' won']])}
 
 /* ---- keep everything in step with the game ---- */
 const hgBgWant=()=>{const k=ovEl.dataset.kind;return !ovEl.hidden&&(k==='menu'||k==='over')&&(state==='menu'||state==='over')};
